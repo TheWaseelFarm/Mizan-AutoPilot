@@ -10,6 +10,7 @@
     --ink:#E6ECF7;--muted:#8D9AB4;--faint:#5C6b86;--gold:#D9B450;--gold-soft:rgba(217,180,80,.14);
     --clean:#3ECB86;--purify:#F3B24A;--fail:#F0625A;
     --clean-soft:rgba(62,203,134,.14);--purify-soft:rgba(243,178,74,.14);--fail-soft:rgba(240,98,90,.14);
+    --slate:#93A0B8;--slate-soft:rgba(147,160,184,.14);
     --shadow:0 18px 44px rgba(0,0,0,.5);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -146,6 +147,15 @@
   .loading{padding:40px 16px;text-align:center;color:var(--faint);font-size:13px;}
   .empty{margin:0 14px;padding:30px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line-2);border-radius:20px;font-size:13px;}
 
+  /* ---- Unscreened (no screening data — grey, never a verdict color) ---- */
+  .b-unscreened{background:linear-gradient(90deg,#5b6b90,#8391b0);}
+  .dot.u{background:var(--slate);}
+  .card.unscreened::before{background:var(--slate);}
+  .badge.unscreened{color:#B7C1D6;background:var(--slate-soft);}
+  .seg.active.unscreened{color:#0A0F1C;background:var(--slate);border-color:var(--slate);}
+  .vchip.unscreened{color:#B7C1D6;background:var(--slate-soft);}
+  .unscreened-note{padding:14px 16px 16px;color:var(--muted);font-size:13px;line-height:1.55;}
+
   /* ---- Discover / Follow ---- */
   .seg-h{display:flex;gap:8px;margin:2px 0 16px;}
   .seg-h button{flex:1;padding:10px 6px;border-radius:12px;border:1px solid var(--line-2);background:var(--surface);color:var(--muted);font-size:12.5px;font-weight:750;cursor:pointer;}
@@ -203,7 +213,10 @@ function classifyFB(rec = {}) {
   if (business === "pass" && impure === 0 && debt <= FB.debtAdvisory) return "clean";
   return "purify"; // non-zero impure income (<=5%), business "watch", or debt over advisory
 }
-const VSHORT = { clean:"Clean", purify:"Purify", fail:"Fail" };
+// Display label. Rows with no screening data are shown as "unscreened" (a UI/data
+// truth-label, NOT a verdict category) — classifyFB itself is never changed for this.
+const labelOf = t => t.screened === false ? "unscreened" : classifyFB(t);
+const VSHORT = { clean:"Clean", purify:"Purify", fail:"Fail", unscreened:"Unscreened" };
 
 /* ---------- sample data (used only if /api/feed is unavailable) ---------- */
 const SAMPLE = [
@@ -213,6 +226,7 @@ const SAMPLE = [
   {id:4,actor:"Public Official Filing",kind:"Congress",initials:"PO",source:"House PTR",side:"SELL",ticker:"XOM",company:"Exxon Mobil Corp.",amount:"$15K–$50K",transactionDate:"Jun 02, 2026",filingDate:"Jun 17, 2026",businessStatus:"pass",business:"Energy production",impurePct:0,debtRatio:52,reasoning:"Permissible energy business, no impure income. Debt is above the advisory reference — but debt is advisory only under Framework B, so it stays Purify-at-sale, not Fail."},
   {id:5,actor:"Northstar Quant Partners",kind:"13F Fund",initials:"NQ",source:"13F-HR",side:"BUY",ticker:"MSFT",company:"Microsoft Corp.",amount:"$100K–$250K",transactionDate:"Jun 10, 2026",filingDate:"Jun 20, 2026",businessStatus:"pass",business:"Software & cloud infrastructure",impurePct:0,debtRatio:11,reasoning:"Permissible software business with no impure income and modest debt. Clean."},
   {id:6,actor:"Corporate Insider Filing",kind:"Insider",initials:"IN",source:"Form 4",side:"SELL",ticker:"TSLA",company:"Tesla, Inc.",amount:"$250K–$500K",transactionDate:"Jun 09, 2026",filingDate:"Jun 12, 2026",businessStatus:"pass",business:"Electric vehicles & energy",impurePct:2.1,debtRatio:8,reasoning:"Permissible business; a small non-operating income slice keeps it at Purify-at-sale."},
+  {id:7,actor:"Public Official Filing",kind:"Congress",initials:"PO",source:"Senate PTR",side:"BUY",ticker:"UBS",company:"UBS Group AG",amount:"$1K–$15K",transactionDate:"Jun 08, 2026",filingDate:"Jun 18, 2026",screened:false,business:"Unscreened",businessStatus:"watch",impurePct:0,debtRatio:0,reasoning:"No screening data available for this ticker — flagged for manual review.",purification:"$0.00"},
 ];
 
 const isFund = t => (t.kind||"").toLowerCase().includes("fund");
@@ -239,10 +253,13 @@ function deriveSources(trades){
   const map = new Map();
   for (const t of (trades||[])) {
     const key = t.actor || "Unknown source";
-    if (!map.has(key)) map.set(key, {name:key, kind:t.kind, initials:t.initials||"·", fund:isFund(t), group:sourceGroup(t.kind), clean:0, purify:0, fail:0, count:0, latest:null});
+    if (!map.has(key)) map.set(key, {name:key, kind:t.kind, initials:t.initials||"·", fund:isFund(t), group:sourceGroup(t.kind), clean:0, purify:0, fail:0, unscreened:0, count:0, latest:null});
     const s = map.get(key);
     s.count++;
-    if (t.label==="clean") s.clean++; else if (t.label==="fail") s.fail++; else s.purify++;
+    if (t.label==="clean") s.clean++;
+    else if (t.label==="fail") s.fail++;
+    else if (t.label==="purify") s.purify++;
+    else s.unscreened++; // unscreened/unknown must NOT inflate the Purify mix
     const d = Date.parse(t.filingDate || t.transactionDate || "");
     if (!Number.isNaN(d) && (s.latest===null || d>s.latest)) s.latest = d;
   }
@@ -259,6 +276,7 @@ function Balance({trades}){
   const c = trades.filter(t=>t.label==="clean").length;
   const p = trades.filter(t=>t.label==="purify").length;
   const f = trades.filter(t=>t.label==="fail").length;
+  const u = trades.filter(t=>t.label==="unscreened").length;
   const w = n => (n/total*100);
   return html`
     <div class="hero">
@@ -269,12 +287,14 @@ function Balance({trades}){
           <i class="b-clean" style=${{width:w(c)+"%"}}></i>
           <i class="b-purify" style=${{width:w(p)+"%"}}></i>
           <i class="b-fail" style=${{width:w(f)+"%"}}></i>
+          <i class="b-unscreened" style=${{width:w(u)+"%"}}></i>
           <span class="fulcrum"></span>
         </div>
         <div class="legend">
           <div><span class="dot c"></span><b>${c}</b> Clean</div>
           <div><span class="dot p"></span><b>${p}</b> Purify</div>
           <div><span class="dot f"></span><b>${f}</b> Fail</div>
+          ${u>0 && html`<div><span class="dot u"></span><b>${u}</b> Unscreened</div>`}
         </div>
       </div>
     </div>`;
@@ -324,6 +344,12 @@ function Detail({t,onClose}){
           <span class="sep">·</span><span>trade ${t.transactionDate||"—"}</span>
         </div>
 
+        ${t.screened===false ? html`
+        <div class="sect">
+          <div class="sect-h"><h3>Screening</h3><em>Manual review</em></div>
+          <div class="row first"><small>Status</small><span class="vchip unscreened">Unscreened</span></div>
+          <div class="unscreened-note">This security has not yet been screened. Treat it as requiring manual review — do not assume it is compliant.</div>
+        </div>` : html`
         <div class="sect">
           <div class="sect-h"><h3>Sharia verdict</h3><em>Framework B · Hanbali</em></div>
           <div class="row first"><small>Business activity</small><span class=${"vchip "+bizS}>${bizText}</span></div>
@@ -336,7 +362,7 @@ function Detail({t,onClose}){
             <div class="meter"><i class="adv" style=${{width:debtW+"%"}}></i></div>
           </div>
           <div class="why">${t.reasoning||"—"}</div>
-        </div>
+        </div>`}
 
         <div class="sect">
           <div class="sect-h"><h3>Disclosure</h3></div>
@@ -546,9 +572,9 @@ function App(){
       .then(r=>r.ok?r.json():Promise.reject())
       .then(data=>{
         const rows = Array.isArray(data)?data:(data&&data.disclosures)||[];
-        if(alive) setTrades((rows.length?rows:SAMPLE).map(t=>({...t,label:classifyFB(t)})));
+        if(alive) setTrades((rows.length?rows:SAMPLE).map(t=>({...t,label:labelOf(t)})));
       })
-      .catch(()=>{ if(alive) setTrades(SAMPLE.map(t=>({...t,label:classifyFB(t)}))); });
+      .catch(()=>{ if(alive) setTrades(SAMPLE.map(t=>({...t,label:labelOf(t)}))); });
     return ()=>{alive=false;};
   },[]);
 
@@ -613,7 +639,7 @@ function App(){
         ${!loaded ? html`<div class="loading">Loading disclosures…</div>` : html`
           <${Balance} trades=${all} />
           <div class="segment">
-            ${[["all","All"],["clean","Clean"],["purify","Purify"],["fail","Fail"]].map(s=>html`
+            ${[["all","All"],["clean","Clean"],["purify","Purify"],["fail","Fail"],["unscreened","Unscreened"]].map(s=>html`
               <button key=${s[0]} class=${"seg "+s[0]+" "+(filter===s[0]?"active":"")} onClick=${()=>setFilter(s[0])}>
                 ${s[0]!=="all" && html`<span class=${"dot "+s[0][0]}></span>`}${s[1]}
               </button>`)}
