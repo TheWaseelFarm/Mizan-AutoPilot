@@ -1,5 +1,7 @@
 # Mizān — Step 1 (foundation)
 
+**Live dashboard:** https://mizan-auto-pilot.vercel.app
+
 Sharia-aware **disclosure intelligence & alerting**. Monitors expert / institutional
 trade disclosures and attaches a Framework B (Hanbali) Sharia verdict to every security
 before it reaches your feed.
@@ -54,7 +56,8 @@ Copy the printed hash.
 `AUTH_SALT` (same salt as step 3), `AUTH_SECRET`, `CRON_SECRET`. Leave `QUIVER_API_KEY`
 and `SCREENING_API_KEY` blank for now. Deploy.
 
-**5. Open your Vercel URL.** The feed loads from Supabase (the seed). Done — it's live.
+**5. Open your Vercel URL** (https://mizan-auto-pilot.vercel.app). The feed loads from
+Supabase (the seed). Done — it's live.
 
 **6. Cron** → on cron-job.org add a job hitting, every 5 minutes:
 ```
