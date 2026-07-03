@@ -36,6 +36,7 @@ export default async function handler(req, res) {
       const s = await screen(d.ticker);           // raw screening inputs
       const rec = { ...d, ...s };
       rec.label = classifyFB(rec);                 // Framework B verdict
+     if (incoming.indexOf(d) === 0) return res.status(200).json({ debugRow: toRow(rec) });
       const { data, error } = await db
         .from("disclosures")
         .upsert(toRow(rec), { onConflict: "dedupe_key", ignoreDuplicates: true })
