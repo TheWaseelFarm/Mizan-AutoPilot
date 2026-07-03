@@ -40,7 +40,8 @@ export default async function handler(req, res) {
         .from("disclosures")
         .upsert(toRow(rec), { onConflict: "dedupe_key", ignoreDuplicates: true })
         .select("id");
-      if (!error && data && data.length) inserted++;
+  if (error) return res.status(200).json({ ok: false, stage: "insert", error: error.message, sampleRow: toRow(rec) });
+      if (data && data.length) inserted++;
       // TODO (next step): if inserted, queue a push notification in alerts_sent.
     }
     return res.status(200).json({ ok: true, checked: incoming.length, inserted });
