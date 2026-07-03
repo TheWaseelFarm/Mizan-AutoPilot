@@ -36,13 +36,12 @@ export default async function handler(req, res) {
       const s = await screen(d.ticker);           // raw screening inputs
       const rec = { ...d, ...s };
       rec.label = classifyFB(rec);                 // Framework B verdict
-     if (incoming.indexOf(d) === 0) return res.status(200).json({ debugRow: toRow(rec) });
+
       const { data, error } = await db
         .from("disclosures")
         .upsert(toRow(rec), { onConflict: "dedupe_key", ignoreDuplicates: true })
         .select("id");
-  if (error) return res.status(200).json({ ok: false, stage: "insert", error: error.message, sampleRow: toRow(rec) });
-      if (data && data.length) inserted++;
+if (!error && data && data.length) inserted++;
       // TODO (next step): if inserted, queue a push notification in alerts_sent.
     }
     return res.status(200).json({ ok: true, checked: incoming.length, inserted });
