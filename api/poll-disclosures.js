@@ -3,7 +3,7 @@
 // De-dupes on a unique key so re-runs are idempotent.
 import { supabase } from "./_lib/supabase.js";
 import { classifyFB } from "./_lib/frameworkB.js";
-import { fetchNewDisclosures } from "./_lib/sources/mock.js";   // -> ./sources/quiver.js later
+   import { fetchNewDisclosures } from "./_lib/sources/housewatcher.js";  // -> ./sources/quiver.js later
 import { screen } from "./_lib/screening/mock.js";              // -> ./screening/zoya.js later
 
 function dedupeKey(r) {
