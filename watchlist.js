@@ -1,18 +1,172 @@
-// api/_lib/screening/zoya.js — REAL Sharia-screening source.
-// IMPORTANT: consume the RAW inputs (business activity, impure-income %, debt ratio)
-// and let api/_lib/frameworkB.js decide the verdict. Do NOT use a vendor's own
-// pass/fail — Framework B treats debt as advisory, unlike AAOIFI-style screens.
-export async function screen(ticker) {
-  const key = process.env.SCREENING_API_KEY;
-  if (!key) throw new Error("SCREENING_API_KEY not set");
-  // const data = await fetchZoya(ticker, key);
-  // return {
-  //   business: data.businessDescription,
-  //   businessStatus: data.compliantActivities ? "pass" : "fail",
-  //   impurePct: data.nonCompliantRevenuePercent,   // raw % of revenue
-  //   debtRatio: data.debtToMarketCapPercent,        // advisory only
-  //   reasoning: data.summary,
-  //   purification: null
-  // };
-  throw new Error("Zoya adapter not implemented yet — using mock screening for now.");
+// api/_lib/sources/mock.js
+// Mock disclosure source — lets the whole pipeline run today with no paid API.
+// Swap for ./quiver.js once you have a Quiver key. Same return shape.
+const POOL = [
+  {
+    "actor": "Renaissance Technologies",
+    "kind": "13F Fund",
+    "initials": "RT",
+    "source": "13F-HR",
+    "side": "BUY",
+    "ticker": "NVDA",
+    "company": "NVIDIA Corp.",
+    "sector": "Semiconductors",
+    "amount": "$15,001–$50,000",
+    "amountMid": 32500,
+    "shares": 235,
+    "sharesLabel": "Estimated from midpoint",
+    "transactionDate": "Jun 17, 2026",
+    "filingDate": "Jun 25, 2026",
+    "purchasePrice": 138.1,
+    "fallbackPrice": 151.42,
+    "alert": "New Clean BUY in AI infrastructure",
+    "confidence": "High"
+  },
+  {
+    "actor": "Berkshire Crest Fund",
+    "kind": "13F Fund",
+    "initials": "BC",
+    "source": "13F-HR",
+    "side": "BUY",
+    "ticker": "GOOGL",
+    "company": "Alphabet Inc. Class A",
+    "sector": "Communication services",
+    "amount": "128,450 shares",
+    "amountMid": 22300000,
+    "shares": 128450,
+    "sharesLabel": "Reported in 13F",
+    "transactionDate": "May 30, 2026",
+    "filingDate": "Jun 24, 2026",
+    "purchasePrice": 173.6,
+    "fallbackPrice": 184.88,
+    "alert": "Purify-at-sale BUY by fund",
+    "confidence": "Medium"
+  },
+  {
+    "actor": "Global Value Fund",
+    "kind": "13F Fund",
+    "initials": "GV",
+    "source": "13F-HR",
+    "side": "SELL",
+    "ticker": "JPM",
+    "company": "JPMorgan Chase & Co.",
+    "sector": "Conventional banking",
+    "amount": "$50,001–$100,000",
+    "amountMid": 75000,
+    "shares": 347,
+    "sharesLabel": "Estimated from midpoint",
+    "transactionDate": "Jun 11, 2026",
+    "filingDate": "Jun 23, 2026",
+    "purchasePrice": 216.25,
+    "fallbackPrice": 209.14,
+    "alert": "Excluded security appeared in filing",
+    "confidence": "High"
+  },
+  {
+    "actor": "Top Growth Fund",
+    "kind": "13F Fund",
+    "initials": "TG",
+    "source": "13F-HR",
+    "side": "BUY",
+    "ticker": "COST",
+    "company": "Costco Wholesale Corp.",
+    "sector": "Consumer staples",
+    "amount": "$1,001–$15,000",
+    "amountMid": 8000,
+    "shares": 9,
+    "sharesLabel": "Estimated from midpoint",
+    "transactionDate": "Jun 09, 2026",
+    "filingDate": "Jun 22, 2026",
+    "purchasePrice": 903.5,
+    "fallbackPrice": 928.76,
+    "alert": "Small BUY requiring purification",
+    "confidence": "Medium"
+  },
+  {
+    "actor": "Northstar Quant Partners",
+    "kind": "13F Fund",
+    "initials": "NQ",
+    "source": "13F-HR/A",
+    "side": "SELL",
+    "ticker": "MSFT",
+    "company": "Microsoft Corp.",
+    "sector": "Software/cloud",
+    "amount": "43,200 shares",
+    "amountMid": 19200000,
+    "shares": 43200,
+    "sharesLabel": "Reported in 13F",
+    "transactionDate": "May 29, 2026",
+    "filingDate": "Jun 21, 2026",
+    "purchasePrice": 444.2,
+    "fallbackPrice": 467.15,
+    "alert": "Purify-at-sale SELL by institutional fund",
+    "confidence": "High"
+  },
+  {
+    "actor": "Public Official Filing",
+    "kind": "Congress",
+    "initials": "PO",
+    "source": "Senate PTR",
+    "side": "BUY",
+    "ticker": "BAC",
+    "company": "Bank of America Corp.",
+    "sector": "Conventional banking",
+    "amount": "$1,001–$15,000",
+    "amountMid": 8000,
+    "shares": 29,
+    "sharesLabel": "Estimated from midpoint",
+    "transactionDate": "Jun 06, 2026",
+    "filingDate": "Jun 19, 2026",
+    "purchasePrice": 274.6,
+    "fallbackPrice": 268.33,
+    "alert": "Fail BUY detected",
+    "confidence": "High"
+  },
+  {
+    "actor": "Crescent Lake Capital",
+    "kind": "13F Fund",
+    "initials": "CL",
+    "source": "13F-HR",
+    "side": "BUY",
+    "ticker": "META",
+    "company": "Meta Platforms Inc.",
+    "sector": "Digital advertising",
+    "amount": "18,900 shares",
+    "amountMid": 11800000,
+    "shares": 18900,
+    "sharesLabel": "Reported in 13F",
+    "transactionDate": "Jun 03, 2026",
+    "filingDate": "Jun 18, 2026",
+    "purchasePrice": 625.7,
+    "fallbackPrice": 642.8,
+    "alert": "Fund added Purify-at-sale name",
+    "confidence": "Medium"
+  },
+  {
+    "actor": "Public Official Filing",
+    "kind": "Congress",
+    "initials": "PO",
+    "source": "House PTR",
+    "side": "SELL",
+    "ticker": "XOM",
+    "company": "Exxon Mobil Corp.",
+    "sector": "Energy",
+    "amount": "$15,001–$50,000",
+    "amountMid": 32500,
+    "shares": 282,
+    "sharesLabel": "Estimated from midpoint",
+    "transactionDate": "Jun 02, 2026",
+    "filingDate": "Jun 17, 2026",
+    "purchasePrice": 115.1,
+    "fallbackPrice": 111.92,
+    "alert": "Purify-at-sale — advisory debt, not a Fail",
+    "confidence": "High"
+  }
+];
+
+export async function fetchNewDisclosures() {
+  // A real source would query by date/watchlist and return only fresh filings.
+  // The pipeline de-dupes on a unique key, so returning the full pool is safe:
+  // first poll inserts all, later polls insert 0.
+  return POOL;
 }
