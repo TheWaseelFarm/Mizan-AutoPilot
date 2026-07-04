@@ -32,11 +32,12 @@ export default async function handler(req, res) {
     });
     const batch = ordered.slice(0, MAX_TICKERS);
 
-    let done = 0, failed = 0;
+    let done = 0, noData = 0, errored = 0;
+    const sampleErrors = [];
     for (const ticker of batch) {
       try {
         const p = await fetchPrice(ticker);
-        if (!p) { failed++; continue; } // no data — leave cache untouched (UI shows "Price pending")
+        if (!p) { noData++; continue; } // genuinely no data — leave cache untouched
         const { error } = await db.from("prices").upsert(
           { ticker, history: p.history, quote: p.quote, updated_at: new Date().toISOString() },
           { onConflict: "ticker" }
@@ -44,11 +45,19 @@ export default async function handler(req, res) {
         if (error) throw error;
         done++;
       } catch (e) {
-        failed++;
+        errored++;
+        if (sampleErrors.length < 3) sampleErrors.push(`${ticker}: ${e.message}`.slice(0, 300));
       }
     }
 
-    return res.status(200).json({ done, failed, remaining: Math.max(0, ordered.length - batch.length) });
+    return res.status(200).json({
+      done,
+      failed: noData + errored,
+      noData,
+      errored,
+      remaining: Math.max(0, ordered.length - batch.length),
+      sampleErrors, // first few real FMP error messages, for diagnosis
+    });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
