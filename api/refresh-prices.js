@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     });
     const batch = ordered.slice(0, MAX_TICKERS);
 
-    let done = 0, noData = 0, errored = 0;
+    let done = 0, noData = 0, errored = 0, rateLimited = false;
     const sampleErrors = [];
     for (const ticker of batch) {
       try {
@@ -45,6 +45,11 @@ export default async function handler(req, res) {
         if (error) throw error;
         done++;
       } catch (e) {
+        if (e.code === "RATE_LIMIT") { // FMP daily quota spent — stop hammering
+          rateLimited = true;
+          sampleErrors.push(`${ticker}: ${e.message}`.slice(0, 200));
+          break;
+        }
         errored++;
         if (sampleErrors.length < 3) sampleErrors.push(`${ticker}: ${e.message}`.slice(0, 300));
       }
@@ -55,8 +60,14 @@ export default async function handler(req, res) {
       failed: noData + errored,
       noData,
       errored,
+      rateLimited,
       remaining: Math.max(0, ordered.length - batch.length),
-      sampleErrors, // first few real FMP error messages, for diagnosis
+      sampleErrors, // first few real FMP messages, for diagnosis
+      ...(rateLimited && {
+        hint: "FMP daily quota (250/day free tier) is spent. Wait for reset (~00:00 UTC), " +
+              "then retry. Prices now use 1 call/ticker; also reduce the poll-disclosures cron " +
+              "frequency (every 5 min = 576 calls/day, over the cap — hourly or less is safer).",
+      }),
     });
   } catch (e) {
     return res.status(500).json({ error: e.message });
