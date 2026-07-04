@@ -156,6 +156,23 @@
   .vchip.unscreened{color:#B7C1D6;background:var(--slate-soft);}
   .unscreened-note{padding:14px 16px 16px;color:var(--muted);font-size:13px;line-height:1.55;}
 
+  /* ---- Performance (evidence — MUTED, never a verdict color) ---- */
+  .perf-primary{padding:14px 16px 8px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;}
+  .perf-primary small{display:block;color:var(--faint);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;}
+  .perf-primary b{font-size:22px;font-weight:820;color:var(--ink);letter-spacing:-.3px;font-variant-numeric:tabular-nums;}
+  .perf-since-note{color:var(--faint);font-size:11px;font-weight:600;text-align:right;flex:0 0 auto;}
+  .perf-chips{padding:8px 16px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .perf-chip{padding:10px 6px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);text-align:center;}
+  .perf-chip small{display:block;color:var(--faint);font-size:10px;font-weight:800;letter-spacing:.4px;margin-bottom:4px;}
+  .perf-chip b{font-size:12.5px;font-weight:750;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .perf-pending{padding:14px 16px 16px;color:var(--faint);font-size:12.5px;line-height:1.5;}
+  .filer-link{cursor:pointer;border-radius:6px;}
+  .filer-link:active{background:rgba(255,255,255,.05);}
+  .filer-agg{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .filer-agg .fa{padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);}
+  .filer-agg .fa small{display:block;color:var(--faint);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
+  .filer-agg .fa b{display:block;margin-top:5px;font-size:20px;font-weight:820;color:var(--ink);font-variant-numeric:tabular-nums;}
+
   /* ---- Discover / Follow ---- */
   .seg-h{display:flex;gap:8px;margin:2px 0 16px;}
   .seg-h button{flex:1;padding:10px 6px;border-radius:12px;border:1px solid var(--line-2);background:var(--surface);color:var(--muted);font-size:12.5px;font-weight:750;cursor:pointer;}
@@ -270,6 +287,52 @@ function daysAgo(ms){
   return Math.max(0, Math.round((Date.now()-ms)/86400000));
 }
 
+/* ---------- performance (evidence since a disclosure — NOT returns/advice) ----------
+   All numbers render muted; ▲/▼ glyphs only. Computed client-side from the cached
+   `history` in /api/prices; no cache -> "Price pending" (never 0%). */
+const DAY_MS = 86400000;
+function median(arr){
+  if (!arr.length) return null;
+  const s = [...arr].sort((a,b)=>a-b);
+  const m = Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+function pctChange(from, to){
+  if (from==null || to==null || !isFinite(from) || from===0) return null;
+  return (to-from)/from*100;
+}
+function fmtPct(v){
+  if (v==null || !isFinite(v)) return null;
+  return (v>=0 ? "▲ " : "▼ ") + Math.abs(v).toFixed(1) + "%";
+}
+// history is [{d,c}] ascending. mode "onOrAfter" = first close on/after target (for trade date);
+// otherwise nearest trading day at/just before target (for fixed intervals).
+function histClose(history, targetMs, mode){
+  if (!history || !history.length) return null;
+  if (mode==="onOrAfter"){
+    for (const p of history){ if (Date.parse(p.d) >= targetMs) return p.c; }
+    return null; // target is after the last cached day
+  }
+  let atOrBefore=null, nearest=null, nearestDiff=Infinity;
+  for (const p of history){
+    const t = Date.parse(p.d);
+    if (t<=targetMs) atOrBefore = p.c;
+    const diff = Math.abs(t-targetMs);
+    if (diff<nearestDiff){ nearestDiff=diff; nearest=p.c; }
+  }
+  return atOrBefore!=null ? atOrBefore : nearest;
+}
+// -> { since, w1, m1, m3, y1, updatedAt } or null when no cached price data.
+function perfFor(t, prices){
+  const p = prices && prices[t.ticker];
+  if (!p || p.quote==null || !p.history || !p.history.length) return null;
+  const now = Number(p.quote);
+  const tradeMs = Date.parse(t.transactionDate || "");
+  const since = Number.isNaN(tradeMs) ? null : pctChange(histClose(p.history, tradeMs, "onOrAfter"), now);
+  const iv = d => pctChange(histClose(p.history, Date.now()-d*DAY_MS, "nearest"), now);
+  return { since, w1: iv(7), m1: iv(30), m3: iv(90), y1: iv(365), updatedAt: p.updatedAt };
+}
+
 /* ---------- small components ---------- */
 function Balance({trades}){
   const total = trades.length || 1;
@@ -300,10 +363,11 @@ function Balance({trades}){
     </div>`;
 }
 
-function Card({t,onOpen}){
+function Card({t,onOpen,onOpenFiler}){
+  const filerTap = onOpenFiler ? (e)=>{ e.stopPropagation(); onOpenFiler(t.actor); } : null;
   return html`
     <article class=${"card "+t.label} onClick=${onOpen}>
-      <div class="c-top">
+      <div class=${"c-top"+(onOpenFiler?" filer-link":"")} onClick=${filerTap} role=${onOpenFiler?"button":null} aria-label=${onOpenFiler?("Open filer "+t.actor):null}>
         <div class=${"avatar "+(isFund(t)?"fund":"")}>${t.initials||"·"}</div>
         <div class="c-who"><b>${t.actor}</b><span>${srcLabel(t)}</span></div>
         <div class="c-time">${t.filingDate||""}</div>
@@ -320,12 +384,13 @@ function Card({t,onOpen}){
     </article>`;
 }
 
-function Detail({t,onClose}){
+function Detail({t,onClose,prices,onOpenFiler}){
   const open = !!t;
   const impureW = t ? Math.min(100, t.impurePct===0?4:(Number(t.impurePct)/5)*100) : 0;
   const debtW = t ? Math.min(100, Number(t.debtRatio)===0?4:(Number(t.debtRatio)/33)*100) : 0;
   const bizS = t ? (t.businessStatus||"watch") : "watch";
   const bizText = bizS==="fail"?"Excluded":bizS==="watch"?"Permitted · watch":"Permitted";
+  const perf = t ? perfFor(t, prices) : null;
   return html`
     <div class=${"panel detail "+(open?"open":"")}>
       <div class="d-head">
@@ -335,7 +400,10 @@ function Detail({t,onClose}){
       </div>
       ${t && html`
       <div class="d-scroll">
-        <div class="eyebrow" style=${{textTransform:"none",letterSpacing:"0"}}>${t.actor} · ${srcLabel(t)}</div>
+        <div class="eyebrow" style=${{textTransform:"none",letterSpacing:"0"}}>
+          <span class=${onOpenFiler?"filer-link":""} role=${onOpenFiler?"button":null}
+                onClick=${onOpenFiler?()=>onOpenFiler(t.actor):null}>${t.actor}</span> · ${srcLabel(t)}
+        </div>
         <div class="d-big">${t.ticker}</div>
         <div class="d-co">${t.company||t.ticker}</div>
         <div class="d-line">
@@ -363,6 +431,20 @@ function Detail({t,onClose}){
           </div>
           <div class="why">${t.reasoning||"—"}</div>
         </div>`}
+
+        <div class="sect">
+          <div class="sect-h"><h3>Performance</h3><em>Evidence since disclosed</em></div>
+          ${perf ? html`
+            <div class="perf-primary">
+              <div><small>Since disclosed</small><b>${fmtPct(perf.since) || "—"}</b></div>
+              <span class="perf-since-note">trade ${t.transactionDate||"—"}<br/>→ now</span>
+            </div>
+            <div class="perf-chips">
+              ${[["1W",perf.w1],["1M",perf.m1],["3M",perf.m3],["1Y",perf.y1]].map(iv=>html`
+                <div class="perf-chip" key=${iv[0]}><small>${iv[0]}</small><b>${fmtPct(iv[1]) || "—"}</b></div>`)}
+            </div>
+          ` : html`<div class="perf-pending">Price pending — awaiting cached market data. Performance is evidence since the disclosure, not a return or recommendation.</div>`}
+        </div>
 
         <div class="sect">
           <div class="sect-h"><h3>Disclosure</h3></div>
@@ -420,6 +502,39 @@ function MixBar({s}){
         <span><span class="dot p"></span><b>${s.purify}</b> Purify</span>
         <span><span class="dot f"></span><b>${s.fail}</b> Fail</span>
       </div>
+    </div>`;
+}
+
+/* Filer track record — reached by TAPPING a filer (never promoted as a leaderboard).
+   Verdict-first: every ticker keeps its verdict badge. Performance is muted evidence. */
+function FilerScreen({actor, trades, prices, onClose, onOpenTicker}){
+  const open = !!actor;
+  const rows = actor ? trades.filter(t=>t.actor===actor) : [];
+  const withPerf = rows.map(t=>perfFor(t, prices)).filter(p=>p && p.since!=null && isFinite(p.since));
+  const med = median(withPerf.map(p=>p.since));
+  const mix = deriveSources(rows)[0] || {clean:0,purify:0,fail:0,unscreened:0};
+  const kind = rows[0] ? rows[0].kind : "";
+  return html`
+    <div class=${"panel detail "+(open?"open":"")}>
+      <div class="d-head">
+        <button class="back" onClick=${onClose} aria-label="Back">‹</button>
+        <span class="d-tk">${actor||""}</span>
+      </div>
+      ${actor && html`
+      <div class="d-scroll">
+        <div class="eyebrow" style=${{textTransform:"none",letterSpacing:"0"}}>${TYPE_LABEL(kind)} · disclosed trades only</div>
+        <div class="filer-agg">
+          <div class="fa"><small>Disclosures</small><b>${rows.length}</b></div>
+          <div class="fa"><small>Median since disclosed</small><b>${withPerf.length?fmtPct(med):"—"}</b></div>
+        </div>
+        ${withPerf.length < rows.length ? html`<div class="perf-pending">Median based on ${withPerf.length} of ${rows.length} disclosures with price data.</div>` : ""}
+        <div class="mixwrap" style=${{margin:"14px 2px 2px"}}><${MixBar} s=${mix} /></div>
+        <div class="list-head" style=${{padding:"14px 2px 10px"}}><h2>Disclosure history</h2><span>${rows.length}</span></div>
+        ${rows.length ? html`<div class="list" style=${{padding:0}}>
+          ${rows.map(t=>html`<${Card} key=${t.id||t.ticker+t.filingDate} t=${t} onOpen=${()=>onOpenTicker(t)} />`)}
+        </div>` : html`<div class="empty">No disclosures on record for this filer.</div>`}
+        <p class="disc">Filer history — disclosed trades only. Disclosure-based history, delayed by filing lag (up to 45 days). Informational only — not a recommendation.</p>
+      </div>`}
     </div>`;
 }
 
@@ -563,6 +678,8 @@ function App(){
   const [sheet,setSheet] = useState(false);
   const [follows,setFollows] = useState({});   // source name -> boolean (explicit); default = followed
   const [intro,setIntro] = useState(false);
+  const [prices,setPrices] = useState({});     // ticker -> { quote, history, updatedAt } from /api/prices
+  const [filer,setFiler] = useState(null);     // actor name -> filer track-record screen
   const idByName = useRef({});
 
   // Load the disclosure feed; fall back to sample data if the API is unreachable.
@@ -591,6 +708,17 @@ function App(){
         setFollows(prev=>({...f,...prev})); // keep any explicit choices the user already made
       })
       .catch(()=>{ /* local state only — fine for now */ });
+    return ()=>{alive=false;};
+  },[]);
+
+  // Load the cached price data once (read-only cache; UI computes intervals client-side).
+  // Empty/failed -> {} so every ticker shows "Price pending" instead of a fake 0%.
+  useEffect(()=>{
+    let alive = true;
+    fetch("/api/prices",{headers:{accept:"application/json"}})
+      .then(r=>r.ok?r.json():Promise.reject())
+      .then(d=>{ if(alive && d && typeof d==="object") setPrices(d); })
+      .catch(()=>{ /* no cache yet — Price pending everywhere */ });
     return ()=>{alive=false;};
   },[]);
 
@@ -645,7 +773,7 @@ function App(){
               </button>`)}
           </div>
           <div class="list-head"><h2>Latest disclosures</h2><span>${shown.length} shown</span></div>
-          ${shown.length ? html`<div class="list">${shown.map(t=>html`<${Card} key=${t.id||t.ticker+t.filingDate} t=${t} onOpen=${()=>setSelected(t)} />`)}</div>`
+          ${shown.length ? html`<div class="list">${shown.map(t=>html`<${Card} key=${t.id||t.ticker+t.filingDate} t=${t} onOpen=${()=>setSelected(t)} onOpenFiler=${(a)=>setFiler(a)} />`)}</div>`
             : html`<div class="empty">No disclosures match this filter yet.</div>`}
         `}
       </div>
@@ -665,7 +793,8 @@ function App(){
           </button>`)}
       </nav>
 
-      <${Detail} t=${selected} onClose=${()=>setSelected(null)} />
+      <${FilerScreen} actor=${filer} trades=${all} prices=${prices} onClose=${()=>setFiler(null)} onOpenTicker=${(t)=>setSelected(t)} />
+      <${Detail} t=${selected} onClose=${()=>setSelected(null)} prices=${prices} onOpenFiler=${(a)=>setFiler(a)} />
       <${FilterSheet} open=${sheet} onClose=${()=>setSheet(false)} />
       ${intro && html`<${Onboarding} sources=${sources} isFollowed=${isFollowed} setFollow=${setFollow} onDone=${dismissIntro} />`}
     </div>`;
