@@ -4,7 +4,9 @@
 import { supabase } from "./_lib/supabase.js";
 import { classifyFB } from "./_lib/frameworkB.js";
  import { fetchNewDisclosures } from "./_lib/sources/fmp.js";  // -> ./sources/quiver.js later
-import { screen } from "./_lib/screening/mock.js";              // -> ./screening/zoya.js later
+// Cache-aware screener. Uses Zoya when SCREENING_API_KEY is set, else the mock adapter —
+// the app keeps working without a key.
+import { screenCached } from "./_lib/screening/index.js";
 
 function dedupeKey(r) {
   return [r.source, r.actor, r.ticker, r.transactionDate, r.side].join("|");
@@ -33,7 +35,7 @@ export default async function handler(req, res) {
     const incoming = await fetchNewDisclosures();
     let inserted = 0;
     for (const d of incoming) {
-      const s = await screen(d.ticker);           // raw screening inputs
+      const s = await screenCached(db, d.ticker); // raw screening inputs (cached, 30-day)
       const rec = { ...d, ...s };
       rec.label = classifyFB(rec);                 // Framework B verdict
 
