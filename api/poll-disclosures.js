@@ -32,7 +32,21 @@ export default async function handler(req, res) {
   if (secret !== process.env.CRON_SECRET) return res.status(401).json({ error: "Unauthorized" });
   try {
     const db = supabase();
-    const incoming = await fetchNewDisclosures();
+
+    // Fetch from the source (FMP). A transient/rate-limit (429) failure must NOT 500 —
+    // cron-job.org disables a job after repeated non-2xx responses. Skip the run instead.
+    let incoming;
+    try {
+      incoming = await fetchNewDisclosures();
+    } catch (e) {
+      const rateLimited = /429|limit reach|rate limit|too many/i.test(e.message || "");
+      return res.status(200).json({
+        ok: false, checked: 0, inserted: 0,
+        skipped: rateLimited ? "source_rate_limited" : "source_error",
+        detail: String(e.message || e).slice(0, 200),
+      });
+    }
+
     let inserted = 0;
     for (const d of incoming) {
       const s = await screenCached(db, d.ticker); // raw screening inputs (cached, 30-day)
@@ -48,6 +62,8 @@ if (!error && data && data.length) inserted++;
     }
     return res.status(200).json({ ok: true, checked: incoming.length, inserted });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    // Keep the cron alive on unexpected errors too (report in the body, not via a 5xx that
+    // would get the job auto-disabled). Truly fatal misconfig still surfaces here.
+    return res.status(200).json({ ok: false, error: String(e.message || e).slice(0, 200) });
   }
 }
