@@ -70,7 +70,14 @@ const TABLE = {
 };
 
 export async function screen(ticker) {
-  return TABLE[ticker] || {
+  const hit = TABLE[ticker];
+  if (hit) return { ...hit, screened: true };
+  // No data for this ticker. Return screened:false and DO NOT fabricate zeros as facts —
+  // the values below are inert placeholders; the UI must render an "Unscreened" state
+  // instead of these numbers. classifyFB still runs (engine unchanged), but the frontend
+  // keys off `screened` to avoid showing a placeholder verdict.
+  return {
+    screened: false,
     business: "Unscreened", businessStatus: "watch",
     impurePct: 0, debtRatio: 0,
     reasoning: "No screening data available for this ticker — flagged for manual review.",

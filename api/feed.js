@@ -17,6 +17,12 @@ function toClient(row) {
     reasoning: row.reasoning, purification: row.purification,
     alert: row.alert, confidence: row.confidence
   };
+  // Whether this row has real screening data. Prefer an explicit `screened` column if the
+  // DB has one; otherwise derive it from the mock fallback's reasoning marker. Kept
+  // migration-free so existing deployments keep working.
+  rec.screened = typeof row.screened === "boolean"
+    ? row.screened
+    : !/^No screening data/i.test(row.reasoning || "");
   rec.label = classifyFB(rec); // engine is the single source of truth for the verdict
   return rec;
 }
