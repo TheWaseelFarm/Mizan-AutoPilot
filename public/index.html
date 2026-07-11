@@ -173,6 +173,40 @@
   .filer-agg .fa small{display:block;color:var(--faint);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
   .filer-agg .fa b{display:block;margin-top:5px;font-size:20px;font-weight:820;color:var(--ink);font-variant-numeric:tabular-nums;}
 
+  /* ---- Detail: key-facts block ---- */
+  .d-side{margin-top:12px;}
+  .keyfacts{margin-top:14px;}
+  .kf-filer{width:100%;display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:var(--surface);border:1px solid var(--line);cursor:pointer;text-align:left;color:var(--ink);font:inherit;}
+  .kf-filer[disabled]{cursor:default;}
+  .kf-filer:not([disabled]):active{border-color:var(--line-2);}
+  .kf-filer .c-who{flex:1;min-width:0;}
+  .kf-filer .c-who b{display:block;font-size:13px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .kf-filer .c-who span{font-size:11.5px;color:var(--faint);}
+  .kf-filer .chev{color:var(--faint);font-size:16px;flex:0 0 auto;}
+  .kf-grid{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .kf{padding:12px;border-radius:14px;background:var(--surface);border:1px solid var(--line);}
+  .kf small{display:block;color:var(--faint);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
+  .kf b{display:block;margin-top:5px;font-size:14px;font-weight:750;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .kf .kf-sub{display:block;margin-top:3px;color:var(--faint);font-size:10.5px;font-weight:600;text-transform:none;letter-spacing:0;}
+  .kf.pending b{color:var(--muted);}
+
+  /* ---- Purification preview (advisory — gold accent, NOT verdict colors) ---- */
+  .purif{margin-top:18px;border-radius:16px;padding:13px 15px;background:var(--gold-soft);border:1px solid rgba(217,180,80,.30);}
+  .purif .ph{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:#E7C86B;margin-bottom:6px;}
+  .purif p{margin:0;color:var(--ink);font-size:13px;line-height:1.5;font-weight:650;}
+  .purif small{display:block;margin-top:7px;color:var(--faint);font-size:11px;line-height:1.45;}
+  .purif.clean,.purif.pending{background:var(--surface);border-color:var(--line);}
+  .purif.clean .ph,.purif.pending .ph{color:var(--muted);}
+  .purif.clean p,.purif.pending p{color:var(--muted);font-weight:600;}
+
+  /* ---- Sparkline + inline intervals (muted evidence) ---- */
+  .perf-spark{padding:6px 16px 4px;color:var(--muted);}
+  .spark{display:block;width:100%;height:40px;}
+  .perf-inline{padding:2px 16px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:650;}
+  .perf-inline .pi{font-variant-numeric:tabular-nums;}
+  .perf-inline .pi em{font-style:normal;color:var(--faint);font-weight:800;font-size:10px;letter-spacing:.4px;margin-right:4px;}
+  .perf-inline .sep{color:var(--faint);}
+
   /* ---- Discover / Follow ---- */
   .seg-h{display:flex;gap:8px;margin:2px 0 16px;}
   .seg-h button{flex:1;padding:10px 6px;border-radius:12px;border:1px solid var(--line-2);background:var(--surface);color:var(--muted);font-size:12.5px;font-weight:750;cursor:pointer;}
@@ -332,6 +366,42 @@ function perfFor(t, prices){
   const iv = d => pctChange(histClose(p.history, Date.now()-d*DAY_MS, "nearest"), now);
   return { since, w1: iv(7), m1: iv(30), m3: iv(90), y1: iv(365), updatedAt: p.updatedAt };
 }
+function fmtAsOf(iso){
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? String(iso).slice(0,10) : d.toISOString().slice(0,10);
+}
+// Nominal invested midpoint parsed from the disclosed amount range (e.g. "$15,001–$50,000").
+function amountMidpoint(amount){
+  const nums = String(amount||"").match(/[\d,]+(?:\.\d+)?/g);
+  if (!nums) return null;
+  const v = nums.map(n=>Number(n.replace(/,/g,""))).filter(n=>!Number.isNaN(n));
+  if (!v.length) return null;
+  return v.length>=2 ? (v[0]+v[1])/2 : v[0];
+}
+// Advisory purification preview tied to the verdict — muted/gold, NOT a fatwa.
+// Returns { kind, text, note } or null (fail = no line).
+function purificationPreview(t, prices){
+  if (t.screened===false) return { kind:"pending", text:"Pending screening — purification can’t be estimated yet." };
+  if (t.label==="fail") return null;
+  const impure = Number(t.impurePct||0);
+  if (t.label==="clean" || impure<=0) return { kind:"clean", text:"No purification required — permissible business with no impure income." };
+  // purify-at-sale
+  const p = prices && prices[t.ticker];
+  const quote = (p && p.quote!=null) ? Number(p.quote) : null;
+  if (quote==null) {
+    return { kind:"purify", text:`~${impure}% of any gain would be owed to charity at sale.`, note:"Purification applies at sale — amount pending live price." };
+  }
+  const disclosed = Number(t.purchasePrice) || (p.history ? histClose(p.history, Date.parse(t.transactionDate||""), "onOrAfter") : null);
+  const mid = (t.amountMid!=null && t.amountMid!=="" ? Number(t.amountMid) : null) || amountMidpoint(t.amount);
+  let estStr = "";
+  if (disclosed && mid && isFinite(disclosed) && disclosed>0){
+    const gain = mid * (quote/disclosed - 1);
+    const owed = gain>0 ? (impure/100)*gain : 0;
+    estStr = ` (≈ $${owed.toFixed(2)} on the disclosed amount today)`;
+  }
+  return { kind:"purify", text:`~${impure}% of any gain would be owed to charity at sale${estStr}.`, note:"Estimate — informational only, not a fatwa." };
+}
 
 /* ---------- small components ---------- */
 function Balance({trades}){
@@ -384,6 +454,22 @@ function Card({t,onOpen,onOpenFiler}){
     </article>`;
 }
 
+// Inline SVG price trend from the cached daily history — shape only, no axes, muted.
+function Sparkline({history}){
+  if (!history || history.length<2) return null;
+  const W=300, H=40, pad=3;
+  const cs = history.map(p=>Number(p.c));
+  const min = Math.min(...cs), max = Math.max(...cs), range = (max-min)||1, n = cs.length;
+  const pts = cs.map((c,i)=>{
+    const x = pad + (i/(n-1))*(W-2*pad);
+    const y = pad + (1-(c-min)/range)*(H-2*pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return html`<svg class="spark" viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height="40" role="img" aria-label="Price trend over the cached history">
+    <polyline points=${pts} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
 function Detail({t,onClose,prices,onOpenFiler}){
   const open = !!t;
   const impureW = t ? Math.min(100, t.impurePct===0?4:(Number(t.impurePct)/5)*100) : 0;
@@ -391,6 +477,9 @@ function Detail({t,onClose,prices,onOpenFiler}){
   const bizS = t ? (t.businessStatus||"watch") : "watch";
   const bizText = bizS==="fail"?"Excluded":bizS==="watch"?"Permitted · watch":"Permitted";
   const perf = t ? perfFor(t, prices) : null;
+  const pr = t ? (prices && prices[t.ticker]) : null;
+  const quoteVal = pr && pr.quote!=null ? Number(pr.quote) : null;
+  const purif = t ? purificationPreview(t, prices) : null;
   return html`
     <div class=${"panel detail "+(open?"open":"")}>
       <div class="d-head">
@@ -400,16 +489,24 @@ function Detail({t,onClose,prices,onOpenFiler}){
       </div>
       ${t && html`
       <div class="d-scroll">
-        <div class="eyebrow" style=${{textTransform:"none",letterSpacing:"0"}}>
-          <span class=${onOpenFiler?"filer-link":""} role=${onOpenFiler?"button":null}
-                onClick=${onOpenFiler?()=>onOpenFiler(t.actor):null}>${t.actor}</span> · ${srcLabel(t)}
-        </div>
         <div class="d-big">${t.ticker}</div>
         <div class="d-co">${t.company||t.ticker}</div>
-        <div class="d-line">
-          <span class=${"side "+(String(t.side).toUpperCase()==="SELL"?"sell":"")}>${sideLabel(t.side)}</span>
-          <span class="sep">·</span><span>${t.amount||"—"}</span>
-          <span class="sep">·</span><span>trade ${t.transactionDate||"—"}</span>
+        <div class="d-side"><span class=${"side "+(String(t.side).toUpperCase()==="SELL"?"sell":"")}>${sideLabel(t.side)}</span></div>
+
+        <div class="keyfacts">
+          <button class="kf-filer" onClick=${onOpenFiler?()=>onOpenFiler(t.actor):null} disabled=${!onOpenFiler} aria-label=${"Open filer "+t.actor}>
+            <div class=${"avatar "+(isFund(t)?"fund":"")}>${t.initials||"·"}</div>
+            <div class="c-who"><b>${t.actor}</b><span>${srcLabel(t)}</span></div>
+            ${onOpenFiler && html`<span class="chev">›</span>`}
+          </button>
+          <div class="kf-grid">
+            <div class="kf"><small>Disclosed amount</small><b>${t.amount||"—"}</b></div>
+            <div class=${"kf"+(quoteVal==null?" pending":"")}>
+              <small>Price now</small>
+              <b>${quoteVal!=null ? "$"+quoteVal.toFixed(2) : "Price pending"}</b>
+              ${quoteVal!=null && pr?.updatedAt && html`<span class="kf-sub">as of ${fmtAsOf(pr.updatedAt)}</span>`}
+            </div>
+          </div>
         </div>
 
         ${t.screened===false ? html`
@@ -432,6 +529,13 @@ function Detail({t,onClose,prices,onOpenFiler}){
           <div class="why">${t.reasoning||"—"}</div>
         </div>`}
 
+        ${purif && html`
+        <div class=${"purif "+purif.kind}>
+          <div class="ph">◆ Purification</div>
+          <p>${purif.text}</p>
+          ${purif.note && html`<small>${purif.note}</small>`}
+        </div>`}
+
         <div class="sect">
           <div class="sect-h"><h3>Performance</h3><em>Evidence since disclosed</em></div>
           ${perf ? html`
@@ -439,9 +543,11 @@ function Detail({t,onClose,prices,onOpenFiler}){
               <div><small>Since disclosed</small><b>${fmtPct(perf.since) || "—"}</b></div>
               <span class="perf-since-note">trade ${t.transactionDate||"—"}<br/>→ now</span>
             </div>
-            <div class="perf-chips">
-              ${[["1W",perf.w1],["1M",perf.m1],["3M",perf.m3],["1Y",perf.y1]].map(iv=>html`
-                <div class="perf-chip" key=${iv[0]}><small>${iv[0]}</small><b>${fmtPct(iv[1]) || "—"}</b></div>`)}
+            <div class="perf-spark"><${Sparkline} history=${pr?.history} /></div>
+            <div class="perf-inline">
+              ${[["1W",perf.w1],["1M",perf.m1],["3M",perf.m3],["1Y",perf.y1]].map((iv,i)=>html`
+                ${i>0 ? html`<span class="sep">·</span>` : ""}
+                <span class="pi"><em>${iv[0]}</em>${fmtPct(iv[1]) || "—"}</span>`)}
             </div>
           ` : html`<div class="perf-pending">Price pending — awaiting cached market data. Performance is evidence since the disclosure, not a return or recommendation.</div>`}
         </div>
