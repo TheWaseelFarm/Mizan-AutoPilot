@@ -211,6 +211,29 @@
   .perf-inline .pi em{font-style:normal;color:var(--faint);font-weight:800;font-size:10px;letter-spacing:.4px;margin-right:4px;}
   .perf-inline .sep{color:var(--faint);}
 
+  /* ===== Light Filer profile (handoff C) ===== */
+  .fp-id{display:flex;align-items:center;gap:15px;margin-top:16px;}
+  .fp-av{width:64px;height:64px;border-radius:50%;background:var(--surface-2);border:2px solid rgba(181,137,43,.55);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--muted);flex:none;}
+  .fp-name{font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.01em;}
+  .fp-role{font-size:13.5px;font-weight:500;color:var(--muted);margin-top:2px;}
+  .fp-h2{margin:22px 2px 0;font-size:20px;line-height:1.35;font-weight:700;color:var(--ink);}
+  .fp-frame{margin:8px 2px 0;font-size:14px;line-height:1.5;font-weight:500;color:var(--muted);}
+  .fp-mix{margin-top:20px;background:#fff;border-radius:20px;padding:18px;border:1px solid var(--line);box-shadow:var(--shadow);}
+  .fp-mix .mh{font-size:14px;font-weight:700;color:var(--ink);}
+  .fp-mixbar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:14px;background:var(--surface-2);}
+  .fp-mixbar i{display:block;height:100%;min-width:0;}
+  .fp-mixleg{display:flex;flex-wrap:wrap;gap:12px 16px;margin-top:14px;}
+  .fp-mixleg span{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--muted);}
+  .fp-mixleg i{width:8px;height:8px;border-radius:2px;flex:none;}
+  .fp-sec{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:24px 2px 12px;}
+  .fp-list{display:flex;flex-direction:column;gap:10px;}
+  .fp-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border-radius:14px;padding:13px 15px;border:1px solid var(--line);box-shadow:var(--shadow);cursor:pointer;}
+  .fp-row:active{transform:scale(.99);}
+  .fp-row .tk{font-size:15px;font-weight:700;color:var(--ink);}
+  .fp-row .sd{font-size:12px;font-weight:500;color:var(--faint);margin-top:2px;}
+  .fp-row .vw{font-size:12.5px;font-weight:700;flex:none;}
+  .fp-row .vw.clean{color:var(--clean-txt);}.fp-row .vw.purify{color:var(--purify-txt);}.fp-row .vw.fail{color:var(--fail-txt);}.fp-row .vw.unscreened{color:var(--slate-txt);}
+
   /* ===== Light Feed (handoff): balance panel + verdict-as-words cards ===== */
   .balpanel{margin:14px 0 8px;background:#fff;border-radius:20px;padding:18px;border:1px solid var(--line);box-shadow:var(--shadow);}
   .balrow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;gap:10px;}
@@ -713,35 +736,53 @@ function MixBar({s}){
     </div>`;
 }
 
-/* Filer track record — reached by TAPPING a filer (never promoted as a leaderboard).
-   Verdict-first: every ticker keeps its verdict badge. Performance is muted evidence. */
+/* Filer profile (handoff C) — a source's public track record, framed as history and
+   evidence, NEVER "copy them". Shows the verdict mix of their picks, never returns. */
 function FilerScreen({actor, trades, prices, onClose, onOpenTicker}){
   const open = !!actor;
   const rows = actor ? trades.filter(t=>t.actor===actor) : [];
-  const withPerf = rows.map(t=>perfFor(t, prices)).filter(p=>p && p.since!=null && isFinite(p.since));
-  const med = median(withPerf.map(p=>p.since));
-  const mix = deriveSources(rows)[0] || {clean:0,purify:0,fail:0,unscreened:0};
-  const kind = rows[0] ? rows[0].kind : "";
+  const s = deriveSources(rows)[0] || {clean:0,purify:0,fail:0,unscreened:0,initials:"·",kind:""};
+  const total = (s.clean+s.purify+s.fail+s.unscreened) || 1;
+  const pct = n => Math.round(n/total*100);
+  const mixSeg = [["clean",s.clean],["purify",s.purify],["fail",s.fail],["unscreened",s.unscreened]];
+  // earliest year on record
+  let since = null;
+  for (const t of rows){ const y = new Date(Date.parse(t.filingDate||t.transactionDate||"")).getFullYear(); if(!Number.isNaN(y)) since = since==null ? y : Math.min(since,y); }
   return html`
     <div class=${"panel detail dx "+(open?"open":"")}>
       ${actor && html`
       <div class="dx-scroll">
-        <div class="dx-back">
-          <button class="dx-backbtn" onClick=${onClose} aria-label="Back">‹ Back</button>
+        <div class="dx-back"><button class="dx-backbtn" onClick=${onClose} aria-label="Back">‹ Back</button></div>
+
+        <div class="fp-id">
+          <div class="fp-av">${s.initials||"·"}</div>
+          <div><div class="fp-name">${actor}</div><div class="fp-role">${TYPE_LABEL(s.kind)} · disclosed record</div></div>
         </div>
-        <h2 style=${{margin:"6px 0 2px",fontSize:"22px",fontWeight:800,letterSpacing:"-.01em",color:"var(--ink)"}}>${actor||""}</h2>
-        <div class="eyebrow" style=${{textTransform:"none",letterSpacing:"0",justifyContent:"flex-start"}}>${TYPE_LABEL(kind)} · disclosed trades only</div>
-        <div class="filer-agg">
-          <div class="fa"><small>Disclosures</small><b>${rows.length}</b></div>
-          <div class="fa"><small>Median since disclosed</small><b>${withPerf.length?fmtPct(med):"—"}</b></div>
+
+        <h2 class="fp-h2">${rows.length} disclosure${rows.length===1?"":"s"} tracked${since!=null?` since ${since}`:""}.</h2>
+        <p class="fp-frame">Public filing record. Framed as history — not a recommendation to follow.</p>
+
+        <div class="fp-mix">
+          <div class="mh">How their picks screen</div>
+          <div class="fp-mixbar">${mixSeg.map(m=> m[1]>0 && html`<i key=${m[0]} class=${"b-"+m[0]} style=${{flex:m[1]}}></i>`)}</div>
+          <div class="fp-mixleg">
+            <span><i style=${{background:"var(--clean)"}}></i>Clean ${pct(s.clean)}%</span>
+            <span><i style=${{background:"var(--purify)"}}></i>Purify ${pct(s.purify)}%</span>
+            <span><i style=${{background:"var(--fail)"}}></i>Fail ${pct(s.fail)}%</span>
+            <span><i style=${{background:"var(--slate)"}}></i>Unscreened ${pct(s.unscreened)}%</span>
+          </div>
         </div>
-        ${withPerf.length < rows.length ? html`<div class="perf-pending">Median based on ${withPerf.length} of ${rows.length} disclosures with price data.</div>` : ""}
-        <div class="mixwrap" style=${{margin:"14px 2px 2px"}}><${MixBar} s=${mix} /></div>
-        <div class="list-head" style=${{padding:"14px 2px 10px"}}><h2>Disclosure history</h2><span>${rows.length}</span></div>
-        ${rows.length ? html`<div class="list" style=${{padding:0}}>
-          ${rows.map(t=>html`<${Card} key=${t.id||t.ticker+t.filingDate} t=${t} onOpen=${()=>onOpenTicker(t)} prices=${prices} />`)}
+
+        <div class="fp-sec">Disclosure history</div>
+        ${rows.length ? html`<div class="fp-list">
+          ${rows.map(t=>html`
+            <div class="fp-row" key=${t.id||t.ticker+t.filingDate} onClick=${()=>onOpenTicker(t)} role="button" aria-label=${"Open "+t.ticker}>
+              <div><div class="tk">${t.ticker}</div><div class="sd">${String(t.side).toUpperCase()==="SELL"?"Sell":"Buy"} · ${t.transactionDate||t.filingDate||"—"}</div></div>
+              <span class=${"vw "+t.label}>${VSHORT[t.label]}</span>
+            </div>`)}
         </div>` : html`<div class="empty">No disclosures on record for this filer.</div>`}
-        <p class="disc">Filer history — disclosed trades only. Disclosure-based history, delayed by filing lag (up to 45 days). Informational only — not a recommendation.</p>
+
+        <p class="dx-disc">Informational disclosure monitoring and Sharia screening only — not investment advice, brokerage, or a fatwa.</p>
       </div>`}
     </div>`;
 }
