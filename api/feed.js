@@ -1,6 +1,11 @@
 // GET /api/feed -> disclosure feed in the exact shape the Mizān UI expects.
+// Optional ?ranked=1      applies the completeness gate (hide unscreened from ranked lists).
+// Optional ?performance=1 joins the cached prices and attaches dual-anchor performance
+// (since disclosed / since public + freshness) per row.
+// Both are additive and opt-in, so existing consumers keep the current shape.
 import { supabase } from "./_lib/supabase.js";
 import { classifyFB } from "./_lib/frameworkB.js";
+import { dualAnchor } from "./_lib/performance.js";
 // import { requireAuth } from "./_lib/auth.js"; // uncomment to require login
 
 function toClient(row) {
@@ -31,22 +36,45 @@ function toClient(row) {
 // screening data (a verdict). Unscreened names must never appear compliant, and are hidden
 // from ranked lists — reachable only by direct search. This is OPT-IN via `?ranked=1` so
 // existing consumers (and search) keep the full set by default; ranked surfaces request it.
-// (Performance-completeness is enforced later, where the price cache is joined.)
 function passesGate(rec) {
   return rec.screened !== false && !!rec.label;
+}
+
+// Attach dual-anchor performance to each row from the cached prices. Best-effort: if the
+// prices table is absent/unreachable, rows get performance:null (UI shows "Price pending")
+// rather than failing the feed. Never fabricates — only computes where cached data exists.
+async function attachPerformance(db, rows) {
+  let byTicker = new Map();
+  try {
+    const tickers = [...new Set(rows.map((r) => r.ticker).filter(Boolean))];
+    if (tickers.length) {
+      const { data, error } = await db
+        .from("prices").select("ticker,quote,history").in("ticker", tickers);
+      if (error) throw error;
+      byTicker = new Map(
+        (data || []).map((p) => [p.ticker, { quote: p.quote == null ? null : Number(p.quote), history: p.history || [] }]),
+      );
+    }
+  } catch (e) {
+    byTicker = new Map(); // cache missing -> everything "Price pending"
+  }
+  return rows.map((r) => ({ ...r, performance: dualAnchor(byTicker.get(r.ticker), r) }));
 }
 
 export default async function handler(req, res) {
   // if (!requireAuth(req)) return res.status(401).json({ error: "Unauthorized" });
   try {
     const ranked = /^(1|true|yes)$/i.test(String(req.query.ranked || ""));
-    const { data, error } = await supabase()
+    const withPerf = /^(1|true|yes)$/i.test(String(req.query.performance || ""));
+    const db = supabase();
+    const { data, error } = await db
       .from("disclosures").select("*")
       .order("filing_date", { ascending: false })
       .limit(100);
     if (error) throw error;
     let rows = (data || []).map(toClient);
     if (ranked) rows = rows.filter(passesGate);
+    if (withPerf) rows = await attachPerformance(db, rows);
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
     return res.status(200).json(rows);
   } catch (e) {

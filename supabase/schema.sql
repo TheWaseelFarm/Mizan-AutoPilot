@@ -65,11 +65,25 @@ create table if not exists screenings (
 );
 create index if not exists screenings_fetched_idx on screenings (fetched_at);
 
+-- Price cache (per ticker). Written by api/refresh-prices.js (cron, batched to respect the
+-- FMP free-tier 250/day cap) and read by api/prices.js. `history` is the RAW daily close
+-- series [{d:'YYYY-MM-DD', c:Number}] ascending; `quote` is the latest close. The UI /
+-- api/_lib/performance.js compute the dual-anchor performance (since disclosed / since
+-- public) from this — no fabrication: a missing row simply reads as "Price pending".
+create table if not exists prices (
+  ticker     text primary key,
+  quote      numeric,
+  history    jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+create index if not exists prices_updated_idx on prices (updated_at);
+
 -- Lock everything down; only the service role (used server-side) may read/write.
 alter table disclosures enable row level security;
 alter table watchlist   enable row level security;
 alter table alerts_sent enable row level security;
 alter table screenings  enable row level security;
+alter table prices      enable row level security;
 -- (No policies for anon/authenticated = no public access. Service role bypasses RLS.)
 
 -- Seed: disclosures (generated from the corrected Mizān prototype)
