@@ -6,7 +6,7 @@
   "description": "Mizān — Sharia-aware disclosure intelligence & alerting (Vercel + Supabase).",
   "engines": { "node": ">=18" },
   "scripts": {
-    "test": "node test/frameworkB.test.js",
+    "test": "node test/frameworkB.test.js && node test/performance.test.js",
     "hash": "node scripts/hash.js"
   },
   "dependencies": {
