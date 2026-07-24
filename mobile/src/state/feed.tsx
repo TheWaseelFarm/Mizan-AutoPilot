@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { fetchFeed, fetchPrices } from '../lib/api';
+import { isScreened } from '../lib/frameworkB';
 import type { PricesMap } from '../lib/performance';
 import type { Disclosure } from '../lib/types';
 
@@ -32,7 +33,8 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     // Feed and prices load in parallel; prices are best-effort (empty -> "Price pending").
     Promise.all([fetchFeed(ctrl.signal), fetchPrices(ctrl.signal)]).then(([feed, priceMap]) => {
       if (!alive) return;
-      setRows(feed.rows);
+      // Completeness gate (decision #2): unscreened items never reach any list/search.
+      setRows(feed.rows.filter(isScreened));
       setLive(feed.live);
       setPrices(priceMap);
       setLoading(false);
