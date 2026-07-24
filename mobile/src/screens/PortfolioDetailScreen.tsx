@@ -16,6 +16,7 @@ import {
   portfolioComposition,
   portfolioFlag,
 } from '../lib/derive';
+import { resolvePrice } from '../lib/illustrative';
 import { dualAnchor, fmtPctCompact } from '../lib/performance';
 import { portfolioIndex } from '../lib/portfolioPerf';
 import type { HomeStackParamList } from '../navigation/types';
@@ -51,6 +52,18 @@ export function PortfolioDetailScreen() {
   const maxWeight = composition[0]?.weightPct || 1;
   const pp = useMemo(() => portfolioIndex(composition, activity, prices), [composition, activity, prices]);
   const ppSince = pp?.sinceDisclosed != null ? fmtPctCompact(pp.sinceDisclosed) : null;
+  // Per-holding "since disclosed" so each name shows whether it's up ▲ or down ▼.
+  const holdingPerf = useMemo(() => {
+    const m: Record<string, { since: string | null; down: boolean }> = {};
+    for (const h of composition) {
+      const disc = activity
+        .filter((r) => r.ticker === h.ticker)
+        .sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || ''))[0];
+      const v = disc ? dualAnchor(resolvePrice(prices, { ticker: h.ticker }).price, disc)?.sinceDisclosed ?? null : null;
+      m[h.ticker] = { since: fmtPctCompact(v), down: v != null && v < 0 };
+    }
+    return m;
+  }, [composition, activity, prices]);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: space.xxl }}>
@@ -119,22 +132,34 @@ export function PortfolioDetailScreen() {
           />
         ))}
       </View>
-      {composition.map((h) => (
-        <View key={h.ticker} style={styles.compRow}>
-          <View style={[styles.compDot, { backgroundColor: verdictColor[h.label].solid }]} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.compTicker} numberOfLines={1}>
-              {h.ticker} <Text style={styles.compCompany}>· {h.company}</Text>
-            </Text>
-            <View style={styles.compTrack}>
-              <View style={[styles.compFill, { width: `${(h.weightPct / maxWeight) * 100}%` }]} />
+      {composition.map((h) => {
+        const perf = holdingPerf[h.ticker];
+        return (
+          <View key={h.ticker} style={styles.compRow}>
+            <View style={[styles.compDot, { backgroundColor: verdictColor[h.label].solid }]} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.compTicker} numberOfLines={1}>
+                {h.ticker} <Text style={styles.compCompany}>· {h.company}</Text>
+              </Text>
+              <View style={styles.compTrack}>
+                <View style={[styles.compFill, { width: `${(h.weightPct / maxWeight) * 100}%` }]} />
+              </View>
+            </View>
+            <View style={styles.compRight}>
+              <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
+              {/* Per-name performance — muted (▲ up / ▼ down); never a verdict color. */}
+              {perf?.since ? (
+                <Text style={[styles.compPerf, perf.down && styles.compPerfDown]}>{perf.since} since</Text>
+              ) : (
+                <Text style={styles.compPerfPending}>perf pending</Text>
+              )}
             </View>
           </View>
-          <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
-        </View>
-      ))}
+        );
+      })}
       <Text style={styles.compNote}>
-        The share each name makes up of this portfolio — informational, not a recommendation to buy.
+        Share of the portfolio, with each name's move since it was disclosed (▲ up / ▼ down) —
+        informational, not a recommendation to buy.
       </Text>
 
       {/* Activity log. */}
@@ -282,7 +307,12 @@ const styles = StyleSheet.create({
   compCompany: { fontSize: font.small, fontWeight: font.weight.regular, color: color.faint },
   compTrack: { height: 6, borderRadius: 3, backgroundColor: color.surfaceAlt, marginTop: 5, overflow: 'hidden' },
   compFill: { height: '100%', borderRadius: 3, backgroundColor: color.brand },
-  compPct: { fontSize: font.body, fontWeight: font.weight.heavy, color: color.ink, fontVariant: ['tabular-nums'], minWidth: 44, textAlign: 'right' },
+  compRight: { alignItems: 'flex-end', minWidth: 74 },
+  compPct: { fontSize: font.body, fontWeight: font.weight.heavy, color: color.ink, fontVariant: ['tabular-nums'], textAlign: 'right' },
+  // Performance stays MUTED (▲/▼ shows direction); never a verdict color.
+  compPerf: { fontSize: font.small, fontWeight: font.weight.bold, color: color.muted, fontVariant: ['tabular-nums'], marginTop: 3 },
+  compPerfDown: { color: color.faint },
+  compPerfPending: { fontSize: font.tiny, fontWeight: font.weight.medium, color: color.faint, marginTop: 3 },
   compNote: { fontSize: font.tiny, color: color.faint, fontStyle: 'italic', paddingHorizontal: space.lg, marginTop: 2, marginBottom: space.sm, lineHeight: 14 },
   logRow: {
     flexDirection: 'row',
