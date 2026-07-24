@@ -8,6 +8,7 @@ import { PerformanceCard } from '../components/PerformanceCard';
 import { VerdictBadge } from '../components/VerdictBadge';
 import { actorDescriptor, daysBetween, lagWord } from '../lib/derive';
 import { VERDICT_PERMISSION } from '../lib/frameworkB';
+import { resolvePrice } from '../lib/illustrative';
 import { dualAnchor, fmtPctCompact } from '../lib/performance';
 import type { StocksStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
@@ -38,7 +39,7 @@ export function StockDetailScreen() {
   const buys = activity.filter((t) => String(t.side).toUpperCase() !== 'SELL').length;
   const sells = activity.length - buys;
   const reason = plainReason(head);
-  const headPerf = dualAnchor(prices[ticker], head);
+  const headPerf = dualAnchor(resolvePrice(prices, head).price, head);
   const sinceDisclosed = headPerf ? fmtPctCompact(headPerf.sinceDisclosed) : null;
 
   return (
