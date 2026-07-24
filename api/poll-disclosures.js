@@ -7,6 +7,24 @@ import { classifyFB } from "./_lib/frameworkB.js";
 // Cache-aware screener. Uses Zoya when SCREENING_API_KEY is set, else the mock adapter —
 // the app keeps working without a key.
 import { screenCached } from "./_lib/screening/index.js";
+import { notificationRowsFor } from "./_lib/notify.js";
+
+// On a newly-inserted disclosure, write one in-app notification per follower of the portfolio.
+// Best-effort: any failure (tables absent, etc.) returns 0 and never blocks ingestion.
+async function notifyFollowers(db, disclosure) {
+  try {
+    const { data: fol, error } = await db.from("follows").select("user_id").eq("portfolio", disclosure.actor);
+    if (error || !fol || !fol.length) return 0;
+    const rows = notificationRowsFor(disclosure, fol.map((f) => f.user_id));
+    if (!rows.length) return 0;
+    const { error: nErr } = await db
+      .from("notifications")
+      .upsert(rows, { onConflict: "user_id,disclosure_id", ignoreDuplicates: true });
+    return nErr ? 0 : rows.length;
+  } catch {
+    return 0;
+  }
+}
 
 function dedupeKey(r) {
   return [r.source, r.actor, r.ticker, r.transactionDate, r.side].join("|");
@@ -47,7 +65,7 @@ export default async function handler(req, res) {
       });
     }
 
-    let inserted = 0;
+    let inserted = 0, notified = 0;
     for (const d of incoming) {
       const s = await screenCached(db, d.ticker); // raw screening inputs (cached, 30-day)
       const rec = { ...d, ...s };
@@ -57,10 +75,14 @@ export default async function handler(req, res) {
         .from("disclosures")
         .upsert(toRow(rec), { onConflict: "dedupe_key", ignoreDuplicates: true })
         .select("id");
-if (!error && data && data.length) inserted++;
-      // TODO (next step): if inserted, queue a push notification in alerts_sent.
+      if (!error && data && data.length) {
+        inserted++;
+        // Fan out an in-app notification to everyone following this portfolio (best-effort;
+        // tolerant of the follows/notifications tables being absent). Never blocks ingest.
+        notified += await notifyFollowers(db, { ...rec, id: data[0].id });
+      }
     }
-    return res.status(200).json({ ok: true, checked: incoming.length, inserted });
+    return res.status(200).json({ ok: true, checked: incoming.length, inserted, notified });
   } catch (e) {
     // Keep the cron alive on unexpected errors too (report in the body, not via a 5xx that
     // would get the job auto-disabled). Truly fatal misconfig still surfaces here.
