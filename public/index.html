@@ -335,6 +335,25 @@
   .btn-ghost{flex:0 0 auto;height:50px;padding:0 18px;border:1px solid var(--line-2);border-radius:15px;background:transparent;color:var(--muted);font-size:14px;font-weight:750;cursor:pointer;}
   .btn-primary{flex:1;height:50px;border:0;border-radius:15px;background:var(--gold);color:#1a1204;font-size:15px;font-weight:850;cursor:pointer;}
   .link-btn{background:transparent;border:0;color:var(--gold);font-size:13px;font-weight:750;cursor:pointer;padding:0;text-decoration:underline;}
+
+  /* ---- Glossary term (tap-to-explain "?") ---- */
+  .term{position:relative;display:inline-flex;align-items:center;}
+  .term-q{margin-left:4px;width:15px;height:15px;flex:none;border:0;border-radius:50%;background:var(--surface-2);
+    color:var(--muted);font-size:9.5px;font-weight:800;line-height:1;cursor:pointer;display:inline-grid;place-items:center;
+    padding:0;vertical-align:middle;border:1px solid var(--line-2);}
+  .term-q:active{transform:scale(.9);}
+  .term-pop{position:absolute;top:calc(100% + 7px);left:0;z-index:55;width:232px;max-width:74vw;
+    background:#0C1424;color:#EAEDF4;font-size:11.5px;font-weight:500;line-height:1.5;letter-spacing:0;
+    text-transform:none;text-align:left;padding:11px 13px;border-radius:12px;
+    box-shadow:0 12px 32px -12px rgba(8,13,24,.6);border:1px solid rgba(255,255,255,.09);}
+  .term-pop::before{content:"";position:absolute;bottom:100%;left:14px;border:6px solid transparent;border-bottom-color:#0C1424;}
+
+  /* ---- Detail: purification stat secondary note + "what this means" line ---- */
+  .dx-stat b.txt{font-size:14px;line-height:1.25;}
+  .dx-stat-sub{display:block;margin-top:4px;font-size:10px;font-weight:600;color:#8A93A6;font-variant-numeric:tabular-nums;}
+  .dx-means{margin:16px 2px 0;font-size:14px;line-height:1.55;font-weight:500;color:#3C465C;
+    padding:13px 15px;background:var(--gold-soft);border:1px solid rgba(217,180,80,.28);border-radius:14px;}
+  .dx-means b{color:#141C2E;font-weight:700;}
 </style>
 </head>
 <body>
@@ -362,10 +381,96 @@ function classifyFB(rec = {}) {
 const labelOf = t => t.screened === false ? "unscreened" : classifyFB(t);
 const VSHORT = { clean:"Clean", purify:"Purify", fail:"Fail", unscreened:"Unscreened" };
 
+/* ---------- centralized beginner-language copy + helpers (v0.3 pass) ----------
+   Grouped here so a later Arabic (RTL) pass can translate in one place.
+   NONE of this touches classifyFB / labelOf — verdict LOGIC is unchanged; this is
+   presentation only: words, money framing, judgment words, and actor descriptors. */
+
+// Rule 1 — a verdict is PERMISSION, never a recommendation. (never: own it, buy, pick…)
+const PERMISSION = {
+  clean:      "Permissible to own",
+  purify:     "Permissible — charity owed on profit",
+  fail:       "Not permissible to own",
+  unscreened: "Not checked yet",
+};
+
+// Rule 4 — one plain descriptor per actor, derived from kind / source.
+function actorDescriptor(t){
+  if (!t) return null;
+  const kind = String(t.kind||"").toLowerCase();
+  const src  = String(t.source||"").toLowerCase();
+  if (src.includes("senate")) return "a US senator";
+  if (src.includes("house"))  return "a US representative";
+  if (kind.includes("congress")||kind.includes("official")) return "a US lawmaker";
+  if (kind.includes("insider")||src.includes("form 4")) return "a corporate insider";
+  if (kind.includes("fund")||kind.includes("13f")||kind.includes("institution")) return "an institutional investment fund";
+  return null;
+}
+
+// Rule 3 — a filing lag never stands bare; it carries a plain judgment word.
+function filingLag(t){
+  const d = daysBetween(t.transactionDate, t.filingDate);
+  if (d==null) return null;
+  const word = d<=10 ? "fast" : d<=30 ? "typical" : "slow";
+  const days = d + (d===1?" day":" days");
+  return { days:d, word,
+    short: `Filed ${days} after — ${word}`,
+    full:  `Filed ${days} after the trade — ${word} (the law allows up to 45).` };
+}
+
+// Rule 2 — purification led by MONEY on a $1,000 profit; % kept only as a small note.
+function purificationMoney(t){
+  const impure = Number(t.impurePct||0);
+  if (t.screened===false)             return { big:"Not calculated yet", sub:null, line:"Not calculated yet." };
+  if (t.label==="fail")               return { big:"—", sub:null, line:null };
+  if (t.label==="clean" || impure<=0) return { big:"Nothing owed", sub:null, line:"Nothing owed." };
+  const perK = Math.round(impure*10); // impure% of a $1,000 profit
+  return { big:`$${perK}`, sub:`per $1,000 profit · ${impure}%`, perK, pct:impure,
+           line:`About $${perK} to charity on every $1,000 of profit` };
+}
+
+// Rule 5 — one factual "what this means for you" line composed from available data.
+function whatThisMeans(t, discPrice, quoteVal){
+  if (discPrice==null || quoteVal==null) return "Prices aren’t available for this name yet.";
+  const isSell = String(t.side).toUpperCase()==="SELL";
+  const at = `$${discPrice.toFixed(2)}`, now = `$${quoteVal.toFixed(2)}`;
+  if (isSell) return `They sold at ${at}. It’s ${now} today.`;
+  const tail = quoteVal!==discPrice ? " — you’re not getting their price." : ".";
+  return `They bought at ${at}. It’s ${now} today${tail}`;
+}
+
+// Evidence accordions — closed-row summaries rich enough to read the screen shut.
+function whyClosed(t){
+  if (t.screened===false) return "No screening data yet — manual review";
+  const impure = Number(t.impurePct||0), debt = Number(t.debtRatio||0);
+  const status = t.label==="fail" ? "Excluded" : "Permitted";
+  return `${status} · ${impure.toFixed(1)}% impure · debt ${debt?debt.toFixed(1)+"% (advisory)":"n/a"}`;
+}
+
+/* ---------- glossary: tappable "?" popover, no jargon left unexplained ---------- */
+const GLOSSARY = {
+  "disclosure":    "A public record — filed with regulators — that a fund, lawmaker, or insider bought or sold a stock.",
+  "13F":           "A quarterly filing in which large institutional investment funds list the US stocks they hold.",
+  "purification":  "Giving away the small share of a profit that came from impermissible income, so what you keep is clean.",
+  "impure income": "The slice of a company’s revenue that comes from non-permissible sources — interest, for example.",
+};
+function Term({term, children}){
+  const [open,setOpen] = useState(false);
+  return html`<span class="term">${children}<button class="term-q" aria-label=${"What does "+term+" mean?"} aria-expanded=${open}
+      onClick=${e=>{e.stopPropagation();e.preventDefault();setOpen(o=>!o);}}>?</button>${open && html`<span class="term-pop" role="note" onClick=${e=>e.stopPropagation()}>${GLOSSARY[term]}</span>`}</span>`;
+}
+// TYPE_LABEL rendered with "13F" made tappable when present.
+function TypeLabel({kind}){
+  const label = TYPE_LABEL(kind);
+  const i = label.indexOf("13F");
+  if (i<0) return html`<span>${label}</span>`;
+  return html`<span>${label.slice(0,i)}<${Term} term="13F">13F</${Term}>${label.slice(i+3)}</span>`;
+}
+
 /* ---------- sample data (used only if /api/feed is unavailable) ---------- */
 const SAMPLE = [
-  {id:1,actor:"Renaissance Technologies",kind:"13F Fund",initials:"RT",source:"13F-HR",side:"BUY",ticker:"NVDA",company:"NVIDIA Corp.",amount:"$15K–$50K",transactionDate:"Jun 17, 2026",filingDate:"Jun 25, 2026",businessStatus:"pass",business:"Hardware, chips, AI infrastructure",impurePct:0,debtRatio:3.2,reasoning:"Permissible technology business with no impure income and low debt. A clean buy — nothing to purify at sale."},
-  {id:2,actor:"Public Official Filing",kind:"Congress",initials:"PO",source:"House PTR",side:"BUY",ticker:"AVGO",company:"Broadcom Inc.",amount:"$50K–$100K",transactionDate:"Jun 15, 2026",filingDate:"Jun 24, 2026",businessStatus:"watch",business:"Semiconductors & infrastructure software",impurePct:1.4,debtRatio:19,reasoning:"Core business permissible; a small slice of revenue is non-operating income. Buyable as Purify-at-sale."},
+  {id:1,actor:"Renaissance Technologies",kind:"13F Fund",initials:"RT",source:"13F-HR",side:"BUY",ticker:"NVDA",company:"NVIDIA Corp.",amount:"$15K–$50K",transactionDate:"Jun 17, 2026",filingDate:"Jun 25, 2026",businessStatus:"pass",business:"Hardware, chips, AI infrastructure",impurePct:0,debtRatio:3.2,reasoning:"Permissible technology business with no impure income and low debt. Permissible to own — nothing to purify at sale."},
+  {id:2,actor:"Public Official Filing",kind:"Congress",initials:"PO",source:"House PTR",side:"BUY",ticker:"AVGO",company:"Broadcom Inc.",amount:"$50K–$100K",transactionDate:"Jun 15, 2026",filingDate:"Jun 24, 2026",businessStatus:"watch",business:"Semiconductors & infrastructure software",impurePct:1.4,debtRatio:19,reasoning:"Core business permissible; a small slice of revenue is non-operating income. Permissible — charity owed on any profit at sale."},
   {id:3,actor:"Global Value Fund",kind:"13F Fund",initials:"GV",source:"13F-HR",side:"SELL",ticker:"JPM",company:"JPMorgan Chase & Co.",amount:"$50K–$100K",transactionDate:"Jun 11, 2026",filingDate:"Jun 23, 2026",businessStatus:"fail",business:"Conventional interest-based banking",impurePct:71,debtRatio:0,reasoning:"Excluded at the business-activity level: conventional banking and interest income are core to the model."},
   {id:4,actor:"Public Official Filing",kind:"Congress",initials:"PO",source:"House PTR",side:"SELL",ticker:"XOM",company:"Exxon Mobil Corp.",amount:"$15K–$50K",transactionDate:"Jun 02, 2026",filingDate:"Jun 17, 2026",businessStatus:"pass",business:"Energy production",impurePct:0,debtRatio:52,reasoning:"Permissible energy business, no impure income. Debt is above the advisory reference — but debt is advisory only under Framework B, so it stays Purify-at-sale, not Fail."},
   {id:5,actor:"Northstar Quant Partners",kind:"13F Fund",initials:"NQ",source:"13F-HR",side:"BUY",ticker:"MSFT",company:"Microsoft Corp.",amount:"$100K–$250K",transactionDate:"Jun 10, 2026",filingDate:"Jun 20, 2026",businessStatus:"pass",business:"Software & cloud infrastructure",impurePct:0,debtRatio:11,reasoning:"Permissible software business with no impure income and modest debt. Clean."},
@@ -486,7 +591,7 @@ function purificationPreview(t, prices){
   const p = prices && prices[t.ticker];
   const quote = (p && p.quote!=null) ? Number(p.quote) : null;
   if (quote==null) {
-    return { kind:"purify", text:`~${impure}% of any gain would be owed to charity at sale.`, note:"Purification applies at sale — amount pending live price." };
+    return { kind:"purify", text:`About $${Math.round(impure*10)} to charity on every $1,000 of profit at sale.`, note:`Purification applies at sale — amount pending live price (≈${impure}%).` };
   }
   const disclosed = Number(t.purchasePrice) || (p.history ? histClose(p.history, Date.parse(t.transactionDate||""), "onOrAfter") : null);
   const mid = (t.amountMid!=null && t.amountMid!=="" ? Number(t.amountMid) : null) || amountMidpoint(t.amount);
@@ -496,7 +601,7 @@ function purificationPreview(t, prices){
     const owed = gain>0 ? (impure/100)*gain : 0;
     estStr = ` (≈ $${owed.toFixed(2)} on the disclosed amount today)`;
   }
-  return { kind:"purify", text:`~${impure}% of any gain would be owed to charity at sale${estStr}.`, note:"Estimate — informational only, not a fatwa." };
+  return { kind:"purify", text:`About $${Math.round(impure*10)} to charity on every $1,000 of profit at sale${estStr}.`, note:`Estimate (≈${impure}%) — informational only, not a fatwa.` };
 }
 
 /* ---------- small components ---------- */
@@ -524,22 +629,21 @@ function Balance({trades}){
 // Feed card (handoff): leads with the verdict as WORDS, then ticker · company, one plain
 // sentence, then a quiet footer with the filing lag + muted price move.
 function Card({t,onOpen,prices}){
-  const impure = Number(t.impurePct||0);
-  const vwords = t.label==="clean" ? "Clean · own it"
-    : t.label==="purify" ? `Purify at sale · ≈${impure}%`
-    : t.label==="fail" ? "Fail · excluded"
-    : "Unscreened · manual review";
+  const vwords = PERMISSION[t.label] || PERMISSION.unscreened;
   const verb = String(t.side).toUpperCase()==="SELL" ? "sold" : "bought";
-  const filedAfter = daysBetween(t.transactionDate, t.filingDate);
+  const desc = actorDescriptor(t);
+  const lag = filingLag(t);
+  const purif = purificationMoney(t);
   const perf = prices ? perfFor(t, prices) : null;
   const move = perf && perf.since!=null ? fmtPctCompact(perf.since) : null;
   return html`
     <article class="fcard" onClick=${onOpen} role="button" aria-label=${t.ticker+" — "+vwords}>
       <div class=${"fc-v "+t.label}>${vwords}</div>
       <div class="fc-tk">${t.ticker} <span>· ${t.company||t.ticker}</span></div>
-      <p class="fc-sent">${t.actor} ${verb} ${t.amount||"—"}.</p>
+      <p class="fc-sent">${t.actor}${desc?", "+desc+",":""} ${verb} ${t.amount||"—"}.</p>
       <div class="fc-foot">
-        <span>${filedAfter!=null ? "Filed "+filedAfter+" day"+(filedAfter===1?"":"s")+" after" : "Filing lag n/a"}</span>
+        <span>${lag ? lag.short : "Filing lag n/a"}</span>
+        ${t.label==="purify" && purif.perK ? html`<${React.Fragment}><span class="sep">·</span><span>≈ $${purif.perK}/$1k profit to charity</span></${React.Fragment}>` : ""}
         <span class="sep">·</span>
         ${move ? html`<span class="mv">${move} since</span>` : html`<span>Price pending</span>`}
       </div>
@@ -549,10 +653,10 @@ function Card({t,onOpen,prices}){
 // Inline SVG price trend from the cached daily history — shape only, no axes, muted.
 /* ---------- light-redesign (handoff) detail helpers ---------- */
 const DXV = {
-  clean:      { word:"Clean",          txt:"#12925A", fill:"#3ECB86", tint:"rgba(18,146,90,.11)",  head:"You can own this." },
-  purify:     { word:"Purify at sale", txt:"#B87A0C", fill:"#F3B24A", tint:"rgba(184,122,12,.11)", head:"Buyable — with a cost." },
-  fail:       { word:"Fail",           txt:"#D24A41", fill:"#F0625A", tint:"rgba(210,74,65,.11)",  head:"You can’t own this." },
-  unscreened: { word:"Unscreened",     txt:"#6B7690", fill:"#AAB3C4", tint:"rgba(107,118,144,.12)",head:"We can’t tell you yet." },
+  clean:      { word:"Clean",          txt:"#12925A", fill:"#3ECB86", tint:"rgba(18,146,90,.11)",  head:"Permissible to own." },
+  purify:     { word:"Purify at sale", txt:"#B87A0C", fill:"#F3B24A", tint:"rgba(184,122,12,.11)", head:"Permissible — charity owed on profit." },
+  fail:       { word:"Fail",           txt:"#D24A41", fill:"#F0625A", tint:"rgba(210,74,65,.11)",  head:"Not permissible to own." },
+  unscreened: { word:"Unscreened",     txt:"#6B7690", fill:"#AAB3C4", tint:"rgba(107,118,144,.12)",head:"Not checked yet." },
 };
 function daysBetween(a, b){
   const t1 = Date.parse(a||""), t2 = Date.parse(b||"");
@@ -608,15 +712,12 @@ function Detail({t,onClose,prices,onOpenFiler}){
   const v = DXV[t ? t.label : "unscreened"] || DXV.unscreened;
   const impure = t ? Number(t.impurePct||0) : 0;
   const debt = t ? Number(t.debtRatio||0) : 0;
-  const filedAfter = t ? daysBetween(t.transactionDate, t.filingDate) : null;
   const isSell = t && String(t.side).toUpperCase()==="SELL";
   const sinceStr = perf && perf.since!=null ? fmtPctCompact(perf.since) : null;
   const meterW = Math.min(100, (impure/6)*100);
-  const purifStat = !t ? "" : t.screened===false ? "Pending" : t.label==="clean" ? "None" : t.label==="fail" ? "—" : `≈${impure}%`;
-  const whySum = !t ? "" : t.screened===false ? "No screening data yet"
-    : t.label==="clean" ? "Impure income well under the limit"
-    : t.label==="fail" ? (impure>5 ? "Impure income above the 5% limit" : "Excluded business activity")
-    : (impure>0 ? `Impure income ${impure}% — within the 5% limit` : "Debt above advisory — still buyable");
+  const desc = t ? actorDescriptor(t) : null;
+  const lag = t ? filingLag(t) : null;
+  const purif = t ? purificationMoney(t) : null;
   const showMeter = t && t.screened!==false && !(t.label==="fail" && impure<=5);
   const discPrice = (t && pr?.history) ? histClose(pr.history, Date.parse(t.transactionDate||""), "onOrAfter") : null;
   const filedPrice = (t && pr?.history) ? histClose(pr.history, Date.parse(t.filingDate||""), "onOrAfter") : null;
@@ -637,25 +738,31 @@ function Detail({t,onClose,prices,onOpenFiler}){
         </div>
 
         <div class="dx-stats">
-          <div class="dx-stat"><small>Purification</small><b>${purifStat}</b></div>
-          <div class="dx-stat"><small>Filed after</small><b>${filedAfter!=null ? filedAfter+(filedAfter===1?" day":" days") : "—"}</b></div>
-          <div class="dx-stat"><small>Since disclosed</small><b class="muted">${sinceStr || "Pending"}</b></div>
+          <div class="dx-stat">
+            <small><${Term} term="purification">Purification</${Term}></small>
+            <b class=${purif.big.length>4?"txt":""}>${purif.big}</b>
+            ${purif.sub && html`<span class="dx-stat-sub">${purif.sub}</span>`}
+          </div>
+          <div class="dx-stat"><small>Filing lag</small><b>${lag ? lag.days+(lag.days===1?" day":" days") : "—"}</b>${lag && html`<span class="dx-stat-sub">${lag.word}</span>`}</div>
+          <div class="dx-stat"><small>Since disclosed</small><b class="muted txt">${sinceStr || "Pending"}</b></div>
         </div>
 
+        <p class="dx-means">${whatThisMeans(t, discPrice, quoteVal)}</p>
+
         <p class="dx-narr">
-          <button class="dx-link" onClick=${onOpenFiler?()=>onOpenFiler(t.actor):null}>${t.actor}</button>${" "}${isSell?"sold":"bought"} <b>${t.amount||"—"}</b>${filedAfter!=null ? html` — you’re seeing it <b>${filedAfter} ${filedAfter===1?"day":"days"} later</b>.` : "."}
+          <button class="dx-link" onClick=${onOpenFiler?()=>onOpenFiler(t.actor):null}>${t.actor}</button>${desc?", "+desc+",":""} ${isSell?"sold":"bought"} <b>${t.amount||"—"}</b>. ${lag ? html`You’re seeing it <b>${lag.days} ${lag.days===1?"day":"days"} later</b> — that’s ${lag.word} (the law allows up to 45 days).` : ""}
         </p>
 
         <div class="dx-evi">Evidence</div>
 
         <div class="dx-acc">
           <button class="dx-acc-h" onClick=${()=>setOpenWhy(!openWhy)} aria-expanded=${openWhy}>
-            <div><b>Why this verdict</b><span>${whySum}</span></div><em>${openWhy?"–":"+"}</em>
+            <div><b>Why this verdict</b><span>${whyClosed(t)}</span></div><em>${openWhy?"–":"+"}</em>
           </button>
           ${openWhy && html`<div class="dx-acc-b">
             ${!showMeter ? html`<p class="dx-note">${t.screened===false ? "No screening data available yet — treated as manual review, never guessed." : (t.reasoning||"Excluded at the business-activity level.")}</p>`
               : html`
-              <div class="dx-meter-top"><span>Impure income</span><b style=${{color:v.txt}}>${impure.toFixed(1)}%</b></div>
+              <div class="dx-meter-top"><span><${Term} term="impure income">Impure income</${Term}></span><b style=${{color:v.txt}}>${impure.toFixed(1)}%</b></div>
               <div class="dx-meter"><i style=${{width:meterW+"%",background:v.fill}}></i><span class="dx-thr"></span><span class="dx-thr-l">5% limit</span></div>
               <p class="dx-note" style=${{marginTop:"26px"}}>${bizPhrase(t).charAt(0).toUpperCase()+bizPhrase(t).slice(1)} — ${impure>5?"impure income above the limit":"a permissible business"}. Debt / market cap ${debt?debt.toFixed(1)+"% (advisory only)":"n/a"}.</p>`}
           </div>`}
@@ -663,7 +770,7 @@ function Detail({t,onClose,prices,onOpenFiler}){
 
         <div class="dx-acc">
           <button class="dx-acc-h" onClick=${()=>setOpenPrice(!openPrice)} aria-expanded=${openPrice}>
-            <div><b>Price context</b><span>${sinceStr ? sinceStr+" since disclosed" : "Price pending"}</span></div><em>${openPrice?"–":"+"}</em>
+            <div><b>Price context</b><span>${quoteVal!=null ? "$"+quoteVal.toFixed(2)+" now"+(sinceStr?" · "+sinceStr+" since":"") : "Price pending"}</span></div><em>${openPrice?"–":"+"}</em>
           </button>
           ${openPrice && html`<div class="dx-acc-b">
             ${perf ? html`
@@ -679,7 +786,7 @@ function Detail({t,onClose,prices,onOpenFiler}){
 
         <div class="dx-acc">
           <button class="dx-acc-h" onClick=${()=>setOpenDisc(!openDisc)} aria-expanded=${openDisc}>
-            <div><b>Disclosure details</b><span>${srcLabel(t)} · ${t.filingDate||"—"}</span></div><em>${openDisc?"–":"+"}</em>
+            <div><b>Disclosure details</b><span>${(isSell?"Sale":"Purchase")+" · "+(t.amount||"—")+" · "+srcLabel(t)}</span></div><em>${openDisc?"–":"+"}</em>
           </button>
           ${openDisc && html`<div class="dx-acc-b dx-facts">
             <div><span>Transaction</span><span>${isSell?"Sale":"Purchase"}</span></div>
@@ -737,7 +844,7 @@ function MixBar({s}){
 }
 
 /* Filer profile (handoff C) — a source's public track record, framed as history and
-   evidence, NEVER "copy them". Shows the verdict mix of their picks, never returns. */
+   evidence, NEVER "copy them". Shows the verdict mix of their disclosures, never returns. */
 function FilerScreen({actor, trades, prices, onClose, onOpenTicker}){
   const open = !!actor;
   const rows = actor ? trades.filter(t=>t.actor===actor) : [];
@@ -756,14 +863,14 @@ function FilerScreen({actor, trades, prices, onClose, onOpenTicker}){
 
         <div class="fp-id">
           <div class="fp-av">${s.initials||"·"}</div>
-          <div><div class="fp-name">${actor}</div><div class="fp-role">${TYPE_LABEL(s.kind)} · disclosed record</div></div>
+          <div><div class="fp-name">${actor}</div><div class="fp-role">${(actorDescriptor(rows[0])||TYPE_LABEL(s.kind))} · disclosed record</div></div>
         </div>
 
         <h2 class="fp-h2">${rows.length} disclosure${rows.length===1?"":"s"} tracked${since!=null?` since ${since}`:""}.</h2>
         <p class="fp-frame">Public filing record. Framed as history — not a recommendation to follow.</p>
 
         <div class="fp-mix">
-          <div class="mh">How their picks screen</div>
+          <div class="mh">How their disclosures screen</div>
           <div class="fp-mixbar">${mixSeg.map(m=> m[1]>0 && html`<i key=${m[0]} class=${"b-"+m[0]} style=${{flex:m[1]}}></i>`)}</div>
           <div class="fp-mixleg">
             <span><i style=${{background:"var(--clean)"}}></i>Clean ${pct(s.clean)}%</span>
@@ -793,7 +900,7 @@ function SourceCard({s, on, onToggle}){
     <div class="src-card">
       <div class="src-top">
         <div class=${"avatar "+(s.fund?"fund":"")}>${s.initials}</div>
-        <div class="c-who"><b>${s.name}</b><span>${TYPE_LABEL(s.kind)}</span></div>
+        <div class="c-who"><b>${s.name}</b><span><${TypeLabel} kind=${s.kind} /></span></div>
         <div class=${"toggle "+(on?"on":"")} role="switch" aria-checked=${on}
              aria-label=${(on?"Unfollow ":"Follow ")+s.name} onClick=${onToggle}><i></i></div>
       </div>
@@ -835,7 +942,7 @@ function Verdicts({trades}){
   const f = trades.filter(t=>t.label==="fail").length;
   const rows = [
     ["clean","Clean","Permissible business with no impure income — nothing to purify."],
-    ["purify","Purify-at-sale","Buyable, but a purification amount applies at sale (non-zero impure income, or debt over the advisory level)."],
+    ["purify","Purify-at-sale","Permissible to own, but charity is owed on any profit at sale (non-zero impure income, or debt over the advisory level)."],
     ["fail","Fail","Impermissible business activity, or impure income above 5%."],
   ];
   return html`
@@ -889,7 +996,7 @@ function Onboarding({sources, isFollowed, setFollow, onDone}){
             <h2>Every name gets a verdict</h2>
             <p class="lead">Before a disclosure reaches your alerts, Mizān screens it under Framework B (Hanbali). There are three outcomes:</p>
             <div class="vrow"><span class="badge clean">Clean</span><div class="vt"><b>Clean</b><small>Permissible business with no impure income — nothing to purify.</small></div></div>
-            <div class="vrow"><span class="badge purify">Purify</span><div class="vt"><b>Purify-at-sale</b><small>Buyable, but a purification amount applies at sale — some impure income, or debt over the advisory level.</small></div></div>
+            <div class="vrow"><span class="badge purify">Purify</span><div class="vt"><b>Purify-at-sale</b><small>Permissible to own, but charity is owed on any profit at sale — some impure income, or debt over the advisory level.</small></div></div>
             <div class="vrow"><span class="badge fail">Fail</span><div class="vt"><b>Fail</b><small>Impermissible business activity, or impure income above 5%.</small></div></div>
           </${React.Fragment}>`}
         ${step===1 && html`
@@ -1015,7 +1122,7 @@ function App(){
                 ${s[0]!=="all" && html`<span class=${"dot "+s[0][0]}></span>`}${s[1]}
               </button>`)}
           </div>
-          <div class="list-head"><h2>Latest disclosures</h2><span>${shown.length} shown</span></div>
+          <div class="list-head"><h2>Latest <${Term} term="disclosure">disclosures</${Term}></h2><span>${shown.length} shown</span></div>
           ${shown.length ? html`<div class="list">${shown.map(t=>html`<${Card} key=${t.id||t.ticker+t.filingDate} t=${t} onOpen=${()=>setSelected(t)} prices=${prices} />`)}</div>`
             : html`<div class="empty">No disclosures match this filter yet.</div>`}
         `}
