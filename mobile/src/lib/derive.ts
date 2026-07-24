@@ -144,6 +144,62 @@ export function portfolioComposition(rows: Disclosure[]): Holding[] {
     .sort((a, b) => b.weightPct - a.weightPct);
 }
 
+/** A smart-money ranked stock row (Tab 2). Mirrors api/_lib/trends.js. */
+export interface SmartRow {
+  ticker: string;
+  company: string;
+  label: Label;
+  /** Σ trade-value-as-%-of-filer-position across filers — the rank metric. */
+  netWeightPct: number;
+  /** Σ disclosed midpoints — secondary $ volume. */
+  dollarVol: number;
+  filers: number;
+}
+
+/**
+ * Client-side smart-money aggregation (fallback for /api/smart-money): ranks stocks on a side
+ * by trade value as a % of each filer's position size, summed across filers. `rows` should be
+ * the already-gated feed (unscreened excluded). `withinDays` filters by filing recency.
+ */
+export function deriveSmartMoney(
+  rows: Disclosure[],
+  side: 'BUY' | 'SELL',
+  withinDays = Infinity,
+  nowMs = Date.now(),
+): SmartRow[] {
+  const totals = new Map<string, number>();
+  for (const r of rows) totals.set(r.actor, (totals.get(r.actor) || 0) + Math.abs(Number(r.amountMid || 0)));
+  const map = new Map<string, { ticker: string; company: string; label: Label; net: number; dollar: number; filers: Set<string> }>();
+  for (const r of rows) {
+    if ((String(r.side).toUpperCase() === 'SELL' ? 'SELL' : 'BUY') !== side) continue;
+    if (withinDays !== Infinity) {
+      const f = Date.parse(r.filingDate || '');
+      if (Number.isNaN(f) || nowMs - f > withinDays * 86_400_000) continue;
+    }
+    const amt = Math.abs(Number(r.amountMid || 0));
+    const ft = totals.get(r.actor) || amt || 1;
+    const w = ft > 0 ? amt / ft : 0;
+    const m =
+      map.get(r.ticker) || { ticker: r.ticker, company: r.company || r.ticker, label: r.label, net: 0, dollar: 0, filers: new Set<string>() };
+    m.net += w;
+    m.dollar += amt;
+    m.filers.add(r.actor);
+    m.label = r.label;
+    map.set(r.ticker, m);
+  }
+  return [...map.values()]
+    .map((m) => ({ ticker: m.ticker, company: m.company, label: m.label, netWeightPct: +(m.net * 100).toFixed(1), dollarVol: m.dollar, filers: m.filers.size }))
+    .sort((a, b) => b.netWeightPct - a.netWeightPct);
+}
+
+/** Compact $ money label (e.g. $1.2M, $340K). */
+export function fmtMoney(v: number): string {
+  const n = Math.abs(v);
+  if (n >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${Math.round(v / 1_000)}K`;
+  return `$${Math.round(v)}`;
+}
+
 /** Days between two dates, floored at 0 (filing lag). */
 export function daysBetween(a?: string, b?: string): number | null {
   const t1 = Date.parse(a || '');
