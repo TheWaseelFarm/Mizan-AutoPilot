@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Disclaimer } from '../components/Disclaimer';
 import { FollowButton } from '../components/FollowButton';
 import { MixBar } from '../components/MixBar';
+import { PerformanceChart } from '../components/PerformanceChart';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
   actorDescriptor,
@@ -16,6 +17,7 @@ import {
   portfolioFlag,
 } from '../lib/derive';
 import { dualAnchor, fmtPctCompact } from '../lib/performance';
+import { portfolioIndex } from '../lib/portfolioPerf';
 import type { HomeStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
 import { color, font, radius, shadow, space, verdictColor } from '../theme/tokens';
@@ -47,6 +49,8 @@ export function PortfolioDetailScreen() {
   const avgLag = averageLag(activity);
   const composition = useMemo(() => portfolioComposition(activity), [activity]);
   const maxWeight = composition[0]?.weightPct || 1;
+  const pp = useMemo(() => portfolioIndex(composition, activity, prices), [composition, activity, prices]);
+  const ppSince = pp?.sinceDisclosed != null ? fmtPctCompact(pp.sinceDisclosed) : null;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: space.xxl }}>
@@ -79,9 +83,27 @@ export function PortfolioDetailScreen() {
       </View>
       <View style={styles.stats}>
         <Stat label="Risk appetite" value="Pending" muted />
-        <Stat label="Performance" value="Pending" muted />
+        <Stat label="Performance" value={ppSince || 'Pending'} muted />
         <Stat label="Followers" value="—" muted />
       </View>
+
+      {/* Portfolio performance — a weighted index of the holdings (spec §4). Muted. */}
+      {pp && pp.history.length > 1 ? (
+        <View style={styles.perfCard}>
+          <View style={styles.perfHead}>
+            <Text style={styles.perfTitle}>Performance</Text>
+            {pp.illustrative ? (
+              <View style={styles.illBadge}>
+                <Text style={styles.illText}>Illustrative · not live prices</Text>
+              </View>
+            ) : null}
+          </View>
+          <PerformanceChart history={pp.history} />
+          <Text style={styles.perfSub}>
+            Weighted index of the holdings{ppSince ? ` · ${ppSince} since disclosed` : ''}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Composition — how much of the portfolio each stock makes up (informational). */}
       <View style={styles.compHead}>
@@ -222,6 +244,20 @@ const styles = StyleSheet.create({
     marginTop: space.md,
     marginBottom: space.sm,
   },
+  perfCard: {
+    marginHorizontal: space.lg,
+    marginTop: space.md,
+    padding: space.lg,
+    borderRadius: radius.md,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.line,
+  },
+  perfHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.sm },
+  perfTitle: { fontSize: font.tiny, fontWeight: font.weight.heavy, color: color.faint, textTransform: 'uppercase', letterSpacing: 0.6 },
+  perfSub: { fontSize: font.small, color: color.faint, marginTop: space.sm },
+  illBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm, backgroundColor: color.surfaceAlt, borderWidth: 1, borderColor: color.line2 },
+  illText: { fontSize: 9.5, fontWeight: font.weight.bold, color: color.faint, letterSpacing: 0.2 },
   compHead: { paddingHorizontal: space.lg, marginTop: space.md, marginBottom: space.sm },
   compSub: { fontSize: font.small, color: color.faint, marginTop: 2 },
   allocBar: {
