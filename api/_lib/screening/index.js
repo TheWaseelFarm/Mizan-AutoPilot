@@ -1,17 +1,27 @@
 // api/_lib/screening/index.js
-// Screening resolver + cache. Picks the live adapter (Zoya) when SCREENING_API_KEY is set,
+// Screening resolver + cache. Picks the live adapter when SCREENING_API_KEY is set,
 // otherwise falls back to the mock adapter so the app keeps working without a key.
+//
+// Provider is chosen by SCREENING_PROVIDER ("halalterminal" (default) | "zoya"). Halal
+// Terminal is the v1 provider (spec §7); Zoya is kept as an alternative adapter.
 //
 // Every adapter returns RAW inputs (business activity, impure %, debt) — NEVER a vendor
 // pass/fail verdict. Framework B (api/_lib/frameworkB.js) is the only thing that decides
 // the verdict; it is not touched here.
+import { screen as halalTerminalScreen } from "./halalterminal.js";
 import { screen as mockScreen } from "./mock.js";
 import { screen as zoyaScreen } from "./zoya.js";
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 
+const LIVE_ADAPTERS = { halalterminal: halalTerminalScreen, zoya: zoyaScreen };
+
 export const usingLiveScreener = () => !!process.env.SCREENING_API_KEY;
-export function activeScreener() { return usingLiveScreener() ? zoyaScreen : mockScreen; }
+export function activeScreener() {
+  if (!usingLiveScreener()) return mockScreen;
+  const provider = String(process.env.SCREENING_PROVIDER || "halalterminal").toLowerCase();
+  return LIVE_ADAPTERS[provider] || halalTerminalScreen;
+}
 
 // Inert "unscreened" payload. Reasoning starts with the "No screening data" marker so
 // api/feed.js derives screened:false (grey Unscreened state) even without a DB column.
