@@ -18,6 +18,8 @@ export interface Price {
   quote: number | null;
   history: PricePoint[];
   updatedAt?: string;
+  /** true when this is a synthetic design placeholder, not real market data. */
+  illustrative?: boolean;
 }
 export type PricesMap = Record<string, Price>;
 

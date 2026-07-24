@@ -1,14 +1,16 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { resolvePrice } from '../lib/illustrative';
 import { dualAnchor, fmtPctCompact, type PricesMap } from '../lib/performance';
 import { color, font, radius, space } from '../theme/tokens';
-import { Sparkline } from './Sparkline';
+import { PerformanceChart } from './PerformanceChart';
 
 /**
- * Dual-anchor performance (spec §3.4): both anchors labelled, a sparkline, and the
- * freshness note when most of the move predates the public filing. All muted (evidence,
- * never a verdict color). Honest: no cached price -> "Price pending", never a fake 0%.
+ * Dual-anchor performance (spec §3.4/§4): a proper chart with the trade-point vs filing-point
+ * markers, both anchors labelled, and the freshness note. All muted (evidence, never a verdict
+ * color). Uses the REAL cached price when available; otherwise a clearly-labelled illustrative
+ * placeholder so the chart is visible before the live FMP cache is populated.
  */
 export function PerformanceCard({
   disclosure,
@@ -17,7 +19,7 @@ export function PerformanceCard({
   disclosure: { ticker: string; transactionDate?: string; filingDate?: string };
   prices: PricesMap;
 }) {
-  const price = prices[disclosure.ticker];
+  const { price, illustrative } = resolvePrice(prices, disclosure);
   const perf = dualAnchor(price, disclosure);
 
   if (!perf) {
@@ -34,8 +36,20 @@ export function PerformanceCard({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Performance</Text>
-      {price?.history?.length ? <Sparkline history={price.history} /> : null}
+      <View style={styles.head}>
+        <Text style={styles.title}>Performance</Text>
+        {illustrative ? (
+          <View style={styles.illBadge}>
+            <Text style={styles.illText}>Illustrative · not live prices</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <PerformanceChart
+        history={price.history}
+        transactionDate={disclosure.transactionDate}
+        filingDate={disclosure.filingDate}
+      />
 
       <View style={styles.anchors}>
         <Anchor label="Since disclosed" value={sinceDisclosed} sub="from the trade date" />
@@ -57,6 +71,12 @@ export function PerformanceCard({
         </Text>
         <Text style={styles.price}>now ${perf.now.toFixed(2)}</Text>
       </View>
+
+      {illustrative ? (
+        <Text style={styles.illNote}>
+          Illustrative sample series — not real market data. Set an FMP key to show live prices.
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -81,14 +101,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.line,
   },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.sm },
   title: {
     fontSize: font.tiny,
     fontWeight: font.weight.heavy,
     color: color.faint,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginBottom: space.sm,
   },
+  illBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    backgroundColor: color.surfaceAlt,
+    borderWidth: 1,
+    borderColor: color.line2,
+  },
+  illText: { fontSize: 9.5, fontWeight: font.weight.bold, color: color.faint, letterSpacing: 0.2 },
   pending: { fontSize: font.small, color: color.faint, lineHeight: 18 },
   anchors: { flexDirection: 'row', gap: space.md, marginTop: space.md },
   anchor: { flex: 1 },
@@ -96,13 +125,9 @@ const styles = StyleSheet.create({
   // Muted — evidence, never a verdict color.
   anchorValue: { fontSize: font.h2, fontWeight: font.weight.heavy, color: color.muted, marginTop: 4, fontVariant: ['tabular-nums'] },
   anchorSub: { fontSize: font.tiny, color: color.faint, marginTop: 2 },
-  fresh: {
-    marginTop: space.md,
-    padding: space.md,
-    borderRadius: radius.sm,
-    backgroundColor: color.surfaceAlt,
-  },
+  fresh: { marginTop: space.md, padding: space.md, borderRadius: radius.sm, backgroundColor: color.surfaceAlt },
   freshText: { fontSize: font.small, color: color.muted, fontWeight: font.weight.medium, lineHeight: 18 },
   prow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.md },
   price: { fontSize: font.small, color: color.faint, fontWeight: font.weight.medium, fontVariant: ['tabular-nums'] },
+  illNote: { fontSize: font.tiny, color: color.faint, fontStyle: 'italic', marginTop: space.sm, lineHeight: 14 },
 });
