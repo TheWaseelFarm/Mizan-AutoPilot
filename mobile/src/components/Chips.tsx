@@ -1,43 +1,59 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { color, font, radius, space } from '../theme/tokens';
 
-/** A horizontally-scrolling row of selectable pill chips (time-frame, sort, filters). */
+/**
+ * A labelled, horizontally-scrolling row of selectable pill chips. The `label` (e.g. "Time",
+ * "Sort by", "Compliance") makes each control group unmistakable — no chip row can be taken
+ * for a navigation tab (v1-extend task #2).
+ */
 export function ChipRow<T extends string>({
   options,
   value,
   onChange,
+  label,
 }: {
   options: readonly { key: T; label: string }[];
   value: T;
   onChange: (key: T) => void;
+  label?: string;
 }) {
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.row}
-    >
-      {options.map((o) => {
-        const on = o.key === value;
-        return (
-          <TouchableOpacity
-            key={o.key}
-            onPress={() => onChange(o.key)}
-            activeOpacity={0.7}
-            style={[styles.chip, on && styles.chipOn]}
-          >
-            <Text style={[styles.chipText, on && styles.chipTextOn]}>{o.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+    <View style={styles.group}>
+      {label ? <Text style={styles.groupLabel}>{label}</Text> : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        {options.map((o) => {
+          const on = o.key === value;
+          return (
+            <TouchableOpacity
+              key={o.key}
+              onPress={() => onChange(o.key)}
+              activeOpacity={0.7}
+              style={[styles.chip, on && styles.chipOn]}
+            >
+              <Text style={[styles.chipText, on && styles.chipTextOn]}>{o.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.sm },
+  group: { marginBottom: 2 },
+  groupLabel: {
+    fontSize: font.tiny,
+    fontWeight: font.weight.heavy,
+    color: color.faint,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    paddingHorizontal: space.lg,
+    marginTop: space.sm,
+    marginBottom: 2,
+  },
+  row: { gap: space.sm, paddingHorizontal: space.lg, paddingVertical: 6 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,

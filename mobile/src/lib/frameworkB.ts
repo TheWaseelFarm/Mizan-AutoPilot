@@ -57,6 +57,15 @@ export function purificationEstimate(rec: ScreenableRecord = {}, realizedGain = 
   return +(gain * (impure / 100)).toFixed(2);
 }
 
+/**
+ * Completeness gate (v1-extend decision #2): an item is surfaced only when fully screened
+ * with a verdict. Unscreened items never appear in any list, feed, or search. Mirrors the
+ * backend `passesGate` in api/feed.js so the rule lives in one place conceptually.
+ */
+export function isScreened(rec: { label?: Label; screened?: boolean }): boolean {
+  return rec.screened !== false && rec.label !== 'unscreened' && !!rec.label;
+}
+
 export const VERDICT_SHORT: Record<Label, string> = {
   clean: 'Clean',
   purify: 'Purify at sale',

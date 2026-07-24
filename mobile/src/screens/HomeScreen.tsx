@@ -37,8 +37,14 @@ const TIMEFRAMES = [
 
 const SORTS = [
   { key: 'performance', label: 'Performance' },
-  { key: 'sharia', label: 'Sharia mix' },
   { key: 'followers', label: 'Followers' },
+] as const;
+
+// Compliance FILTERS the list (it is not a sort) — v1-extend task #2.
+const COMPLIANCE = [
+  { key: 'all', label: 'All' },
+  { key: 'fully', label: 'Fully compliant' },
+  { key: 'exclude', label: 'Exclude non-compliant' },
 ] as const;
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Home'>;
@@ -49,6 +55,7 @@ export function HomeScreen() {
   const { rows, loading, live, refresh } = useFeed();
   const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('1M');
   const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('performance');
+  const [compliance, setCompliance] = useState<(typeof COMPLIANCE)[number]['key']>('all');
   const [query, setQuery] = useState('');
 
   const portfolios = useMemo(() => {
@@ -61,13 +68,17 @@ export function HomeScreen() {
           p.tickers.some((t) => t.ticker.toLowerCase().includes(q)),
       );
     }
-    if (sort === 'sharia') {
-      list = [...list].sort((a, b) => cleanShare(b) - cleanShare(a));
+    // Compliance filter (not a sort): by the portfolio Sharia flag.
+    if (compliance !== 'all') {
+      list = list.filter((p) => {
+        const tone = portfolioFlag(p).tone;
+        return compliance === 'fully' ? tone === 'clean' : tone !== 'fail';
+      });
     }
     // 'performance' (default) and 'followers' keep the count-based order until
-    // the price cache / follower counts land (completeness gate, spec §7).
+    // the price cache / follower counts land.
     return list;
-  }, [rows, query, sort]);
+  }, [rows, query, sort, compliance]);
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -86,8 +97,9 @@ export function HomeScreen() {
         )}
         ListHeaderComponent={
           <View>
-            <ChipRow options={TIMEFRAMES} value={tf} onChange={setTf} />
-            <ChipRow options={SORTS} value={sort} onChange={setSort} />
+            <ChipRow label="Time" options={TIMEFRAMES} value={tf} onChange={setTf} />
+            <ChipRow label="Sort by" options={SORTS} value={sort} onChange={setSort} />
+            <ChipRow label="Compliance" options={COMPLIANCE} value={compliance} onChange={setCompliance} />
             <View style={styles.listHead}>
               <Text style={styles.listHeadTitle}>Ranked portfolios</Text>
               <Text style={styles.listHeadMeta}>
@@ -111,11 +123,6 @@ export function HomeScreen() {
       />
     </View>
   );
-}
-
-function cleanShare(p: Portfolio): number {
-  const total = p.mix.clean + p.mix.purify + p.mix.fail + p.mix.unscreened || 1;
-  return p.mix.clean / total;
 }
 
 function PortfolioCard({ p, rank, onPress }: { p: Portfolio; rank: number; onPress: () => void }) {

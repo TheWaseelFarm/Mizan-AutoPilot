@@ -1,8 +1,8 @@
 // GET /api/feed -> disclosure feed in the exact shape the Mizān UI expects.
-// Optional ?ranked=1      applies the completeness gate (hide unscreened from ranked lists).
-// Optional ?performance=1 joins the cached prices and attaches dual-anchor performance
-// (since disclosed / since public + freshness) per row.
-// Both are additive and opt-in, so existing consumers keep the current shape.
+// The completeness gate is ON BY DEFAULT: unscreened / verdict-less rows are excluded from
+// the feed (spec + v1-extend decision #2 — hide unscreened app-wide, in the query layer).
+//   ?all=1          include unscreened rows too (internal/admin/debug only).
+//   ?performance=1  join the cached prices and attach dual-anchor performance per row.
 import { supabase } from "./_lib/supabase.js";
 import { classifyFB } from "./_lib/frameworkB.js";
 import { dualAnchor } from "./_lib/performance.js";
@@ -32,12 +32,11 @@ function toClient(row) {
   return rec;
 }
 
-// Completeness gate (spec §5/§7): a row is eligible for RANKED lists only when it has real
-// screening data (a verdict). Unscreened names must never appear compliant, and are hidden
-// from ranked lists — reachable only by direct search. This is OPT-IN via `?ranked=1` so
-// existing consumers (and search) keep the full set by default; ranked surfaces request it.
+// Completeness gate (spec §5/§7, v1-extend decision #2): a row is surfaced only when it has
+// real screening data (a verdict) and is not unscreened. Unscreened names must never appear
+// compliant — they're hidden from every list, feed, and search. Applied by default below.
 function passesGate(rec) {
-  return rec.screened !== false && !!rec.label;
+  return rec.screened !== false && rec.label !== "unscreened" && !!rec.label;
 }
 
 // Attach dual-anchor performance to each row from the cached prices. Best-effort: if the
@@ -64,7 +63,7 @@ async function attachPerformance(db, rows) {
 export default async function handler(req, res) {
   // if (!requireAuth(req)) return res.status(401).json({ error: "Unauthorized" });
   try {
-    const ranked = /^(1|true|yes)$/i.test(String(req.query.ranked || ""));
+    const includeAll = /^(1|true|yes)$/i.test(String(req.query.all || ""));
     const withPerf = /^(1|true|yes)$/i.test(String(req.query.performance || ""));
     const db = supabase();
     const { data, error } = await db
@@ -73,7 +72,7 @@ export default async function handler(req, res) {
       .limit(100);
     if (error) throw error;
     let rows = (data || []).map(toClient);
-    if (ranked) rows = rows.filter(passesGate);
+    if (!includeAll) rows = rows.filter(passesGate); // gate ON by default
     if (withPerf) rows = await attachPerformance(db, rows);
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
     return res.status(200).json(rows);
