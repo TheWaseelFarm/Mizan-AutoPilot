@@ -4,9 +4,11 @@ import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Disclaimer } from '../components/Disclaimer';
+import { PerformanceCard } from '../components/PerformanceCard';
 import { VerdictBadge } from '../components/VerdictBadge';
 import { actorDescriptor, daysBetween, lagWord } from '../lib/derive';
 import { VERDICT_PERMISSION } from '../lib/frameworkB';
+import { dualAnchor, fmtPctCompact } from '../lib/performance';
 import type { StocksStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
 import { color, font, radius, shadow, space } from '../theme/tokens';
@@ -14,7 +16,7 @@ import { color, font, radius, shadow, space } from '../theme/tokens';
 export function StockDetailScreen() {
   const route = useRoute<RouteProp<StocksStackParamList, 'StockDetail'>>();
   const { ticker } = route.params;
-  const { rows } = useFeed();
+  const { rows, prices } = useFeed();
 
   const activity = useMemo(
     () =>
@@ -36,6 +38,8 @@ export function StockDetailScreen() {
   const buys = activity.filter((t) => String(t.side).toUpperCase() !== 'SELL').length;
   const sells = activity.length - buys;
   const reason = plainReason(head);
+  const headPerf = dualAnchor(prices[ticker], head);
+  const sinceDisclosed = headPerf ? fmtPctCompact(headPerf.sinceDisclosed) : null;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: space.xxl }}>
@@ -54,8 +58,11 @@ export function StockDetailScreen() {
       <View style={styles.stats}>
         <Stat label="Filers buying" value={String(buys)} />
         <Stat label="Filers selling" value={String(sells)} />
-        <Stat label="Performance" value="Pending" muted />
+        <Stat label="Since disclosed" value={sinceDisclosed || 'Pending'} muted />
       </View>
+
+      {/* Dual-anchor performance (since disclosed / since public + freshness). */}
+      <PerformanceCard disclosure={head} prices={prices} />
 
       {/* Activity log: who bought / who sold. */}
       <Text style={styles.sectionTitle}>Who bought & who sold</Text>

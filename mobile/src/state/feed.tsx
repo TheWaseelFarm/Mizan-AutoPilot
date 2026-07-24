@@ -1,10 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { fetchFeed } from '../lib/api';
+import { fetchFeed, fetchPrices } from '../lib/api';
+import type { PricesMap } from '../lib/performance';
 import type { Disclosure } from '../lib/types';
 
 interface FeedState {
   rows: Disclosure[];
+  /** Cached price map (ticker -> { quote, history }). Empty means "Price pending". */
+  prices: PricesMap;
   loading: boolean;
   /** true when data came from the live API, false when the bundled sample fallback was used. */
   live: boolean;
@@ -15,6 +18,7 @@ const Ctx = createContext<FeedState | null>(null);
 
 export function FeedProvider({ children }: { children: React.ReactNode }) {
   const [rows, setRows] = useState<Disclosure[]>([]);
+  const [prices, setPrices] = useState<PricesMap>({});
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
   const [nonce, setNonce] = useState(0);
@@ -25,10 +29,12 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     const ctrl = new AbortController();
     let alive = true;
     setLoading(true);
-    fetchFeed(ctrl.signal).then(({ rows: r, live: l }) => {
+    // Feed and prices load in parallel; prices are best-effort (empty -> "Price pending").
+    Promise.all([fetchFeed(ctrl.signal), fetchPrices(ctrl.signal)]).then(([feed, priceMap]) => {
       if (!alive) return;
-      setRows(r);
-      setLive(l);
+      setRows(feed.rows);
+      setLive(feed.live);
+      setPrices(priceMap);
       setLoading(false);
     });
     return () => {
@@ -37,7 +43,10 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     };
   }, [nonce]);
 
-  const value = useMemo(() => ({ rows, loading, live, refresh }), [rows, loading, live, refresh]);
+  const value = useMemo(
+    () => ({ rows, prices, loading, live, refresh }),
+    [rows, prices, loading, live, refresh],
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

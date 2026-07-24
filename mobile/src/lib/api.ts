@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 
 import { labelOf } from './frameworkB';
+import type { PricesMap } from './performance';
 import { SAMPLE } from './sample';
 import type { Disclosure } from './types';
 
@@ -37,6 +38,25 @@ export async function fetchFeed(signal?: AbortSignal): Promise<{ rows: Disclosur
     return { rows: withLabel(rows), live: true };
   } catch {
     return { rows: withLabel(SAMPLE), live: false };
+  }
+}
+
+/**
+ * Fetch the cached price map: { TICKER: { quote, history:[{d,c}], updatedAt } }.
+ * This endpoint returns ONLY cached data (never fabricates); an empty object means
+ * "Price pending" everywhere, which the UI renders honestly. Failures degrade to {}.
+ */
+export async function fetchPrices(signal?: AbortSignal): Promise<PricesMap> {
+  try {
+    const res = await fetch(`${API_BASE}/api/prices`, {
+      headers: { accept: 'application/json' },
+      signal,
+    });
+    if (!res.ok) throw new Error(`prices ${res.status}`);
+    const data = await res.json();
+    return data && typeof data === 'object' ? (data as PricesMap) : {};
+  } catch {
+    return {};
   }
 }
 

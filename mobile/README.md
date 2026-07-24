@@ -5,12 +5,16 @@ front-end build target (Expo RN, EAS cloud builds → App Store / Play). It reus
 the repo's existing serverless backend (`/api/*`) and the **Framework B** engine —
 the mobile app never re-implements the verdict rule, it mirrors it.
 
-> **Scaffold status.** This is the initial project scaffold: navigation, the
-> light/blue design system, the reserved verdict color language, the four tabs
-> (Home · Stocks · Following · Profile) with detail screens, follow state, and a
-> live-feed data layer with an offline sample fallback. Performance charts,
-> Halal Terminal screening, price caching, and per-user accounts are stubbed as
-> "Pending" and land in later phases (see the repo spec §7 / §9).
+> **Status.** Navigation, the light/blue design system, the reserved verdict color
+> language, the four tabs (Home · Stocks · Following · Profile) with detail screens,
+> follow state, and a live-feed data layer with an offline sample fallback.
+> **Sharia verdicts and dual-anchor performance are wired to live data:** the Stock
+> detail shows a sparkline plus *since disclosed* / *since public* with the freshness
+> note (spec §3.4), computed client-side from `/api/prices` via `src/lib/performance.ts`
+> (a mirror of the backend module), degrading honestly to "Price pending" when the
+> cache is empty. Portfolio-level performance (needs portfolio reconstruction),
+> risk-appetite (external provider), and per-user accounts remain "Pending" for later
+> phases (spec §7 / §9).
 
 ## Run it
 

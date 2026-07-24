@@ -8,6 +8,7 @@ import { FollowButton } from '../components/FollowButton';
 import { MixBar } from '../components/MixBar';
 import { VerdictBadge } from '../components/VerdictBadge';
 import { actorDescriptor, daysBetween, derivePortfolios, lagWord, portfolioFlag } from '../lib/derive';
+import { dualAnchor, fmtPctCompact } from '../lib/performance';
 import type { HomeStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
 import { color, font, radius, shadow, space, verdictColor } from '../theme/tokens';
@@ -15,7 +16,7 @@ import { color, font, radius, shadow, space, verdictColor } from '../theme/token
 export function PortfolioDetailScreen() {
   const route = useRoute<RouteProp<HomeStackParamList, 'PortfolioDetail'>>();
   const { name } = route.params;
-  const { rows } = useFeed();
+  const { rows, prices } = useFeed();
 
   const activity = useMemo(
     () =>
@@ -77,6 +78,8 @@ export function PortfolioDetailScreen() {
       <Text style={styles.sectionTitle}>Activity</Text>
       {activity.map((t) => {
         const lag = daysBetween(t.transactionDate, t.filingDate);
+        const perf = dualAnchor(prices[t.ticker], t);
+        const since = perf ? fmtPctCompact(perf.sinceDisclosed) : null;
         return (
           <View key={String(t.id)} style={styles.logRow}>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -86,6 +89,7 @@ export function PortfolioDetailScreen() {
               <Text style={styles.logMeta}>
                 {t.amount || '—'} · {t.transactionDate || '—'}
                 {lag != null ? ` · filed ${lag}d after — ${lagWord(lag)}` : ''}
+                {since ? ` · ${since} since disclosed` : ''}
               </Text>
             </View>
             <VerdictBadge label={t.label} size="sm" />
