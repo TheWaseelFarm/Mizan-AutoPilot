@@ -211,6 +211,22 @@
   .perf-inline .pi em{font-style:normal;color:var(--faint);font-weight:800;font-size:10px;letter-spacing:.4px;margin-right:4px;}
   .perf-inline .sep{color:var(--faint);}
 
+  /* ===== Light First-run (handoff E) ===== */
+  .intro.fr{overflow-y:auto;scrollbar-width:none;}
+  .intro.fr::-webkit-scrollbar{display:none;}
+  .fr-brand{margin-top:34px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+  .fr-word{font-size:34px;font-weight:800;color:var(--gold);letter-spacing:-.01em;margin-top:14px;}
+  .fr-tag{font-size:15px;line-height:1.5;font-weight:500;color:var(--muted);margin-top:8px;max-width:280px;}
+  .fr-sec{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:40px 2px 14px;}
+  .fr-list{display:flex;flex-direction:column;gap:12px;}
+  .fr-row{display:flex;gap:13px;align-items:flex-start;background:#fff;border-radius:16px;padding:15px;border:1px solid var(--line);box-shadow:var(--shadow);}
+  .fr-dot{width:11px;height:11px;border-radius:50%;margin-top:3px;flex:none;}
+  .fr-name{font-size:15px;font-weight:700;}
+  .fr-desc{font-size:13.5px;line-height:1.45;font-weight:500;color:var(--muted);margin-top:3px;}
+  .fr-start{border:0;border-radius:16px;padding:16px 0;background:var(--gold);color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:28px;width:100%;}
+  .fr-start:active{filter:brightness(.95);}
+  .fr-disc{font-size:10.5px;font-style:italic;font-weight:400;color:#A2AABA;margin:16px 4px 0;text-align:center;line-height:1.4;}
+
   /* ===== Light Watchlist / Discover (handoff D) ===== */
   .wl-title{font-size:26px;font-weight:800;color:var(--ink);letter-spacing:-.01em;margin-top:6px;}
   .wl-seg{display:flex;gap:4px;background:var(--surface-2);border-radius:12px;padding:4px;margin-top:16px;}
@@ -914,43 +930,33 @@ function Settings({onReplayIntro}){
 }
 
 /* ---------- first-run guided intro (2–3 steps) ---------- */
-function Onboarding({sources, isFollowed, setFollow, onDone}){
-  const [step,setStep] = useState(0);
-  const STEPS = 3;
+// First-run (handoff E): a short, calm intro — brand block, the three verdicts (Unscreened
+// given equal dignity), a "Start monitoring" button, and the disclaimer.
+function Onboarding({onDone}){
+  const rows = [
+    ["clean","#3ECB86","var(--clean-txt)","Clean","Permissible business, no impure income. Own it freely."],
+    ["purify","#F3B24A","var(--purify-txt)","Purify at sale","Buyable, but a % of any gain is donated to charity when sold."],
+    ["fail","#F0625A","var(--fail-txt)","Fail","Impermissible business — excluded from what you’d own."],
+    ["unscreened","#AAB3C4","var(--slate-txt)","Unscreened","No screening data yet. We’ll tell you honestly — never guess."],
+  ];
   return html`
-    <div class="intro">
-      <div class="steps">${Array.from({length:STEPS}).map((_,i)=>html`<i key=${i} class=${i<=step?"on":""}></i>`)}</div>
-      <div class="body">
-        ${step===0 && html`
-          <${React.Fragment}>
-            <h2>Every name gets a verdict</h2>
-            <p class="lead">Before a disclosure reaches your alerts, Mizān screens it under Framework B (Hanbali). There are three outcomes:</p>
-            <div class="vrow"><span class="badge clean">Clean</span><div class="vt"><b>Clean</b><small>Permissible business with no impure income — nothing to purify.</small></div></div>
-            <div class="vrow"><span class="badge purify">Purify</span><div class="vt"><b>Purify-at-sale</b><small>Buyable, but a purification amount applies at sale — some impure income, or debt over the advisory level.</small></div></div>
-            <div class="vrow"><span class="badge fail">Fail</span><div class="vt"><b>Fail</b><small>Impermissible business activity, or impure income above 5%.</small></div></div>
-          </${React.Fragment}>`}
-        ${step===1 && html`
-          <${React.Fragment}>
-            <h2>Pick a few sources to follow</h2>
-            <p class="lead">Following a source subscribes you to its future disclosures — for screening and alerts, never copy-trading.</p>
-            ${sources.length ? sources.map(s=>html`
-              <${SourceCard} key=${s.name} s=${s} on=${isFollowed(s.name)} onToggle=${()=>setFollow(s.name,!isFollowed(s.name))} />`)
-              : html`<div class="empty">Sources appear here once your feed loads.</div>`}
-          </${React.Fragment}>`}
-        ${step===2 && html`
-          <${React.Fragment}>
-            <h2>You’re all set</h2>
-            <p class="lead">Your Alerts feed now screens disclosures from the sources you follow. The verdict logic never changes — but you can adjust who you follow anytime under Discover.</p>
-            <div class="vrow"><span class="badge clean">✓</span><div class="vt"><b>Informational only</b><small>Mizān is disclosure monitoring and Sharia screening — not investment advice, brokerage, or a fatwa.</small></div></div>
-          </${React.Fragment}>`}
+    <div class="intro fr">
+      <div class="fr-brand">
+        <svg width="60" height="60" viewBox="0 0 26 26" fill="none" aria-hidden="true"><path d="M4 20 L4 9 L13 15 L22 9 L22 20" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="fr-word">Mizān</div>
+        <div class="fr-tag">Every disclosed trade, screened for Sharia compliance before it reaches you.</div>
       </div>
-      <div class="intro-actions">
-        ${step>0 && html`<button class="btn-ghost" onClick=${()=>setStep(step-1)}>Back</button>`}
-        ${step===0 && html`<button class="btn-ghost" onClick=${onDone}>Skip</button>`}
-        <button class="btn-primary" onClick=${()=> step<STEPS-1 ? setStep(step+1) : onDone()}>
-          ${step<STEPS-1 ? "Continue" : "Go to Alerts"}
-        </button>
+      <div class="fr-sec">Three verdicts</div>
+      <div class="fr-list">
+        ${rows.map(r=>html`
+          <div class="fr-row" key=${r[0]}>
+            <i class="fr-dot" style=${{background:r[1]}}></i>
+            <div><div class="fr-name" style=${{color:r[2]}}>${r[3]}</div><div class="fr-desc">${r[4]}</div></div>
+          </div>`)}
       </div>
+      <div style=${{flex:1,minHeight:"20px"}}></div>
+      <button class="fr-start" onClick=${onDone}>Start monitoring</button>
+      <p class="fr-disc">Informational disclosure monitoring and Sharia screening only — not investment advice, brokerage, or a fatwa.</p>
     </div>`;
 }
 
@@ -1076,7 +1082,7 @@ function App(){
       <${FilerScreen} actor=${filer} trades=${all} prices=${prices} onClose=${()=>setFiler(null)} onOpenTicker=${(t)=>setSelected(t)} />
       <${Detail} t=${selected} onClose=${()=>setSelected(null)} prices=${prices} onOpenFiler=${(a)=>setFiler(a)} />
       <${FilterSheet} open=${sheet} onClose=${()=>setSheet(false)} />
-      ${intro && html`<${Onboarding} sources=${sources} isFollowed=${isFollowed} setFollow=${setFollow} onDone=${dismissIntro} />`}
+      ${intro && html`<${Onboarding} onDone=${dismissIntro} />`}
     </div>`;
 }
 
