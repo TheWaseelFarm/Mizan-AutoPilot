@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Mizān",
+    "slug": "mizan",
+    "scheme": "mizan",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F4F6FB",
+    "primaryColor": "#2563EB",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mizan.app"
+    },
+    "android": {
+      "package": "com.mizan.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#F4F6FB"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "apiBase": "https://mizan-auto-pilot.vercel.app"
+    }
+  }
+}
