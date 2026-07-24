@@ -207,6 +207,52 @@
   .perf-inline .pi em{font-style:normal;color:var(--faint);font-weight:800;font-size:10px;letter-spacing:.4px;margin-right:4px;}
   .perf-inline .sep{color:var(--faint);}
 
+  /* ===== Light-theme Detail redesign (handoff) — scoped to .detail.dx ===== */
+  .detail.dx{background:#F5F7FB;}
+  .dx-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:calc(12px + env(safe-area-inset-top)) 20px calc(30px + env(safe-area-inset-bottom));}
+  .dx-scroll::-webkit-scrollbar{display:none;}
+  .dx-back{display:flex;align-items:center;justify-content:space-between;height:44px;}
+  .dx-backbtn{border:0;background:transparent;color:#64708A;font-size:15px;font-weight:600;cursor:pointer;padding:6px 8px 6px 0;}
+  .dx-bm{color:#9BA4B5;font-size:18px;}
+  .dx-answer{margin-top:10px;}
+  .dx-pill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:999px;font-size:13px;font-weight:700;}
+  .dx-pill i{width:7px;height:7px;border-radius:50%;flex:none;}
+  .dx-h1{margin:16px 0 0;font-size:34px;line-height:1.12;font-weight:800;letter-spacing:-.02em;color:#141C2E;}
+  .dx-sub{margin:12px 0 0;font-size:15.5px;line-height:1.5;font-weight:500;color:#64708A;}
+  .dx-stats{display:flex;gap:10px;margin-top:22px;}
+  .dx-stat{flex:1;min-width:0;background:#fff;border-radius:16px;padding:14px 12px;border:1px solid rgba(16,26,45,.06);box-shadow:0 4px 14px -10px rgba(16,26,45,.28);}
+  .dx-stat small{display:block;font-size:11px;font-weight:600;letter-spacing:.03em;color:#8A93A6;}
+  .dx-stat b{display:block;margin-top:8px;font-size:19px;font-weight:700;color:#141C2E;font-variant-numeric:tabular-nums;}
+  .dx-stat b.muted{color:#3C465C;}
+  .dx-narr{margin:22px 2px 0;font-size:15.5px;line-height:1.6;font-weight:500;color:#3C465C;}
+  .dx-narr b{color:#141C2E;font-weight:700;}
+  .dx-link{border:0;background:transparent;padding:0;font:inherit;color:#9A7415;font-weight:700;cursor:pointer;}
+  .dx-link:active{color:#7d5e10;}
+  .dx-evi{margin:26px 2px 12px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8A93A6;}
+  .dx-acc{background:#fff;border-radius:16px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(16,26,45,.06);box-shadow:0 4px 14px -10px rgba(16,26,45,.28);}
+  .dx-acc-h{width:100%;border:0;background:transparent;cursor:pointer;padding:15px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;}
+  .dx-acc-h>div{min-width:0;}
+  .dx-acc-h b{display:block;font-size:14.5px;font-weight:700;color:#141C2E;}
+  .dx-acc-h span{display:block;font-size:12.5px;font-weight:500;color:#64708A;margin-top:3px;}
+  .dx-acc-h em{font-style:normal;color:#8A93A6;font-size:18px;flex:none;line-height:1;}
+  .dx-acc-b{padding:0 16px 18px;}
+  .dx-note{margin:0;font-size:13px;line-height:1.45;font-weight:500;color:#64708A;}
+  .dx-meter-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;}
+  .dx-meter-top span{font-size:12.5px;font-weight:600;color:#64708A;}
+  .dx-meter-top b{font-size:15px;font-weight:700;}
+  .dx-meter{position:relative;height:9px;background:#EAEDF4;border-radius:5px;}
+  .dx-meter i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;}
+  .dx-thr{position:absolute;left:83.3%;top:-4px;bottom:-4px;width:2px;background:#141C2E;border-radius:2px;}
+  .dx-thr-l{position:absolute;left:83.3%;top:14px;transform:translateX(-50%);font-size:10.5px;font-weight:600;color:#64708A;white-space:nowrap;}
+  .dx-spark{color:#9BA4B5;}
+  .dx-spark .spark{height:56px;}
+  .dx-prow{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;font-weight:500;color:#8A93A6;margin-top:6px;}
+  .dx-facts{display:flex;flex-direction:column;gap:11px;}
+  .dx-facts>div{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;font-weight:500;}
+  .dx-facts>div>span:first-child{color:#64708A;}
+  .dx-facts>div>span:last-child{color:#141C2E;text-align:right;}
+  .dx-disc{margin:20px 2px 0;font-size:10.5px;font-style:italic;font-weight:400;color:#A2AABA;text-align:center;line-height:1.5;}
+
   /* ---- Discover / Follow ---- */
   .seg-h{display:flex;gap:8px;margin:2px 0 16px;}
   .seg-h button{flex:1;padding:10px 6px;border-radius:12px;border:1px solid var(--line-2);background:var(--surface);color:var(--muted);font-size:12.5px;font-weight:750;cursor:pointer;}
@@ -455,6 +501,38 @@ function Card({t,onOpen,onOpenFiler}){
 }
 
 // Inline SVG price trend from the cached daily history — shape only, no axes, muted.
+/* ---------- light-redesign (handoff) detail helpers ---------- */
+const DXV = {
+  clean:      { word:"Clean",          txt:"#12925A", fill:"#3ECB86", tint:"rgba(18,146,90,.11)",  head:"You can own this." },
+  purify:     { word:"Purify at sale", txt:"#B87A0C", fill:"#F3B24A", tint:"rgba(184,122,12,.11)", head:"Buyable — with a cost." },
+  fail:       { word:"Fail",           txt:"#D24A41", fill:"#F0625A", tint:"rgba(210,74,65,.11)",  head:"You can’t own this." },
+  unscreened: { word:"Unscreened",     txt:"#6B7690", fill:"#AAB3C4", tint:"rgba(107,118,144,.12)",head:"We can’t tell you yet." },
+};
+function daysBetween(a, b){
+  const t1 = Date.parse(a||""), t2 = Date.parse(b||"");
+  if (Number.isNaN(t1) || Number.isNaN(t2)) return null;
+  return Math.max(0, Math.round((t2 - t1) / DAY_MS));
+}
+function fmtPctCompact(v){
+  if (v==null || !isFinite(v)) return null;
+  return (v>=0 ? "▲" : "▼") + Math.abs(v).toFixed(1) + "%";
+}
+// Business description with a leading "Pass/Fail/Watch — " prefix (from the DB) stripped.
+function bizPhrase(t){
+  const b = String(t.business||"").replace(/^\s*(pass|fail|watch)[^—]*—\s*/i, "").trim();
+  return b || "the disclosed business";
+}
+// One plain-language supporting line naming the company + reason.
+function supportLine(t){
+  const co = t.company || t.ticker;
+  const impure = Number(t.impurePct||0);
+  if (t.screened===false) return `${co} hasn’t been screened yet — treat it as manual review, not as compliant.`;
+  if (t.label==="clean")  return `${co} — ${bizPhrase(t)}. A permissible business with no impure income.`;
+  if (t.label==="purify") return `${co} — a permissible business, but about ${impure}% of revenue is impure, so a share of any gain is owed to charity at sale.`;
+  if (t.label==="fail")   return `${co} — excluded at the business-activity level (${bizPhrase(t)}).`;
+  return `${co} — manual review.`;
+}
+
 function Sparkline({history}){
   if (!history || history.length<2) return null;
   const W=300, H=40, pad=3;
@@ -470,101 +548,102 @@ function Sparkline({history}){
   </svg>`;
 }
 
+// Detail — light redesign (handoff): decision-first. Verdict pill + plain headline,
+// exactly three stats, a narrative line, and collapsed "Evidence" accordions.
 function Detail({t,onClose,prices,onOpenFiler}){
   const open = !!t;
-  const impureW = t ? Math.min(100, t.impurePct===0?4:(Number(t.impurePct)/5)*100) : 0;
-  const debtW = t ? Math.min(100, Number(t.debtRatio)===0?4:(Number(t.debtRatio)/33)*100) : 0;
-  const bizS = t ? (t.businessStatus||"watch") : "watch";
-  const bizText = bizS==="fail"?"Excluded":bizS==="watch"?"Permitted · watch":"Permitted";
+  const [openWhy,setOpenWhy] = useState(false);
+  const [openPrice,setOpenPrice] = useState(false);
+  const [openDisc,setOpenDisc] = useState(false);
+
   const perf = t ? perfFor(t, prices) : null;
   const pr = t ? (prices && prices[t.ticker]) : null;
   const quoteVal = pr && pr.quote!=null ? Number(pr.quote) : null;
-  const purif = t ? purificationPreview(t, prices) : null;
+  const v = DXV[t ? t.label : "unscreened"] || DXV.unscreened;
+  const impure = t ? Number(t.impurePct||0) : 0;
+  const debt = t ? Number(t.debtRatio||0) : 0;
+  const filedAfter = t ? daysBetween(t.transactionDate, t.filingDate) : null;
+  const isSell = t && String(t.side).toUpperCase()==="SELL";
+  const sinceStr = perf && perf.since!=null ? fmtPctCompact(perf.since) : null;
+  const meterW = Math.min(100, (impure/6)*100);
+  const purifStat = !t ? "" : t.screened===false ? "Pending" : t.label==="clean" ? "None" : t.label==="fail" ? "—" : `≈${impure}%`;
+  const whySum = !t ? "" : t.screened===false ? "No screening data yet"
+    : t.label==="clean" ? "Impure income well under the limit"
+    : t.label==="fail" ? (impure>5 ? "Impure income above the 5% limit" : "Excluded business activity")
+    : (impure>0 ? `Impure income ${impure}% — within the 5% limit` : "Debt above advisory — still buyable");
+  const showMeter = t && t.screened!==false && !(t.label==="fail" && impure<=5);
+  const discPrice = (t && pr?.history) ? histClose(pr.history, Date.parse(t.transactionDate||""), "onOrAfter") : null;
+  const filedPrice = (t && pr?.history) ? histClose(pr.history, Date.parse(t.filingDate||""), "onOrAfter") : null;
+
   return html`
-    <div class=${"panel detail "+(open?"open":"")}>
-      <div class="d-head">
-        <button class="back" onClick=${onClose} aria-label="Back">‹</button>
-        <span class="d-tk">${t?t.ticker:""}</span>
-        ${t && html`<span class=${"badge "+t.label}>${VSHORT[t.label]}</span>`}
-      </div>
+    <div class=${"panel detail dx "+(open?"open":"")}>
       ${t && html`
-      <div class="d-scroll">
-        <div class="d-big">${t.ticker}</div>
-        <div class="d-co">${t.company||t.ticker}</div>
-        <div class="d-side"><span class=${"side "+(String(t.side).toUpperCase()==="SELL"?"sell":"")}>${sideLabel(t.side)}</span></div>
+      <div class="dx-scroll">
+        <div class="dx-back">
+          <button class="dx-backbtn" onClick=${onClose} aria-label="Back to feed">‹ Feed</button>
+          <span class="dx-bm" aria-hidden="true">⚑</span>
+        </div>
 
-        <div class="keyfacts">
-          <button class="kf-filer" onClick=${onOpenFiler?()=>onOpenFiler(t.actor):null} disabled=${!onOpenFiler} aria-label=${"Open filer "+t.actor}>
-            <div class=${"avatar "+(isFund(t)?"fund":"")}>${t.initials||"·"}</div>
-            <div class="c-who"><b>${t.actor}</b><span>${srcLabel(t)}</span></div>
-            ${onOpenFiler && html`<span class="chev">›</span>`}
+        <div class="dx-answer">
+          <span class="dx-pill" style=${{background:v.tint,color:v.txt}}><i style=${{background:v.txt}}></i>${v.word}</span>
+          <h1 class="dx-h1">${v.head}</h1>
+          <p class="dx-sub">${supportLine(t)}</p>
+        </div>
+
+        <div class="dx-stats">
+          <div class="dx-stat"><small>Purification</small><b>${purifStat}</b></div>
+          <div class="dx-stat"><small>Filed after</small><b>${filedAfter!=null ? filedAfter+(filedAfter===1?" day":" days") : "—"}</b></div>
+          <div class="dx-stat"><small>Since disclosed</small><b class="muted">${sinceStr || "Pending"}</b></div>
+        </div>
+
+        <p class="dx-narr">
+          <button class="dx-link" onClick=${onOpenFiler?()=>onOpenFiler(t.actor):null}>${t.actor}</button>${" "}${isSell?"sold":"bought"} <b>${t.amount||"—"}</b>${filedAfter!=null ? html` — you’re seeing it <b>${filedAfter} ${filedAfter===1?"day":"days"} later</b>.` : "."}
+        </p>
+
+        <div class="dx-evi">Evidence</div>
+
+        <div class="dx-acc">
+          <button class="dx-acc-h" onClick=${()=>setOpenWhy(!openWhy)} aria-expanded=${openWhy}>
+            <div><b>Why this verdict</b><span>${whySum}</span></div><em>${openWhy?"–":"+"}</em>
           </button>
-          <div class="kf-grid">
-            <div class="kf"><small>Disclosed amount</small><b>${t.amount||"—"}</b></div>
-            <div class=${"kf"+(quoteVal==null?" pending":"")}>
-              <small>Price now</small>
-              <b>${quoteVal!=null ? "$"+quoteVal.toFixed(2) : "Price pending"}</b>
-              ${quoteVal!=null && pr?.updatedAt && html`<span class="kf-sub">as of ${fmtAsOf(pr.updatedAt)}</span>`}
-            </div>
-          </div>
+          ${openWhy && html`<div class="dx-acc-b">
+            ${!showMeter ? html`<p class="dx-note">${t.screened===false ? "No screening data available yet — treated as manual review, never guessed." : (t.reasoning||"Excluded at the business-activity level.")}</p>`
+              : html`
+              <div class="dx-meter-top"><span>Impure income</span><b style=${{color:v.txt}}>${impure.toFixed(1)}%</b></div>
+              <div class="dx-meter"><i style=${{width:meterW+"%",background:v.fill}}></i><span class="dx-thr"></span><span class="dx-thr-l">5% limit</span></div>
+              <p class="dx-note" style=${{marginTop:"26px"}}>${bizPhrase(t).charAt(0).toUpperCase()+bizPhrase(t).slice(1)} — ${impure>5?"impure income above the limit":"a permissible business"}. Debt / market cap ${debt?debt.toFixed(1)+"% (advisory only)":"n/a"}.</p>`}
+          </div>`}
         </div>
 
-        ${t.screened===false ? html`
-        <div class="sect">
-          <div class="sect-h"><h3>Screening</h3><em>Manual review</em></div>
-          <div class="row first"><small>Status</small><span class="vchip unscreened">Unscreened</span></div>
-          <div class="unscreened-note">This security has not yet been screened. Treat it as requiring manual review — do not assume it is compliant.</div>
-        </div>` : html`
-        <div class="sect">
-          <div class="sect-h"><h3>Sharia verdict</h3><em>Framework B · Hanbali</em></div>
-          <div class="row first"><small>Business activity</small><span class=${"vchip "+bizS}>${bizText}</span></div>
-          <div class="meter-row">
-            <div class="meter-top"><small>Impure income</small><b>${Number(t.impurePct).toFixed(1)}% <span class="adv-tag">/ ≤5%</span></b></div>
-            <div class="meter"><i class=${Number(t.impurePct)>0?"warn":"ok"} style=${{width:impureW+"%"}}></i></div>
-          </div>
-          <div class="meter-row">
-            <div class="meter-top"><small>Debt / market cap</small><b>${Number(t.debtRatio)===0?"N/A":Number(t.debtRatio).toFixed(1)+"%"} <span class="adv-tag">/ advisory</span></b></div>
-            <div class="meter"><i class="adv" style=${{width:debtW+"%"}}></i></div>
-          </div>
-          <div class="why">${t.reasoning||"—"}</div>
-        </div>`}
-
-        ${purif && html`
-        <div class=${"purif "+purif.kind}>
-          <div class="ph">◆ Purification</div>
-          <p>${purif.text}</p>
-          ${purif.note && html`<small>${purif.note}</small>`}
-        </div>`}
-
-        <div class="sect">
-          <div class="sect-h"><h3>Performance</h3><em>Evidence since disclosed</em></div>
-          ${perf ? html`
-            <div class="perf-primary">
-              <div><small>Since disclosed</small><b>${fmtPct(perf.since) || "—"}</b></div>
-              <span class="perf-since-note">trade ${t.transactionDate||"—"}<br/>→ now</span>
-            </div>
-            <div class="perf-spark"><${Sparkline} history=${pr?.history} /></div>
-            <div class="perf-inline">
-              ${[["1W",perf.w1],["1M",perf.m1],["3M",perf.m3],["1Y",perf.y1]].map((iv,i)=>html`
-                ${i>0 ? html`<span class="sep">·</span>` : ""}
-                <span class="pi"><em>${iv[0]}</em>${fmtPct(iv[1]) || "—"}</span>`)}
-            </div>
-          ` : html`<div class="perf-pending">Price pending — awaiting cached market data. Performance is evidence since the disclosure, not a return or recommendation.</div>`}
+        <div class="dx-acc">
+          <button class="dx-acc-h" onClick=${()=>setOpenPrice(!openPrice)} aria-expanded=${openPrice}>
+            <div><b>Price context</b><span>${sinceStr ? sinceStr+" since disclosed" : "Price pending"}</span></div><em>${openPrice?"–":"+"}</em>
+          </button>
+          ${openPrice && html`<div class="dx-acc-b">
+            ${perf ? html`
+              <div class="dx-spark"><${Sparkline} history=${pr.history} /></div>
+              <div class="dx-prow">
+                <span>disclosed${discPrice!=null?" $"+discPrice.toFixed(2):""}</span>
+                <span>filed${filedPrice!=null?" $"+filedPrice.toFixed(2):""}</span>
+                <span>now${quoteVal!=null?" $"+quoteVal.toFixed(2):""}</span>
+              </div>
+            ` : html`<p class="dx-note">Price pending — awaiting cached market data. Evidence since the disclosure, not a return or recommendation.</p>`}
+          </div>`}
         </div>
 
-        <div class="sect">
-          <div class="sect-h"><h3>Disclosure</h3></div>
-          <div class="facts">
-            <div class="fact"><small>Filed by</small><b>${t.actor}</b></div>
-            <div class="fact"><small>Source</small><b>${srcLabel(t)}</b></div>
-            <div class="fact"><small>Side</small><b>${sideLabel(t.side)}</b></div>
-            <div class="fact"><small>Amount</small><b>${t.amount||"—"}</b></div>
-            <div class="fact"><small>Trade date</small><b>${t.transactionDate||"—"}</b></div>
-            <div class="fact"><small>Filing received</small><b>${t.filingDate||"—"}</b></div>
-          </div>
+        <div class="dx-acc">
+          <button class="dx-acc-h" onClick=${()=>setOpenDisc(!openDisc)} aria-expanded=${openDisc}>
+            <div><b>Disclosure details</b><span>${srcLabel(t)} · ${t.filingDate||"—"}</span></div><em>${openDisc?"–":"+"}</em>
+          </button>
+          ${openDisc && html`<div class="dx-acc-b dx-facts">
+            <div><span>Transaction</span><span>${isSell?"Sale":"Purchase"}</span></div>
+            <div><span>Amount</span><span>${t.amount||"—"}</span></div>
+            <div><span>Trade date</span><span>${t.transactionDate||"—"}</span></div>
+            <div><span>Filing</span><span>${srcLabel(t)}</span></div>
+          </div>`}
         </div>
 
-        <p class="disc">Mizān provides informational disclosure monitoring and Sharia screening only — not investment advice, brokerage, or a fatwa.</p>
+        <p class="dx-disc">Informational disclosure monitoring and Sharia screening only — not investment advice, brokerage, or a fatwa.</p>
       </div>`}
     </div>`;
 }
