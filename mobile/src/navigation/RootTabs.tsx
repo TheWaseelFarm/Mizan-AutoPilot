@@ -9,6 +9,8 @@ import { PortfolioDetailScreen } from '../screens/PortfolioDetailScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { StockDetailScreen } from '../screens/StockDetailScreen';
 import { StocksScreen } from '../screens/StocksScreen';
+import { useFeed } from '../state/feed';
+import { useFollows } from '../state/follows';
 import { color, font } from '../theme/tokens';
 import type { HomeStackParamList, StocksStackParamList, TabParamList } from './types';
 
@@ -58,6 +60,11 @@ function tabIcon(glyph: string) {
 }
 
 export function RootTabs() {
+  // In-app Alerts badge: disclosures from the portfolios the user follows (spec §4 Tab 3).
+  const { rows } = useFeed();
+  const { followed } = useFollows();
+  const alerts = followed.length ? rows.filter((r) => followed.includes(r.actor)).length : 0;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -81,7 +88,12 @@ export function RootTabs() {
       <Tab.Screen
         name="FollowingTab"
         component={FollowingScreen}
-        options={{ title: 'Following', tabBarIcon: tabIcon('★') }}
+        options={{
+          title: 'Following',
+          tabBarIcon: tabIcon('★'),
+          tabBarBadge: alerts || undefined,
+          tabBarBadgeStyle: { backgroundColor: color.brand, fontSize: 10 },
+        }}
       />
       <Tab.Screen
         name="ProfileTab"

@@ -95,7 +95,37 @@ create table if not exists smart_money_trends (
 );
 create index if not exists smt_rank_idx on smart_money_trends (timeframe, side, net_weight desc);
 
+-- Follows (user ↔ filer/portfolio). `user_id` is the authed username today (single-admin
+-- hash auth); it becomes a real per-user id when accounts land (spec §7). `portfolio` is the
+-- filer/actor name being followed. Coexists with the legacy global `watchlist` table.
+create table if not exists follows (
+  id         bigint generated always as identity primary key,
+  user_id    text not null,
+  portfolio  text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, portfolio)
+);
+create index if not exists follows_user_idx on follows (user_id);
+create index if not exists follows_portfolio_idx on follows (portfolio);
+
+-- In-app notifications (Alerts inbox). Written by the poll loop when a followed portfolio
+-- files a new disclosure. `read_at` null = unread. Unique per (user, disclosure) so repeated
+-- polls never double-notify.
+create table if not exists notifications (
+  id            bigint generated always as identity primary key,
+  user_id       text not null,
+  disclosure_id bigint references disclosures(id) on delete cascade,
+  portfolio     text,
+  title         text,
+  created_at    timestamptz not null default now(),
+  read_at       timestamptz,
+  unique (user_id, disclosure_id)
+);
+create index if not exists notifications_user_idx on notifications (user_id, created_at desc);
+
 -- Lock everything down; only the service role (used server-side) may read/write.
+alter table follows            enable row level security;
+alter table notifications      enable row level security;
 alter table disclosures        enable row level security;
 alter table watchlist          enable row level security;
 alter table alerts_sent        enable row level security;

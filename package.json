@@ -8,7 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node test/frameworkB.test.js && node test/screening.test.js && node test/performance.test.js && node test/trends.test.js",
+    "test": "node test/frameworkB.test.js && node test/screening.test.js && node test/performance.test.js && node test/trends.test.js && node test/notify.test.js",
     "hash": "node scripts/hash.js"
   },
   "dependencies": {
