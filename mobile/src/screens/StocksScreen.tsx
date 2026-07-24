@@ -13,11 +13,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandHeader } from '../components/BrandHeader';
+import { ChipRow } from '../components/Chips';
 import { Disclaimer } from '../components/Disclaimer';
 import { SearchBar } from '../components/SearchBar';
 import { VerdictBadge } from '../components/VerdictBadge';
-import { deriveStocks } from '../lib/derive';
-import type { Stock } from '../lib/types';
+import { deriveSmartMoney, fmtMoney, type SmartRow } from '../lib/derive';
 import type { StocksStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
 import { color, font, radius, shadow, space } from '../theme/tokens';
@@ -25,25 +25,52 @@ import { color, font, radius, shadow, space } from '../theme/tokens';
 type Side = 'bought' | 'sold';
 type Nav = NativeStackNavigationProp<StocksStackParamList, 'Stocks'>;
 
+// Same Time control as Portfolios; here it's the aggregation window (trade recency).
+const TIMEFRAMES = [
+  { key: '1W', label: '1W' },
+  { key: '1M', label: '1M' },
+  { key: '3M', label: '3M' },
+  { key: '6M', label: '6M' },
+  { key: '1Y', label: '1Y' },
+  { key: '3Y', label: '3Y' },
+  { key: '5Y', label: '5Y' },
+  { key: 'ALL', label: 'All' },
+] as const;
+const TF_DAYS: Record<string, number> = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '3Y': 1095, '5Y': 1825, ALL: Infinity };
+
+const SORTS = [
+  { key: 'weight', label: 'Weight' },
+  { key: 'volume', label: '$ Volume' },
+] as const;
+
+const COMPLIANCE = [
+  { key: 'all', label: 'All' },
+  { key: 'fully', label: 'Fully compliant' },
+  { key: 'exclude', label: 'Exclude non-compliant' },
+] as const;
+
 export function StocksScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const { rows, loading, live, refresh } = useFeed();
   const [side, setSide] = useState<Side>('bought');
+  const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('ALL');
+  const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('weight');
+  const [compliance, setCompliance] = useState<(typeof COMPLIANCE)[number]['key']>('all');
   const [query, setQuery] = useState('');
 
   const stocks = useMemo(() => {
-    let list = deriveStocks(rows).filter((s) => (side === 'bought' ? s.buys > 0 : s.sells > 0));
+    let list = deriveSmartMoney(rows, side === 'bought' ? 'BUY' : 'SELL', TF_DAYS[tf]);
     if (query.trim()) {
       const q = query.trim().toLowerCase();
-      list = list.filter(
-        (s) => s.ticker.toLowerCase().includes(q) || s.company.toLowerCase().includes(q),
-      );
+      list = list.filter((s) => s.ticker.toLowerCase().includes(q) || s.company.toLowerCase().includes(q));
     }
-    // Weight-normalized ranking (trade value as a stand-in until position sizes land).
-    list.sort((a, b) => (side === 'bought' ? b.buyWeight - a.buyWeight : b.sellWeight - a.sellWeight));
-    return list;
-  }, [rows, side, query]);
+    if (compliance !== 'all') {
+      list = list.filter((s) => (compliance === 'fully' ? s.label === 'clean' : s.label !== 'fail'));
+    }
+    if (sort === 'volume') list = [...list].sort((a, b) => b.dollarVol - a.dollarVol);
+    return list; // default already sorted by net weight
+  }, [rows, side, tf, sort, compliance, query]);
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -69,19 +96,19 @@ export function StocksScreen() {
         data={stocks}
         keyExtractor={(s) => s.ticker}
         renderItem={({ item, index }) => (
-          <StockRow
-            s={item}
-            side={side}
-            rank={index + 1}
-            onPress={() => nav.navigate('StockDetail', { ticker: item.ticker })}
-          />
+          <StockRow s={item} rank={index + 1} onPress={() => nav.navigate('StockDetail', { ticker: item.ticker })} />
         )}
         ListHeaderComponent={
-          <View style={styles.listHead}>
-            <Text style={styles.listHeadTitle}>{side === 'bought' ? 'Most bought' : 'Most sold'}</Text>
-            <Text style={styles.listHeadMeta}>
-              {stocks.length} shown{live ? '' : ' · sample data'}
-            </Text>
+          <View>
+            <ChipRow label="Time" options={TIMEFRAMES} value={tf} onChange={setTf} />
+            <ChipRow label="Sort by" options={SORTS} value={sort} onChange={setSort} />
+            <ChipRow label="Compliance" options={COMPLIANCE} value={compliance} onChange={setCompliance} />
+            <View style={styles.listHead}>
+              <Text style={styles.listHeadTitle}>{side === 'bought' ? 'Most bought' : 'Most sold'}</Text>
+              <Text style={styles.listHeadMeta}>
+                {stocks.length} shown{live ? '' : ' · sample data'}
+              </Text>
+            </View>
           </View>
         }
         ListEmptyComponent={
@@ -93,26 +120,13 @@ export function StocksScreen() {
         }
         ListFooterComponent={<Disclaimer />}
         contentContainerStyle={{ paddingBottom: space.xxl }}
-        refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={color.brand} />
-        }
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={color.brand} />}
       />
     </View>
   );
 }
 
-function StockRow({
-  s,
-  side,
-  rank,
-  onPress,
-}: {
-  s: Stock;
-  side: Side;
-  rank: number;
-  onPress: () => void;
-}) {
-  const n = side === 'bought' ? s.buys : s.sells;
+function StockRow({ s, rank, onPress }: { s: SmartRow; rank: number; onPress: () => void }) {
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.row}>
       <Text style={styles.rank}>{rank}</Text>
@@ -124,9 +138,11 @@ function StockRow({
       </View>
       <View style={styles.right}>
         <VerdictBadge label={s.label} size="sm" />
+        {/* Primary rank metric: trade value as % of filer position, summed across filers. */}
+        <Text style={styles.weight}>{s.netWeightPct.toFixed(1)}% wt</Text>
+        {/* Secondary: $ volume · filer count (muted). */}
         <Text style={styles.metric}>
-          {n} {side === 'bought' ? 'buy' : 'sell'}
-          {n === 1 ? '' : 's'} · {s.filers} filer{s.filers === 1 ? '' : 's'}
+          {fmtMoney(s.dollarVol)} · {s.filers} filer{s.filers === 1 ? '' : 's'}
         </Text>
       </View>
     </TouchableOpacity>
@@ -174,8 +190,10 @@ const styles = StyleSheet.create({
   rank: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.faint, width: 16 },
   ticker: { fontSize: font.h2, fontWeight: font.weight.heavy, color: color.ink, letterSpacing: -0.4 },
   company: { fontSize: font.small, color: color.muted, marginTop: 2 },
-  right: { alignItems: 'flex-end', gap: 6 },
-  metric: { fontSize: font.small, color: color.faint, fontWeight: font.weight.medium },
+  right: { alignItems: 'flex-end', gap: 4 },
+  // Rank metric is a neutral figure (not P&L) — ink, tabular; kept distinct from verdict color.
+  weight: { fontSize: font.body, fontWeight: font.weight.heavy, color: color.ink, fontVariant: ['tabular-nums'] },
+  metric: { fontSize: font.small, color: color.faint, fontWeight: font.weight.medium, fontVariant: ['tabular-nums'] },
   empty: {
     marginHorizontal: space.lg,
     marginTop: space.xl,

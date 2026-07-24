@@ -78,12 +78,30 @@ create table if not exists prices (
 );
 create index if not exists prices_updated_idx on prices (updated_at);
 
+-- Smart-money trends cache (spec §A3). Materialized by api/refresh-trends.js on a cron so the
+-- Stocks tab reads a cache instead of aggregating raw trades on every request. One row per
+-- (ticker, timeframe, side); net_weight is the weight-normalized rank metric.
+create table if not exists smart_money_trends (
+  ticker      text not null,
+  timeframe   text not null,               -- '7d' | '30d' | '90d' | 'all'
+  side        text not null check (side in ('BUY','SELL')),
+  company     text,
+  net_weight  numeric,                      -- Σ trade-value-as-%-of-filer-position (rank metric)
+  dollar_est  numeric,                      -- Σ disclosed midpoints (secondary $ volume)
+  filer_count integer,
+  label       text,                         -- Framework B verdict for the ticker
+  updated_at  timestamptz not null default now(),
+  primary key (ticker, timeframe, side)
+);
+create index if not exists smt_rank_idx on smart_money_trends (timeframe, side, net_weight desc);
+
 -- Lock everything down; only the service role (used server-side) may read/write.
-alter table disclosures enable row level security;
-alter table watchlist   enable row level security;
-alter table alerts_sent enable row level security;
-alter table screenings  enable row level security;
-alter table prices      enable row level security;
+alter table disclosures        enable row level security;
+alter table watchlist          enable row level security;
+alter table alerts_sent        enable row level security;
+alter table screenings         enable row level security;
+alter table prices             enable row level security;
+alter table smart_money_trends enable row level security;
 -- (No policies for anon/authenticated = no public access. Service role bypasses RLS.)
 
 -- Seed: disclosures (generated from the corrected Mizān prototype)
