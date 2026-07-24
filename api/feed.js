@@ -27,17 +27,31 @@ function toClient(row) {
   return rec;
 }
 
+// Completeness gate (spec §5/§7): a row is eligible for RANKED lists only when it has real
+// screening data (a verdict). Unscreened names must never appear compliant, and are hidden
+// from ranked lists — reachable only by direct search. This is OPT-IN via `?ranked=1` so
+// existing consumers (and search) keep the full set by default; ranked surfaces request it.
+// (Performance-completeness is enforced later, where the price cache is joined.)
+function passesGate(rec) {
+  return rec.screened !== false && !!rec.label;
+}
+
 export default async function handler(req, res) {
   // if (!requireAuth(req)) return res.status(401).json({ error: "Unauthorized" });
   try {
+    const ranked = /^(1|true|yes)$/i.test(String(req.query.ranked || ""));
     const { data, error } = await supabase()
       .from("disclosures").select("*")
       .order("filing_date", { ascending: false })
       .limit(100);
     if (error) throw error;
+    let rows = (data || []).map(toClient);
+    if (ranked) rows = rows.filter(passesGate);
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
-    return res.status(200).json((data || []).map(toClient));
+    return res.status(200).json(rows);
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+export { passesGate };

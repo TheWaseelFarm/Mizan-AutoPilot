@@ -52,10 +52,24 @@ create table if not exists alerts_sent (
   unique (disclosure_id, channel)
 );
 
+-- Screening verdict cache (per ticker). Written by api/_lib/screening/index.js
+-- (screenCached): stores the RAW screening payload so the poll loop reuses it and only
+-- re-screens when older than ~30 days — this is what keeps the app inside the Halal
+-- Terminal free-tier quota (spec §7). `payload` is the raw-inputs shape
+-- (business/businessStatus/impurePct/debtRatio/reasoning/screened), NEVER a verdict —
+-- the verdict is always recomputed by Framework B.
+create table if not exists screenings (
+  ticker     text primary key,
+  payload    jsonb not null,
+  fetched_at timestamptz not null default now()
+);
+create index if not exists screenings_fetched_idx on screenings (fetched_at);
+
 -- Lock everything down; only the service role (used server-side) may read/write.
 alter table disclosures enable row level security;
 alter table watchlist   enable row level security;
 alter table alerts_sent enable row level security;
+alter table screenings  enable row level security;
 -- (No policies for anon/authenticated = no public access. Service role bypasses RLS.)
 
 -- Seed: disclosures (generated from the corrected Mizān prototype)
