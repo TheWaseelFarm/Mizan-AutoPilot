@@ -7,7 +7,14 @@ import { Disclaimer } from '../components/Disclaimer';
 import { FollowButton } from '../components/FollowButton';
 import { MixBar } from '../components/MixBar';
 import { VerdictBadge } from '../components/VerdictBadge';
-import { actorDescriptor, daysBetween, derivePortfolios, lagWord, portfolioFlag } from '../lib/derive';
+import {
+  actorDescriptor,
+  daysBetween,
+  derivePortfolios,
+  lagWord,
+  portfolioComposition,
+  portfolioFlag,
+} from '../lib/derive';
 import { dualAnchor, fmtPctCompact } from '../lib/performance';
 import type { HomeStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
@@ -38,6 +45,8 @@ export function PortfolioDetailScreen() {
   const flag = portfolioFlag(portfolio);
   const descriptor = actorDescriptor(activity[0] ?? { kind: portfolio.kind });
   const avgLag = averageLag(activity);
+  const composition = useMemo(() => portfolioComposition(activity), [activity]);
+  const maxWeight = composition[0]?.weightPct || 1;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: space.xxl }}>
@@ -74,6 +83,38 @@ export function PortfolioDetailScreen() {
         <Stat label="Followers" value="—" muted />
       </View>
 
+      {/* Composition — how much of the portfolio each stock makes up (informational). */}
+      <View style={styles.compHead}>
+        <Text style={styles.sectionTitle}>Composition</Text>
+        <Text style={styles.compSub}>Share of the disclosed portfolio, by amount</Text>
+      </View>
+      {/* Stacked allocation bar (neutral blue tints — verdict colors stay reserved). */}
+      <View style={styles.allocBar}>
+        {composition.map((h, i) => (
+          <View
+            key={h.ticker}
+            style={{ flex: h.weightPct, backgroundColor: allocTint(i, composition.length), height: '100%' }}
+          />
+        ))}
+      </View>
+      {composition.map((h) => (
+        <View key={h.ticker} style={styles.compRow}>
+          <View style={[styles.compDot, { backgroundColor: verdictColor[h.label].solid }]} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.compTicker} numberOfLines={1}>
+              {h.ticker} <Text style={styles.compCompany}>· {h.company}</Text>
+            </Text>
+            <View style={styles.compTrack}>
+              <View style={[styles.compFill, { width: `${(h.weightPct / maxWeight) * 100}%` }]} />
+            </View>
+          </View>
+          <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
+        </View>
+      ))}
+      <Text style={styles.compNote}>
+        The share each name makes up of this portfolio — informational, not a recommendation to buy.
+      </Text>
+
       {/* Activity log. */}
       <Text style={styles.sectionTitle}>Activity</Text>
       {activity.map((t) => {
@@ -109,6 +150,13 @@ function Stat({ label, value, muted }: { label: string; value: string; muted?: b
       <Text style={[styles.statValue, muted && styles.statValueMuted]}>{value}</Text>
     </View>
   );
+}
+
+// Neutral blue tint for an allocation segment (index-based) — kept distinct from the
+// reserved verdict color language.
+function allocTint(i: number, n: number): string {
+  const opacity = Math.max(0.28, 0.9 - (i / Math.max(1, n - 1)) * 0.62);
+  return `rgba(37, 99, 235, ${opacity.toFixed(2)})`;
 }
 
 function sideWord(side: string): string {
@@ -174,6 +222,32 @@ const styles = StyleSheet.create({
     marginTop: space.md,
     marginBottom: space.sm,
   },
+  compHead: { paddingHorizontal: space.lg, marginTop: space.md, marginBottom: space.sm },
+  compSub: { fontSize: font.small, color: color.faint, marginTop: 2 },
+  allocBar: {
+    flexDirection: 'row',
+    height: 12,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    marginHorizontal: space.lg,
+    marginBottom: space.md,
+    backgroundColor: color.surfaceAlt,
+  },
+  compRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    marginHorizontal: space.lg,
+    marginBottom: space.sm,
+    paddingVertical: 6,
+  },
+  compDot: { width: 9, height: 9, borderRadius: 5, flex: 0 },
+  compTicker: { fontSize: font.body, fontWeight: font.weight.bold, color: color.ink },
+  compCompany: { fontSize: font.small, fontWeight: font.weight.regular, color: color.faint },
+  compTrack: { height: 6, borderRadius: 3, backgroundColor: color.surfaceAlt, marginTop: 5, overflow: 'hidden' },
+  compFill: { height: '100%', borderRadius: 3, backgroundColor: color.brand },
+  compPct: { fontSize: font.body, fontWeight: font.weight.heavy, color: color.ink, fontVariant: ['tabular-nums'], minWidth: 44, textAlign: 'right' },
+  compNote: { fontSize: font.tiny, color: color.faint, fontStyle: 'italic', paddingHorizontal: space.lg, marginTop: 2, marginBottom: space.sm, lineHeight: 14 },
   logRow: {
     flexDirection: 'row',
     alignItems: 'center',

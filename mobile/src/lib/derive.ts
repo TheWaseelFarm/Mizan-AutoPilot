@@ -104,6 +104,46 @@ export function deriveStocks(rows: Disclosure[]): Stock[] {
   return [...map.values()];
 }
 
+/** One holding's share of a filer's portfolio (spec §4 / Appendix A `holdings.weight_pct`). */
+export interface Holding {
+  ticker: string;
+  company: string;
+  label: Label;
+  /** net disclosed dollars in this name (buys − sells, floored at 0). */
+  net: number;
+  /** share of the whole portfolio, 0–100. */
+  weightPct: number;
+}
+
+/**
+ * Portfolio composition — how much of a filer's disclosed portfolio each stock makes up,
+ * so a user can see the allocation (informational, never a buy instruction). Weight is the
+ * name's net disclosed amount (buys − sells) as a share of the total; if net positions sum to
+ * zero (e.g. only sells on record) it falls back to gross disclosed amount so nothing vanishes.
+ * `rows` should already be filtered to a single actor.
+ */
+export function portfolioComposition(rows: Disclosure[]): Holding[] {
+  const map = new Map<string, { ticker: string; company: string; label: Label; net: number; gross: number }>();
+  for (const t of rows) {
+    const m =
+      map.get(t.ticker) || { ticker: t.ticker, company: t.company || t.ticker, label: t.label, net: 0, gross: 0 };
+    const amt = Number(t.amountMid || 0);
+    m.net += (String(t.side).toUpperCase() === 'SELL' ? -1 : 1) * amt;
+    m.gross += amt;
+    m.label = t.label; // same per ticker; keep the latest
+    map.set(t.ticker, m);
+  }
+  const items = [...map.values()];
+  const totalPos = items.reduce((s, i) => s + Math.max(0, i.net), 0);
+  const usePos = totalPos > 0;
+  const basis = (i: { net: number; gross: number }) => (usePos ? Math.max(0, i.net) : i.gross);
+  const total = items.reduce((s, i) => s + basis(i), 0) || 1;
+  return items
+    .map((i) => ({ ticker: i.ticker, company: i.company, label: i.label, net: i.net, weightPct: (basis(i) / total) * 100 }))
+    .filter((h) => h.weightPct > 0)
+    .sort((a, b) => b.weightPct - a.weightPct);
+}
+
 /** Days between two dates, floored at 0 (filing lag). */
 export function daysBetween(a?: string, b?: string): number | null {
   const t1 = Date.parse(a || '');
