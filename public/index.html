@@ -6,27 +6,31 @@
 <title>Mizān</title>
 <style>
   :root{
-    --bg:#0A0F1C;--surface:#111A30;--surface-2:#16223E;--line:rgba(255,255,255,.07);--line-2:rgba(255,255,255,.13);
-    --ink:#E6ECF7;--muted:#8D9AB4;--faint:#5C6b86;--gold:#D9B450;--gold-soft:rgba(217,180,80,.14);
+    /* Light theme (mobile redesign handoff) */
+    --bg:#F5F7FB;--surface:#FFFFFF;--surface-2:#EAEDF4;--line:rgba(16,26,45,.06);--line-2:rgba(16,26,45,.12);
+    --ink:#141C2E;--muted:#64708A;--faint:#8A93A6;--gold:#B5892B;--gold-soft:rgba(181,137,43,.12);
     --clean:#3ECB86;--purify:#F3B24A;--fail:#F0625A;
-    --clean-soft:rgba(62,203,134,.14);--purify-soft:rgba(243,178,74,.14);--fail-soft:rgba(240,98,90,.14);
-    --slate:#93A0B8;--slate-soft:rgba(147,160,184,.14);
-    --shadow:0 18px 44px rgba(0,0,0,.5);
+    --clean-soft:rgba(62,203,134,.16);--purify-soft:rgba(243,178,74,.18);--fail-soft:rgba(240,98,90,.15);
+    --slate:#AAB3C4;--slate-soft:rgba(147,160,184,.18);
+    /* verdict TEXT (darkened for legibility on white) — bars/dots keep the fills above */
+    --clean-txt:#12925A;--purify-txt:#B87A0C;--fail-txt:#D24A41;--slate-txt:#6B7690;
+    --shadow:0 6px 20px -14px rgba(16,26,45,.3);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;height:100%;}
-  body{background:#05070E;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;justify-content:center;}
+  body{background:#E4E8EF;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;justify-content:center;}
   #root{width:100%;display:flex;justify-content:center;}
   .app{width:100%;max-width:460px;height:100dvh;min-height:100dvh;position:relative;overflow:hidden;
-    background:radial-gradient(120% 60% at 50% -10%,rgba(217,180,80,.10),transparent 60%),linear-gradient(180deg,#0C1424 0%,#080D18 100%);
-    border-left:1px solid var(--line);border-right:1px solid var(--line);}
+    background:#F5F7FB;border-left:1px solid var(--line);border-right:1px solid var(--line);}
   .panel{position:absolute;inset:0;display:flex;flex-direction:column;}
   .detail{transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);z-index:25;background:linear-gradient(180deg,#0C1424 0%,#080D18 100%);}
   .detail.open{transform:translateX(0);}
-  .topbar{flex:0 0 auto;height:58px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;background:rgba(10,15,28,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);z-index:20;}
+  .topbar{flex:0 0 auto;height:58px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;background:rgba(245,247,251,.9);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);z-index:20;}
+  .topdate{font-size:13px;font-weight:600;color:var(--faint);}
+  .mmark{flex:none;}
   .brand{display:flex;align-items:center;gap:9px;}
   .mark{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:radial-gradient(circle at 50% 30%,#1c2b4c,#0a1120);border:1px solid rgba(217,180,80,.5);box-shadow:inset 0 0 10px rgba(217,180,80,.15);}
-  .brand b{font-size:16px;letter-spacing:.5px;font-weight:800;color:#EBD79A;}
+  .brand b{font-size:19px;letter-spacing:-.01em;font-weight:800;color:var(--gold);}
   .top-actions{display:flex;gap:8px;}
   .icon-btn{width:38px;height:38px;border:0;border-radius:11px;display:grid;place-items:center;background:rgba(255,255,255,.05);color:var(--ink);cursor:pointer;font-size:15px;border:1px solid var(--line);}
   .icon-btn:active{transform:scale(.94);}
@@ -48,14 +52,14 @@
   .legend b{color:var(--ink);font-weight:820;}
   .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
   .dot.c{background:var(--clean);}.dot.p{background:var(--purify);}.dot.f{background:var(--fail);}
-  .segment{position:sticky;top:0;z-index:15;padding:14px 16px 12px;background:linear-gradient(180deg,rgba(10,15,28,.96),rgba(10,15,28,.82));backdrop-filter:blur(10px);display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;}
+  .segment{position:sticky;top:0;z-index:15;padding:12px 20px 12px;background:linear-gradient(180deg,rgba(245,247,251,.98),rgba(245,247,251,.85));backdrop-filter:blur(10px);display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;}
   .segment::-webkit-scrollbar{display:none;}
   .seg{flex:0 0 auto;padding:9px 15px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);color:var(--muted);font-size:13px;font-weight:750;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap;transition:.15s;}
   .seg .dot{width:8px;height:8px;}
-  .seg.active{color:#0A0F1C;background:var(--ink);border-color:var(--ink);}
-  .seg.active.clean{background:var(--clean);border-color:var(--clean);}
-  .seg.active.purify{background:var(--purify);border-color:var(--purify);}
-  .seg.active.fail{background:var(--fail);border-color:var(--fail);}
+  .seg.active{color:#fff;background:var(--gold);border-color:var(--gold);}
+  .seg.active.clean{background:var(--clean-txt);border-color:var(--clean-txt);}
+  .seg.active.purify{background:var(--purify-txt);border-color:var(--purify-txt);}
+  .seg.active.fail{background:var(--fail-txt);border-color:var(--fail-txt);}
   .list-head{padding:6px 18px 10px;display:flex;align-items:baseline;justify-content:space-between;}
   .list-head h2{font-size:13px;font-weight:800;letter-spacing:.3px;color:var(--muted);text-transform:uppercase;}
   .list-head span{font-size:12px;color:var(--faint);font-weight:650;}
@@ -66,7 +70,7 @@
   .card.clean::before{background:var(--clean);}.card.purify::before{background:var(--purify);}.card.fail::before{background:var(--fail);}
   .c-top{display:flex;align-items:center;gap:10px;}
   .avatar{width:34px;height:34px;border-radius:10px;flex:0 0 auto;display:grid;place-items:center;font-size:11px;font-weight:820;color:var(--muted);background:var(--surface-2);border:1px solid var(--line-2);}
-  .avatar.fund{color:var(--gold);background:var(--gold-soft);border-color:rgba(217,180,80,.3);}
+  .avatar.fund{color:var(--gold);background:var(--gold-soft);border-color:rgba(181,137,43,.3);}
   .c-who{min-width:0;flex:1;}
   .c-who b{display:block;font-size:13px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .c-who span{font-size:11.5px;color:var(--faint);}
@@ -75,19 +79,19 @@
   .c-ticker{font-size:25px;font-weight:850;letter-spacing:-.8px;line-height:1;}
   .c-co{margin-top:4px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;}
   .badge{flex:0 0 auto;padding:8px 12px;border-radius:12px;font-size:12px;font-weight:820;display:flex;align-items:center;gap:6px;white-space:nowrap;}
-  .badge.clean{color:var(--clean);background:var(--clean-soft);}.badge.purify{color:var(--purify);background:var(--purify-soft);}.badge.fail{color:var(--fail);background:var(--fail-soft);}
+  .badge.clean{color:var(--clean-txt);background:var(--clean-soft);}.badge.purify{color:var(--purify-txt);background:var(--purify-soft);}.badge.fail{color:var(--fail-txt);background:var(--fail-soft);}
   .c-meta{margin-top:13px;padding-top:12px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--muted);font-weight:600;}
   .side{padding:4px 9px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line-2);font-weight:750;font-size:11px;letter-spacing:.2px;color:var(--ink);}
   .side.sell{color:var(--gold);background:var(--gold-soft);border-color:rgba(217,180,80,.25);}
   .sep{color:var(--faint);}
   .chev{margin-left:auto;color:var(--faint);font-size:15px;}
-  .tabs{flex:0 0 auto;height:74px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:rgba(9,13,24,.92);backdrop-filter:blur(16px);border-top:1px solid var(--line);z-index:20;}
-  .tab{border:0;background:transparent;color:var(--faint);display:grid;place-items:center;gap:3px;font-size:10.5px;font-weight:750;cursor:pointer;border-radius:14px;}
+  .tabs{flex:0 0 auto;height:86px;padding:10px 10px calc(10px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:rgba(255,255,255,.92);backdrop-filter:blur(16px);border-top:1px solid rgba(16,26,45,.07);z-index:20;}
+  .tab{border:0;background:transparent;color:#9BA4B5;display:grid;place-items:center;gap:4px;font-size:10.5px;font-weight:600;cursor:pointer;border-radius:14px;}
   .tab .ti{font-size:18px;line-height:1;}
   .tab.active{color:var(--gold);}
-  .scrim{position:absolute;inset:0;background:rgba(4,7,14,.6);opacity:0;pointer-events:none;transition:.2s;z-index:30;}
+  .scrim{position:absolute;inset:0;background:rgba(16,26,45,.35);opacity:0;pointer-events:none;transition:.2s;z-index:30;}
   .scrim.open{opacity:1;pointer-events:auto;}
-  .sheet{position:absolute;left:0;right:0;bottom:0;z-index:31;transform:translateY(100%);transition:transform .26s cubic-bezier(.32,.72,0,1);background:linear-gradient(180deg,#13203A,#0C1424);border-top:1px solid var(--line-2);border-radius:26px 26px 0 0;padding:10px 18px calc(20px + env(safe-area-inset-bottom));box-shadow:var(--shadow);}
+  .sheet{position:absolute;left:0;right:0;bottom:0;z-index:31;transform:translateY(100%);transition:transform .26s cubic-bezier(.32,.72,0,1);background:#FFFFFF;border-top:1px solid var(--line-2);border-radius:26px 26px 0 0;padding:10px 18px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px -18px rgba(16,26,45,.3);}
   .sheet.open{transform:translateY(0);}
   .grab{width:40px;height:4px;border-radius:3px;background:var(--line-2);margin:4px auto 14px;}
   .sheet h3{margin:0 0 4px;font-size:17px;font-weight:820;}
@@ -97,7 +101,7 @@
   .flabel{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin:0 0 8px;}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
   .chip{padding:9px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line-2);color:var(--muted);font-size:12.5px;font-weight:700;cursor:pointer;}
-  .chip.on{color:#0A0F1C;background:var(--gold);border-color:var(--gold);}
+  .chip.on{color:#fff;background:var(--gold);border-color:var(--gold);}
   .apply{width:100%;height:50px;border:0;border-radius:15px;background:var(--gold);color:#1a1204;font-size:15px;font-weight:850;cursor:pointer;margin-top:4px;}
   .d-head{flex:0 0 auto;height:58px;padding:0 8px 0 6px;display:flex;align-items:center;gap:6px;background:rgba(10,15,28,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);z-index:20;}
   .back{width:44px;height:44px;border:0;background:transparent;color:var(--ink);font-size:26px;cursor:pointer;border-radius:12px;}
@@ -118,7 +122,7 @@
   .row small{color:var(--muted);font-size:12.5px;font-weight:650;}
   .row b{font-size:13px;font-weight:750;}
   .vchip{padding:6px 11px;border-radius:9px;font-size:11.5px;font-weight:800;}
-  .vchip.pass{color:var(--clean);background:var(--clean-soft);}.vchip.watch{color:var(--purify);background:var(--purify-soft);}.vchip.fail{color:var(--fail);background:var(--fail-soft);}
+  .vchip.pass{color:var(--clean-txt);background:var(--clean-soft);}.vchip.watch{color:var(--purify-txt);background:var(--purify-soft);}.vchip.fail{color:var(--fail-txt);background:var(--fail-soft);}
   .meter-row{padding:13px 16px;border-top:1px solid var(--line);}
   .meter-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
   .meter-top small{color:var(--muted);font-size:12.5px;font-weight:650;}
@@ -151,9 +155,9 @@
   .b-unscreened{background:linear-gradient(90deg,#5b6b90,#8391b0);}
   .dot.u{background:var(--slate);}
   .card.unscreened::before{background:var(--slate);}
-  .badge.unscreened{color:#B7C1D6;background:var(--slate-soft);}
-  .seg.active.unscreened{color:#0A0F1C;background:var(--slate);border-color:var(--slate);}
-  .vchip.unscreened{color:#B7C1D6;background:var(--slate-soft);}
+  .badge.unscreened{color:var(--slate-txt);background:var(--slate-soft);}
+  .seg.active.unscreened{color:#fff;background:var(--slate-txt);border-color:var(--slate-txt);}
+  .vchip.unscreened{color:var(--slate-txt);background:var(--slate-soft);}
   .unscreened-note{padding:14px 16px 16px;color:var(--muted);font-size:13px;line-height:1.55;}
 
   /* ---- Performance (evidence — MUTED, never a verdict color) ---- */
@@ -206,6 +210,26 @@
   .perf-inline .pi{font-variant-numeric:tabular-nums;}
   .perf-inline .pi em{font-style:normal;color:var(--faint);font-weight:800;font-size:10px;letter-spacing:.4px;margin-right:4px;}
   .perf-inline .sep{color:var(--faint);}
+
+  /* ===== Light Feed (handoff): balance panel + verdict-as-words cards ===== */
+  .balpanel{margin:14px 0 8px;background:#fff;border-radius:20px;padding:18px;border:1px solid var(--line);box-shadow:var(--shadow);}
+  .balrow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;gap:10px;}
+  .balrow .ttl{font-size:15px;font-weight:700;color:var(--ink);}
+  .balrow .cnt{font-size:12.5px;font-weight:600;color:var(--faint);}
+  .balbar{height:12px;border-radius:6px;overflow:hidden;display:flex;background:var(--surface-2);}
+  .balbar i{display:block;height:100%;min-width:0;}
+  .ballegend{margin-top:12px;display:flex;flex-wrap:wrap;gap:11px 16px;}
+  .ballegend span{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--muted);}
+  .ballegend i{width:9px;height:9px;border-radius:50%;flex:none;}
+  .fcard{background:#fff;border-radius:18px;padding:16px;border:1px solid var(--line);box-shadow:var(--shadow);cursor:pointer;}
+  .fcard:active{transform:scale(.99);}
+  .fc-v{font-size:13px;font-weight:700;letter-spacing:.01em;}
+  .fc-v.clean{color:var(--clean-txt);}.fc-v.purify{color:var(--purify-txt);}.fc-v.fail{color:var(--fail-txt);}.fc-v.unscreened{color:var(--slate-txt);}
+  .fc-tk{margin-top:8px;font-size:18px;font-weight:700;color:var(--ink);}
+  .fc-tk span{font-size:14px;font-weight:500;color:var(--muted);}
+  .fc-sent{margin:7px 0 0;font-size:14.5px;line-height:1.4;font-weight:500;color:#3C465C;}
+  .fc-foot{margin-top:13px;padding-top:12px;border-top:1px solid rgba(16,26,45,.07);display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--faint);flex-wrap:wrap;}
+  .fc-foot .mv{color:#3C465C;font-variant-numeric:tabular-nums;}
 
   /* ===== Light-theme Detail redesign (handoff) — scoped to .detail.dx ===== */
   .detail.dx{background:#F5F7FB;}
@@ -271,7 +295,7 @@
   .foll{color:var(--gold);font-weight:750;}
 
   /* ---- First-run intro ---- */
-  .intro{position:absolute;inset:0;z-index:60;background:radial-gradient(120% 55% at 50% -8%,rgba(217,180,80,.12),transparent 60%),linear-gradient(180deg,#0C1424 0%,#080D18 100%);display:flex;flex-direction:column;padding:26px 20px calc(20px + env(safe-area-inset-bottom));}
+  .intro{position:absolute;inset:0;z-index:60;background:#F5F7FB;display:flex;flex-direction:column;padding:26px 24px calc(20px + env(safe-area-inset-bottom));}
   .intro .steps{display:flex;gap:6px;margin-bottom:22px;flex:0 0 auto;}
   .intro .steps i{flex:1;height:4px;border-radius:3px;background:var(--surface-2);transition:.2s;}
   .intro .steps i.on{background:var(--gold);}
@@ -366,6 +390,9 @@ function daysAgo(ms){
   if (ms==null) return null;
   return Math.max(0, Math.round((Date.now()-ms)/86400000));
 }
+function fmtToday(){
+  try { return new Date().toLocaleDateString(undefined,{day:"numeric",month:"short"}); } catch(e){ return ""; }
+}
 
 /* ---------- performance (evidence since a disclosure — NOT returns/advice) ----------
    All numbers render muted; ▲/▼ glyphs only. Computed client-side from the cached
@@ -451,51 +478,47 @@ function purificationPreview(t, prices){
 
 /* ---------- small components ---------- */
 function Balance({trades}){
-  const total = trades.length || 1;
   const c = trades.filter(t=>t.label==="clean").length;
   const p = trades.filter(t=>t.label==="purify").length;
   const f = trades.filter(t=>t.label==="fail").length;
   const u = trades.filter(t=>t.label==="unscreened").length;
-  const w = n => (n/total*100);
+  const seg = [["clean",c],["purify",p],["fail",f],["unscreened",u]];
   return html`
-    <div class="hero">
-      <div class="eyebrow"><span>Today</span><span>Screened live</span></div>
-      <h1>${trades.length} <span>disclosures</span></h1>
-      <div class="balance">
-        <div class="balance-track">
-          <i class="b-clean" style=${{width:w(c)+"%"}}></i>
-          <i class="b-purify" style=${{width:w(p)+"%"}}></i>
-          <i class="b-fail" style=${{width:w(f)+"%"}}></i>
-          <i class="b-unscreened" style=${{width:w(u)+"%"}}></i>
-          <span class="fulcrum"></span>
-        </div>
-        <div class="legend">
-          <div><span class="dot c"></span><b>${c}</b> Clean</div>
-          <div><span class="dot p"></span><b>${p}</b> Purify</div>
-          <div><span class="dot f"></span><b>${f}</b> Fail</div>
-          ${u>0 && html`<div><span class="dot u"></span><b>${u}</b> Unscreened</div>`}
-        </div>
+    <div class="balpanel">
+      <div class="balrow"><span class="ttl">Today’s balance</span><span class="cnt">${trades.length} disclosure${trades.length===1?"":"s"}</span></div>
+      <div class="balbar">
+        ${seg.map(s=> s[1]>0 && html`<i key=${s[0]} class=${"b-"+s[0]} style=${{flex:s[1]}}></i>`)}
+      </div>
+      <div class="ballegend">
+        <span><i style=${{background:"var(--clean)"}}></i>Clean ${c}</span>
+        <span><i style=${{background:"var(--purify)"}}></i>Purify ${p}</span>
+        <span><i style=${{background:"var(--fail)"}}></i>Fail ${f}</span>
+        <span><i style=${{background:"var(--slate)"}}></i>Unscreened ${u}</span>
       </div>
     </div>`;
 }
 
-function Card({t,onOpen,onOpenFiler}){
-  const filerTap = onOpenFiler ? (e)=>{ e.stopPropagation(); onOpenFiler(t.actor); } : null;
+// Feed card (handoff): leads with the verdict as WORDS, then ticker · company, one plain
+// sentence, then a quiet footer with the filing lag + muted price move.
+function Card({t,onOpen,prices}){
+  const impure = Number(t.impurePct||0);
+  const vwords = t.label==="clean" ? "Clean · own it"
+    : t.label==="purify" ? `Purify at sale · ≈${impure}%`
+    : t.label==="fail" ? "Fail · excluded"
+    : "Unscreened · manual review";
+  const verb = String(t.side).toUpperCase()==="SELL" ? "sold" : "bought";
+  const filedAfter = daysBetween(t.transactionDate, t.filingDate);
+  const perf = prices ? perfFor(t, prices) : null;
+  const move = perf && perf.since!=null ? fmtPctCompact(perf.since) : null;
   return html`
-    <article class=${"card "+t.label} onClick=${onOpen}>
-      <div class=${"c-top"+(onOpenFiler?" filer-link":"")} onClick=${filerTap} role=${onOpenFiler?"button":null} aria-label=${onOpenFiler?("Open filer "+t.actor):null}>
-        <div class=${"avatar "+(isFund(t)?"fund":"")}>${t.initials||"·"}</div>
-        <div class="c-who"><b>${t.actor}</b><span>${srcLabel(t)}</span></div>
-        <div class="c-time">${t.filingDate||""}</div>
-      </div>
-      <div class="c-mid">
-        <div><div class="c-ticker">${t.ticker}</div><div class="c-co">${t.company||t.ticker}</div></div>
-        <div class=${"badge "+t.label}>${VSHORT[t.label]}</div>
-      </div>
-      <div class="c-meta">
-        <span class=${"side "+(String(t.side).toUpperCase()==="SELL"?"sell":"")}>${sideLabel(t.side)}</span>
-        <span class="sep">·</span><span>${t.amount||"—"}</span>
-        <span class="chev">›</span>
+    <article class="fcard" onClick=${onOpen} role="button" aria-label=${t.ticker+" — "+vwords}>
+      <div class=${"fc-v "+t.label}>${vwords}</div>
+      <div class="fc-tk">${t.ticker} <span>· ${t.company||t.ticker}</span></div>
+      <p class="fc-sent">${t.actor} ${verb} ${t.amount||"—"}.</p>
+      <div class="fc-foot">
+        <span>${filedAfter!=null ? "Filed "+filedAfter+" day"+(filedAfter===1?"":"s")+" after" : "Filing lag n/a"}</span>
+        <span class="sep">·</span>
+        ${move ? html`<span class="mv">${move} since</span>` : html`<span>Price pending</span>`}
       </div>
     </article>`;
 }
@@ -700,14 +723,14 @@ function FilerScreen({actor, trades, prices, onClose, onOpenTicker}){
   const mix = deriveSources(rows)[0] || {clean:0,purify:0,fail:0,unscreened:0};
   const kind = rows[0] ? rows[0].kind : "";
   return html`
-    <div class=${"panel detail "+(open?"open":"")}>
-      <div class="d-head">
-        <button class="back" onClick=${onClose} aria-label="Back">‹</button>
-        <span class="d-tk">${actor||""}</span>
-      </div>
+    <div class=${"panel detail dx "+(open?"open":"")}>
       ${actor && html`
-      <div class="d-scroll">
-        <div class="eyebrow" style=${{textTransform:"none",letterSpacing:"0"}}>${TYPE_LABEL(kind)} · disclosed trades only</div>
+      <div class="dx-scroll">
+        <div class="dx-back">
+          <button class="dx-backbtn" onClick=${onClose} aria-label="Back">‹ Back</button>
+        </div>
+        <h2 style=${{margin:"6px 0 2px",fontSize:"22px",fontWeight:800,letterSpacing:"-.01em",color:"var(--ink)"}}>${actor||""}</h2>
+        <div class="eyebrow" style=${{textTransform:"none",letterSpacing:"0",justifyContent:"flex-start"}}>${TYPE_LABEL(kind)} · disclosed trades only</div>
         <div class="filer-agg">
           <div class="fa"><small>Disclosures</small><b>${rows.length}</b></div>
           <div class="fa"><small>Median since disclosed</small><b>${withPerf.length?fmtPct(med):"—"}</b></div>
@@ -716,7 +739,7 @@ function FilerScreen({actor, trades, prices, onClose, onOpenTicker}){
         <div class="mixwrap" style=${{margin:"14px 2px 2px"}}><${MixBar} s=${mix} /></div>
         <div class="list-head" style=${{padding:"14px 2px 10px"}}><h2>Disclosure history</h2><span>${rows.length}</span></div>
         ${rows.length ? html`<div class="list" style=${{padding:0}}>
-          ${rows.map(t=>html`<${Card} key=${t.id||t.ticker+t.filingDate} t=${t} onOpen=${()=>onOpenTicker(t)} />`)}
+          ${rows.map(t=>html`<${Card} key=${t.id||t.ticker+t.filingDate} t=${t} onOpen=${()=>onOpenTicker(t)} prices=${prices} />`)}
         </div>` : html`<div class="empty">No disclosures on record for this filer.</div>`}
         <p class="disc">Filer history — disclosed trades only. Disclosure-based history, delayed by filing lag (up to 45 days). Informational only — not a recommendation.</p>
       </div>`}
@@ -930,23 +953,17 @@ function App(){
   const all = trades||[];
   const shown = all.filter(t=>filter==="all"||t.label===filter);
   const sources = deriveSources(all);
+  const todayStr = fmtToday();
 
   const Alerts = html`
     <div class="panel">
       <div class="topbar">
         <div class="brand">
-          <div class="mark">
-            <svg viewBox="0 0 48 48" width="19" height="19" aria-hidden="true">
-              <defs><linearGradient id="mzg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#B98E2C"/><stop offset="1" stop-color="#F0D483"/></linearGradient></defs>
-              <path d="M9 39 V15 L24 31 L39 15 V39" fill="none" stroke="url(#mzg)" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M33 7.4 l1.2 2.8 2.8 1.2 -2.8 1.2 L33 16.6 l-1.2 -2.8 -2.8 -1.2 2.8 -1.2 Z" fill="#F3E2B0"/>
-            </svg>
-          </div><b>Mizān</b>
+          <svg class="mmark" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+            <path d="M4 20 L4 9 L13 15 L22 9 L22 20" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg><b>Mizān</b>
         </div>
-        <div class="top-actions">
-          <button class="icon-btn" onClick=${()=>setSheet(true)} aria-label="Filter">⚙</button>
-          <button class="icon-btn" aria-label="Notifications">🔔</button>
-        </div>
+        <span class="topdate">${todayStr}</span>
       </div>
       <div class="scroll">
         ${!loaded ? html`<div class="loading">Loading disclosures…</div>` : html`
@@ -958,7 +975,7 @@ function App(){
               </button>`)}
           </div>
           <div class="list-head"><h2>Latest disclosures</h2><span>${shown.length} shown</span></div>
-          ${shown.length ? html`<div class="list">${shown.map(t=>html`<${Card} key=${t.id||t.ticker+t.filingDate} t=${t} onOpen=${()=>setSelected(t)} onOpenFiler=${(a)=>setFiler(a)} />`)}</div>`
+          ${shown.length ? html`<div class="list">${shown.map(t=>html`<${Card} key=${t.id||t.ticker+t.filingDate} t=${t} onOpen=${()=>setSelected(t)} prices=${prices} />`)}</div>`
             : html`<div class="empty">No disclosures match this filter yet.</div>`}
         `}
       </div>
