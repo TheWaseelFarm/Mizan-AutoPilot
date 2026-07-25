@@ -117,15 +117,61 @@ export interface Holding {
   held: boolean;
 }
 
+/** True when a filer reports POSITIONS (13F funds) rather than TRANSACTIONS (Congress/insider). */
+export function reportsPositions(rows: Disclosure[]): boolean {
+  return rows.length > 0 && sourceGroup(rows[0].kind) === 'fund';
+}
+
 /**
  * Portfolio composition — how much of a filer's disclosed portfolio each stock makes up, so a
- * user can see the allocation (informational, never a buy instruction). Held names (net buys >
- * sells) are weighted by their net disclosed amount as a share of the total. Names that netted
- * to a SALE are NOT dropped — they're kept with 0% and `held: false` (tagged "Sold" in the UI)
- * so nothing silently vanishes. If a filer only ever sold (no net position at all), weights
- * fall back to gross disclosed amount so the split is still visible. `rows` = one actor.
+ * user can see the allocation (informational, never a buy instruction).
+ *
+ * Two data shapes, weighted correctly for each:
+ *   • 13F funds file a POSITION SNAPSHOT — each holding has a reported value, and a later
+ *     filing SUPERSEDES an earlier one. So we take the LATEST reported value per ticker
+ *     (`positionValue`, falling back to `amountMid`) — exact holding weights, never a sum of
+ *     re-files. A latest filing that is a SELL means the position was exited.
+ *   • Congress / insider PTRs file TRANSACTIONS, so we net buys − sells.
+ *
+ * Net-sold / exited names are kept at 0% with `held: false` (tagged "Sold" in the UI) so
+ * nothing silently vanishes. `rows` = one actor.
  */
 export function portfolioComposition(rows: Disclosure[]): Holding[] {
+  if (reportsPositions(rows)) return positionComposition(rows);
+  return transactionComposition(rows);
+}
+
+/** 13F: weight by the latest reported position value per ticker (exact, never summed). */
+function positionComposition(rows: Disclosure[]): Holding[] {
+  const latest = new Map<string, Disclosure>();
+  for (const t of rows) {
+    const cur = latest.get(t.ticker);
+    const td = Date.parse(t.filingDate || t.transactionDate || '') || 0;
+    const cd = cur ? Date.parse(cur.filingDate || cur.transactionDate || '') || 0 : -Infinity;
+    if (!cur || td >= cd) latest.set(t.ticker, t);
+  }
+  const items = [...latest.values()]
+    .map((t) => {
+      const value = Math.max(0, Number(t.positionValue ?? t.amountMid ?? 0));
+      const held = String(t.side).toUpperCase() !== 'SELL' && value > 0;
+      return { ticker: t.ticker, company: t.company || t.ticker, label: t.label, value, held };
+    })
+    .filter((i) => i.value > 0);
+  const total = items.reduce((s, i) => s + (i.held ? i.value : 0), 0) || 1;
+  return items
+    .map((i) => ({
+      ticker: i.ticker,
+      company: i.company,
+      label: i.label,
+      net: i.value,
+      held: i.held,
+      weightPct: i.held ? (i.value / total) * 100 : 0,
+    }))
+    .sort((a, b) => Number(b.held) - Number(a.held) || b.weightPct - a.weightPct || b.net - a.net);
+}
+
+/** PTR / insider: net buys − sells; net-sold names kept at 0% (held: false). */
+function transactionComposition(rows: Disclosure[]): Holding[] {
   const map = new Map<string, { ticker: string; company: string; label: Label; net: number; gross: number }>();
   for (const t of rows) {
     const m =
@@ -139,8 +185,6 @@ export function portfolioComposition(rows: Disclosure[]): Holding[] {
   const items = [...map.values()].filter((i) => i.gross > 0);
   const totalPos = items.reduce((s, i) => s + Math.max(0, i.net), 0);
   const denom = totalPos > 0 ? totalPos : 1;
-  // Held names (net > 0) weighted by net; net-sold names kept at 0% and held: false (tagged
-  // "Sold" in the UI) so nothing silently vanishes. Held first, then sold.
   return items
     .map((i) => ({
       ticker: i.ticker,
