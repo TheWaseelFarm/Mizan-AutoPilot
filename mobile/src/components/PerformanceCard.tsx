@@ -2,8 +2,8 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { resolvePrice } from '../lib/illustrative';
-import { dualAnchor, fmtPctCompact, type PricesMap } from '../lib/performance';
-import { color, font, radius, space } from '../theme/tokens';
+import { dualAnchor, fmtPctCompact, perfTone, type PricesMap } from '../lib/performance';
+import { color, font, perfColor, radius, space } from '../theme/tokens';
 import { PerformanceChart } from './PerformanceChart';
 
 /**
@@ -52,8 +52,8 @@ export function PerformanceCard({
       />
 
       <View style={styles.anchors}>
-        <Anchor label="Since disclosed" value={sinceDisclosed} sub="from the trade date" />
-        <Anchor label="Since public" value={sincePublic} sub="from the filing date" />
+        <Anchor label="Since disclosed" value={sinceDisclosed} sub="from the trade date" tone={perfTone(perf.sinceDisclosed)} />
+        <Anchor label="Since public" value={sincePublic} sub="from the filing date" tone={perfTone(perf.sincePublic)} />
       </View>
 
       {perf.freshness ? (
@@ -81,11 +81,11 @@ export function PerformanceCard({
   );
 }
 
-function Anchor({ label, value, sub }: { label: string; value: string | null; sub: string }) {
+function Anchor({ label, value, sub, tone }: { label: string; value: string | null; sub: string; tone?: 'up' | 'down' | 'flat' }) {
   return (
     <View style={styles.anchor}>
       <Text style={styles.anchorLabel}>{label}</Text>
-      <Text style={styles.anchorValue}>{value ?? 'Pending'}</Text>
+      <Text style={[styles.anchorValue, value != null && tone ? { color: perfColor[tone] } : null]}>{value ?? 'Pending'}</Text>
       <Text style={styles.anchorSub}>{sub}</Text>
     </View>
   );

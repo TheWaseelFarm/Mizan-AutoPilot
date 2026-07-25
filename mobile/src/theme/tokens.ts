@@ -42,6 +42,20 @@ export const verdictColor = {
 
 export type VerdictCode = keyof typeof verdictColor;
 
+/**
+ * Performance tones — deliberately NOT the verdict hues (green/amber/red stay reserved for the
+ * Sharia verdict). Performance up/down must never be mistaken for a verdict, so "up" uses the
+ * brand blue (a gain pops) and "down" a muted slate. Option C (round-2 #2/#5).
+ */
+export const perfColor = {
+  up: '#2563EB',
+  upSoft: 'rgba(37, 99, 235, 0.12)',
+  down: '#5B6B86',
+  downSoft: 'rgba(91, 107, 134, 0.12)',
+  flat: '#8A96AB',
+  flatSoft: 'rgba(138, 150, 171, 0.12)',
+} as const;
+
 export const space = {
   xs: 4,
   sm: 8,

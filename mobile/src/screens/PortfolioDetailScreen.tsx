@@ -18,11 +18,11 @@ import {
   portfolioFlag,
 } from '../lib/derive';
 import { resolvePrice } from '../lib/illustrative';
-import { dualAnchor, fmtPctCompact } from '../lib/performance';
+import { dualAnchor, fmtPctCompact, perfTone } from '../lib/performance';
 import { portfolioIndex } from '../lib/portfolioPerf';
 import type { HomeStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
-import { color, font, radius, shadow, space, verdictColor } from '../theme/tokens';
+import { color, font, perfColor, radius, shadow, space, verdictColor } from '../theme/tokens';
 
 export function PortfolioDetailScreen() {
   const route = useRoute<RouteProp<HomeStackParamList, 'PortfolioDetail'>>();
@@ -55,13 +55,13 @@ export function PortfolioDetailScreen() {
   const ppSince = pp?.sinceDisclosed != null ? fmtPctCompact(pp.sinceDisclosed) : null;
   // Per-holding "since disclosed" so each name shows whether it's up ▲ or down ▼.
   const holdingPerf = useMemo(() => {
-    const m: Record<string, { since: string | null; down: boolean }> = {};
+    const m: Record<string, { since: string | null; tone: 'up' | 'down' | 'flat' }> = {};
     for (const h of composition) {
       const disc = activity
         .filter((r) => r.ticker === h.ticker)
         .sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || ''))[0];
       const v = disc ? dualAnchor(resolvePrice(prices, { ticker: h.ticker }).price, disc)?.sinceDisclosed ?? null : null;
-      m[h.ticker] = { since: fmtPctCompact(v), down: v != null && v < 0 };
+      m[h.ticker] = { since: fmtPctCompact(v), tone: perfTone(v) };
     }
     return m;
   }, [composition, activity, prices]);
@@ -97,7 +97,12 @@ export function PortfolioDetailScreen() {
       </View>
       <View style={styles.stats}>
         <Stat label="Risk appetite" value="Pending" muted />
-        <Stat label="Performance" value={ppSince || 'Pending'} muted />
+        <Stat
+          label="Performance"
+          value={ppSince || 'Pending'}
+          muted
+          valueColor={ppSince ? perfColor[perfTone(pp?.sinceDisclosed ?? null)] : undefined}
+        />
         <Stat label="Followers" value="—" muted />
       </View>
 
@@ -143,9 +148,9 @@ export function PortfolioDetailScreen() {
             </View>
             <View style={styles.compRight}>
               <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
-              {/* Per-name performance — muted (▲ up / ▼ down); never a verdict color. */}
+              {/* Per-name performance — up=blue / down=slate (a non-verdict tone). */}
               {perf?.since ? (
-                <Text style={[styles.compPerf, perf.down && styles.compPerfDown]}>{perf.since} since</Text>
+                <Text style={[styles.compPerf, { color: perfColor[perf.tone] }]}>{perf.since} since</Text>
               ) : (
                 <Text style={styles.compPerfPending}>perf pending</Text>
               )}
@@ -186,11 +191,11 @@ export function PortfolioDetailScreen() {
   );
 }
 
-function Stat({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+function Stat({ label, value, muted, valueColor }: { label: string; value: string; muted?: boolean; valueColor?: string }) {
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[styles.statValue, muted && styles.statValueMuted]}>{value}</Text>
+      <Text style={[styles.statValue, muted && styles.statValueMuted, valueColor ? { color: valueColor } : null]}>{value}</Text>
     </View>
   );
 }

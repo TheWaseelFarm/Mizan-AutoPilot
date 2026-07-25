@@ -95,10 +95,16 @@ export function freshnessNote(
   return null;
 }
 
-/** Muted ▲/▼ compact percent (evidence styling — never a verdict color). */
+/** ▲/▼ compact percent. */
 export function fmtPctCompact(v: number | null): string | null {
   if (v == null || !isFinite(v)) return null;
   return (v >= 0 ? '▲' : '▼') + Math.abs(v).toFixed(1) + '%';
+}
+
+/** Performance direction — drives the (non-verdict) up/down/flat color. */
+export function perfTone(v: number | null | undefined): 'up' | 'down' | 'flat' {
+  if (v == null || !isFinite(v) || v === 0) return 'flat';
+  return v > 0 ? 'up' : 'down';
 }
 
 /**

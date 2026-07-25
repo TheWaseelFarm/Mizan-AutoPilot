@@ -21,12 +21,12 @@ import { MixBar } from '../components/MixBar';
 import { SearchBar } from '../components/SearchBar';
 import { derivePortfolios, portfolioComposition, portfolioFlag, typeLabel } from '../lib/derive';
 import { hasMeaningfulFollowers } from '../lib/followers';
-import { fmtPctCompact, windowReturn } from '../lib/performance';
+import { fmtPctCompact, perfTone, windowReturn } from '../lib/performance';
 import { portfolioIndex } from '../lib/portfolioPerf';
 import type { Disclosure, Portfolio } from '../lib/types';
 import type { HomeStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
-import { color, font, radius, shadow, space, verdictColor } from '../theme/tokens';
+import { color, font, perfColor, radius, shadow, space, verdictColor } from '../theme/tokens';
 
 const TIMEFRAMES = [
   { key: '1W', label: '1W' },
@@ -296,6 +296,7 @@ function TimeBar({
 function PerformerRow({ r, rank, onPress }: { r: Ranked; rank: number; onPress: () => void }) {
   const flag = portfolioFlag(r.p);
   const perf = fmtPctCompact(r.perf);
+  const tone = perfTone(r.perf); // up = blue, down = slate — never a verdict color
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.row}>
       <Text style={styles.rank}>{rank}</Text>
@@ -321,9 +322,9 @@ function PerformerRow({ r, rank, onPress }: { r: Ranked; rank: number; onPress: 
       </View>
 
       <View style={styles.rowRight}>
-        {/* Neutral performance chip — grey ▲/▼, never a verdict color. */}
-        <View style={styles.perfChip}>
-          <Text style={styles.perfText}>{perf ?? 'perf pending'}</Text>
+        {/* Performance chip — up=blue / down=slate (a non-verdict tone, so a gain reads clearly). */}
+        <View style={[styles.perfChip, { backgroundColor: perfColor[`${tone}Soft`] }]}>
+          <Text style={[styles.perfText, { color: perfColor[tone] }]}>{perf ?? 'perf pending'}</Text>
         </View>
         {r.illustrative && perf ? <Text style={styles.perfNote}>sample</Text> : null}
         <Text style={styles.chevron}>›</Text>
