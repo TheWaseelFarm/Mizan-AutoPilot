@@ -4,7 +4,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 
 import type { PricePoint } from '../lib/performance';
-import { color, font, radius } from '../theme/tokens';
+import { color, font, perfColor, radius } from '../theme/tokens';
+
+export interface ChartEvent {
+  date?: string;
+  side?: string; // 'BUY' | 'SELL'
+  label?: string;
+}
 
 /** "Jun 17" style short date for the scrub tooltip. */
 function shortDate(iso: string): string {
@@ -23,10 +29,13 @@ export function PerformanceChart({
   history,
   transactionDate,
   filingDate,
+  events,
 }: {
   history: PricePoint[];
   transactionDate?: string;
   filingDate?: string;
+  /** Buy/sell markers to plot on the timeline (e.g. a portfolio's disclosures). */
+  events?: ChartEvent[];
 }) {
   // Measure real width so the SVG draws 1:1 (no aspect-ratio stretch => crisp line + labels).
   const [w, setW] = useState(0);
@@ -59,6 +68,12 @@ export function PerformanceChart({
   const areaPath = `${linePath} L${xAt(n - 1).toFixed(1)},${baseY} L${xAt(0).toFixed(1)},${baseY} Z`;
   const lastX = xAt(n - 1);
   const lastY = yAt(cs[n - 1]);
+
+  // Colour the line by its net direction over the window (up = blue, down = slate) — a
+  // non-verdict tone, so it never reads as a Sharia colour.
+  const trendUp = cs[n - 1] >= cs[0];
+  const lineColor = trendUp ? perfColor.up : perfColor.down;
+  const hasEvents = Array.isArray(events) && events.length > 0;
 
   // Faint interior gridlines for depth (kept very light — the line stays the hero).
   const grid = [0.33, 0.66].map((f) => padTop + f * (baseY - padTop));
@@ -135,9 +150,9 @@ export function PerformanceChart({
         >
           <Defs>
             <LinearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={color.muted} stopOpacity={0.22} />
-              <Stop offset="0.7" stopColor={color.muted} stopOpacity={0.05} />
-              <Stop offset="1" stopColor={color.muted} stopOpacity={0} />
+              <Stop offset="0" stopColor={lineColor} stopOpacity={0.28} />
+              <Stop offset="0.7" stopColor={lineColor} stopOpacity={0.06} />
+              <Stop offset="1" stopColor={lineColor} stopOpacity={0} />
             </LinearGradient>
           </Defs>
 
@@ -149,12 +164,33 @@ export function PerformanceChart({
 
           {/* soft area fill under the line */}
           <Path d={areaPath} fill={`url(#${gid})`} />
-          {/* price line (muted, crisp) */}
-          <Path d={linePath} fill="none" stroke={color.muted} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          {/* price line — direction-coloured, crisp */}
+          <Path d={linePath} fill="none" stroke={lineColor} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" />
 
-          {/* the lag made visible: trade point vs filing point */}
+          {/* the lag made visible: trade point vs filing point (single-stock chart) */}
           <Marker i={tradeI} label="trade" tone={color.faint} side="left" />
           <Marker i={fileI} label="filed" tone={color.brand} side="right" />
+
+          {/* buy / sell markers (portfolio chart): filled dot = bought, hollow = sold */}
+          {(events || []).map((ev, k) => {
+            const i = idxOnOrAfter(ev.date);
+            if (i < 0) return null;
+            const x = xAt(i);
+            const buy = String(ev.side).toUpperCase() !== 'SELL';
+            return (
+              <React.Fragment key={`ev${k}`}>
+                <Line x1={x} y1={yAt(cs[i])} x2={x} y2={baseY} stroke={color.line2} strokeWidth={1} opacity={0.7} />
+                <Circle
+                  cx={x}
+                  cy={yAt(cs[i])}
+                  r={4}
+                  fill={buy ? color.ink : color.surface}
+                  stroke={color.ink}
+                  strokeWidth={1.5}
+                />
+              </React.Fragment>
+            );
+          })}
 
           {/* "now" — the latest close, emphasised with a soft halo */}
           <Circle cx={lastX} cy={lastY} r={7} fill={color.muted} opacity={0.14} />
@@ -178,12 +214,22 @@ export function PerformanceChart({
             <Text style={styles.tipVal}>${cs[active].toFixed(2)}</Text>
             <Text style={styles.tipDate}>{shortDate(history[active].d)}</Text>
           </View>
-        ) : null}
+        ) : (
+          // Discoverability hint — fades out once the user starts scrubbing.
+          <View pointerEvents="none" style={styles.hint}>
+            <Text style={styles.hintText}>↔ Drag to explore</Text>
+          </View>
+        )}
       </View>
 
-      {/* minimal price range labels */}
+      {/* price range + (optional) buy/sell legend */}
       <View style={styles.axis}>
         <Text style={styles.axisText}>${min.toFixed(0)}</Text>
+        {hasEvents ? (
+          <Text style={styles.legendText}>
+            ● bought{'  '}○ sold
+          </Text>
+        ) : null}
         <Text style={styles.axisText}>${max.toFixed(0)}</Text>
       </View>
     </View>
@@ -191,8 +237,20 @@ export function PerformanceChart({
 }
 
 const styles = StyleSheet.create({
-  axis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  axis: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   axisText: { fontSize: font.tiny, color: color.faint, fontWeight: font.weight.medium, fontVariant: ['tabular-nums'] },
+  legendText: { fontSize: font.tiny, color: color.muted, fontWeight: font.weight.medium },
+  hint: {
+    position: 'absolute',
+    right: 8,
+    top: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    backgroundColor: color.surfaceAlt,
+    opacity: 0.9,
+  },
+  hintText: { fontSize: font.tiny, color: color.muted, fontWeight: font.weight.bold },
   tip: {
     position: 'absolute',
     top: 0,

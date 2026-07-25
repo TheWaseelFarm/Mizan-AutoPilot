@@ -113,7 +113,10 @@ export function PortfolioDetailScreen() {
               </View>
             ) : null}
           </View>
-          <PerformanceChart history={pp.history} />
+          <PerformanceChart
+            history={pp.history}
+            events={activity.map((t) => ({ date: t.transactionDate || t.filingDate, side: t.side, label: t.ticker }))}
+          />
           <Text style={styles.perfSub}>
             Weighted index of the holdings{ppSince ? ` · ${ppSince} since disclosed` : ''}
           </Text>

@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootTabs } from './src/navigation/RootTabs';
 import { FeedProvider } from './src/state/feed';
 import { FollowsProvider } from './src/state/follows';
+import { PreferencesProvider } from './src/state/preferences';
 import { color } from './src/theme/tokens';
 
 const navTheme: Theme = {
@@ -25,10 +26,12 @@ export default function App() {
     <SafeAreaProvider>
       <FeedProvider>
         <FollowsProvider>
-          <NavigationContainer theme={navTheme}>
-            <StatusBar style="dark" />
-            <RootTabs />
-          </NavigationContainer>
+          <PreferencesProvider>
+            <NavigationContainer theme={navTheme}>
+              <StatusBar style="dark" />
+              <RootTabs />
+            </NavigationContainer>
+          </PreferencesProvider>
         </FollowsProvider>
       </FeedProvider>
     </SafeAreaProvider>

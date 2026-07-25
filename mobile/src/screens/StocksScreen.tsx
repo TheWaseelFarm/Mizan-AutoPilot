@@ -21,6 +21,7 @@ import { VerdictBadge } from '../components/VerdictBadge';
 import { deriveSmartMoney, fmtMoney, type SmartRow } from '../lib/derive';
 import type { StocksStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
+import { usePreferences } from '../state/preferences';
 import { color, font, radius, shadow, space } from '../theme/tokens';
 
 type Side = 'bought' | 'sold';
@@ -52,7 +53,8 @@ export function StocksScreen() {
   const [side, setSide] = useState<Side>('bought');
   const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('ALL');
   const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('volume');
-  const [compliance, setCompliance] = useState<ComplianceKey>('all');
+  // Shared app-wide verdict tolerance (also set from Profile).
+  const { compliance, setCompliance } = usePreferences();
   const [query, setQuery] = useState('');
 
   const stocks = useMemo(() => {
