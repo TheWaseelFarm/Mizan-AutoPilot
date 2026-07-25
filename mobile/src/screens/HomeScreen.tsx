@@ -19,6 +19,7 @@ import { FilterSheet } from '../components/FilterSheet';
 import { MixBar } from '../components/MixBar';
 import { SearchBar } from '../components/SearchBar';
 import { derivePortfolios, portfolioComposition, portfolioFlag, typeLabel } from '../lib/derive';
+import { hasMeaningfulFollowers } from '../lib/followers';
 import { fmtPctCompact } from '../lib/performance';
 import { portfolioIndex } from '../lib/portfolioPerf';
 import type { Disclosure, Portfolio } from '../lib/types';
@@ -51,11 +52,6 @@ const COMPLIANCE = [
 
 const INITIAL_SHOWN = 6;
 
-// Most-followed board stays hidden until follower counts are meaningful (decision #8): the app
-// has no real follower graph yet, so ranking by it would be noise. The section is built and
-// gated here so it lights up the day follower data lands.
-const SHOW_MOST_FOLLOWED = false;
-
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Home'>;
 
 /** One ranked portfolio with its neutral (evidence-only) performance figure attached. */
@@ -64,6 +60,7 @@ interface Ranked {
   who: string;
   perf: number | null;
   illustrative: boolean;
+  followers: number;
 }
 
 /** A plain "who is this" subtitle from the filer's group + filing source (no invented titles). */
@@ -86,7 +83,7 @@ function whoLine(p: Portfolio, source?: string): string {
 export function HomeScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { rows, prices, loading, live, refresh } = useFeed();
+  const { rows, prices, followerCounts, loading, live, refresh } = useFeed();
   const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('1M');
   const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('performance');
   const [compliance, setCompliance] = useState<(typeof COMPLIANCE)[number]['key']>('all');
@@ -116,6 +113,7 @@ export function HomeScreen() {
         who: whoLine(p, source),
         perf: idx?.sinceDisclosed ?? null,
         illustrative: idx?.illustrative ?? true,
+        followers: followerCounts[p.name] || 0,
       };
     });
 
@@ -138,13 +136,19 @@ export function HomeScreen() {
       // Rank by the neutral evidence figure; names with no price fall to the bottom.
       list = list.sort((a, b) => (b.perf ?? -Infinity) - (a.perf ?? -Infinity));
     } else {
-      list = list.sort((a, b) => b.p.count - a.p.count);
+      // Followers: real follower counts, disclosure count only as a stable tiebreak.
+      list = list.sort((a, b) => b.followers - a.followers || b.p.count - a.p.count);
     }
     return list;
-  }, [rows, byActor, prices, query, sort, compliance]);
+  }, [rows, byActor, prices, followerCounts, query, sort, compliance]);
 
   const shown = showAll ? ranked : ranked.slice(0, INITIAL_SHOWN);
   const activeFilters = (sort !== 'performance' ? 1 : 0) + (compliance !== 'all' ? 1 : 0);
+  // "sample performance" reflects the PRICES, not the feed: it clears itself the moment real
+  // cached prices replace the illustrative series (decision: illustrative must be labelled).
+  const samplePerf = ranked.some((r) => r.perf != null && r.illustrative);
+  // Most-followed board appears only when the counts describe a real leaderboard (decision #8).
+  const showMostFollowed = hasMeaningfulFollowers(followerCounts);
 
   const goStocks = () => nav.getParent()?.navigate('StocksTab' as never);
 
@@ -195,7 +199,7 @@ export function HomeScreen() {
                 <Text style={styles.sectionTitle}>Top performers</Text>
                 <Text style={styles.sectionMeta}>
                   {ranked.length} portfolio{ranked.length === 1 ? '' : 's'}
-                  {live ? '' : ' · sample performance'}
+                  {samplePerf ? ' · sample performance' : ''}
                 </Text>
               </View>
               <TouchableOpacity
@@ -233,7 +237,7 @@ export function HomeScreen() {
               </TouchableOpacity>
             ) : null}
 
-            {SHOW_MOST_FOLLOWED ? <MostFollowed ranked={ranked} /> : null}
+            {showMostFollowed ? <MostFollowed ranked={ranked} /> : null}
 
             <View style={styles.guardrail}>
               <Text style={styles.guardrailText}>
@@ -328,14 +332,20 @@ function PerformerRow({ r, rank, onPress }: { r: Ranked; rank: number; onPress: 
   );
 }
 
-/** Most-followed board — built but gated off until follower data is meaningful (decision #8). */
+/** Most-followed board — shown only once follower counts are meaningful (decision #8). */
 function MostFollowed({ ranked }: { ranked: Ranked[] }) {
+  // Only portfolios that actually have followers — never pad the board with 0-follower rows.
+  const top = ranked
+    .filter((r) => r.followers > 0)
+    .sort((a, b) => b.followers - a.followers)
+    .slice(0, 3);
+  if (!top.length) return null;
   return (
     <View>
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Most followed</Text>
       </View>
-      {ranked.slice(0, 3).map((r, i) => (
+      {top.map((r, i) => (
         <View key={r.p.name} style={styles.row}>
           <Text style={styles.rank}>{i + 1}</Text>
           <Emblem p={r.p} />
@@ -347,10 +357,17 @@ function MostFollowed({ ranked }: { ranked: Ranked[] }) {
               {r.who}
             </Text>
           </View>
+          <Text style={styles.followers}>{fmtFollowers(r.followers)}</Text>
         </View>
       ))}
     </View>
   );
+}
+
+/** Compact follower label (e.g. 1.2k followers). */
+function fmtFollowers(n: number): string {
+  const s = n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
+  return `${s} follower${n === 1 ? '' : 's'}`;
 }
 
 const styles = StyleSheet.create({
@@ -455,6 +472,7 @@ const styles = StyleSheet.create({
   perfText: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.muted },
   perfNote: { fontSize: font.tiny, color: color.faint, fontWeight: font.weight.medium },
   chevron: { fontSize: 22, color: color.faint, marginTop: 2 },
+  followers: { fontSize: font.small, fontWeight: font.weight.heavy, color: color.muted },
 
   more: {
     marginHorizontal: space.lg,
