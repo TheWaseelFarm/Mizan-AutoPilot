@@ -20,12 +20,15 @@ export function portfolioIndex(
   rows: Disclosure[],
   prices: PricesMap,
 ): PortfolioPerf | null {
-  if (!composition.length) return null;
+  // Only currently-held names (weight > 0) drive the weighted index; net-sold names carry 0
+  // weight and would otherwise needlessly shrink the common price window.
+  const held = composition.filter((h) => h.weightPct > 0);
+  if (!held.length) return null;
 
   let illustrative = false;
   const parts: { w: number; closes: number[]; dates: string[]; since: number | null }[] = [];
 
-  for (const h of composition) {
+  for (const h of held) {
     const { price, illustrative: ill } = resolvePrice(prices, { ticker: h.ticker });
     if (ill) illustrative = true;
     const disc = rows
@@ -60,7 +63,7 @@ export function portfolioIndex(
   // Weighted since-disclosed across holdings that have a value.
   let wsum = 0;
   let acc = 0;
-  for (let k = 0; k < composition.length; k++) {
+  for (let k = 0; k < parts.length; k++) {
     const since = parts[k].since;
     if (since != null) {
       acc += parts[k].w * since;

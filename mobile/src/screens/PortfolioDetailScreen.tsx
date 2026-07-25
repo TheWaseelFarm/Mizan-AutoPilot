@@ -50,7 +50,8 @@ export function PortfolioDetailScreen() {
   const descriptor = actorDescriptor(activity[0] ?? { kind: portfolio.kind });
   const avgLag = averageLag(activity);
   const composition = useMemo(() => portfolioComposition(activity), [activity]);
-  const maxWeight = composition[0]?.weightPct || 1;
+  const held = composition.filter((h) => h.held);
+  const maxWeight = held[0]?.weightPct || 1;
   const pp = useMemo(() => portfolioIndex(composition, activity, prices), [composition, activity, prices]);
   const ppSince = pp?.sinceDisclosed != null ? fmtPctCompact(pp.sinceDisclosed) : null;
   // Per-holding "since disclosed" so each name shows whether it's up ▲ or down ▼.
@@ -129,25 +130,38 @@ export function PortfolioDetailScreen() {
         <Text style={styles.sectionTitle}>Composition</Text>
         <Text style={styles.compSub}>Share of the disclosed portfolio, by value invested</Text>
       </View>
-      {/* Donut: value split by stock (neutral categorical colors — verdict colors stay reserved). */}
-      <View style={styles.pieCard}>
-        <PieChart slices={composition.map((h) => ({ key: h.ticker, label: h.ticker, sub: h.company, pct: h.weightPct }))} />
-      </View>
+      {/* Donut: value split by CURRENT holdings (net-sold names carry 0% and drop out of the
+          pie, but still appear below tagged "Sold"). Neutral colors — verdict colors reserved. */}
+      {held.length ? (
+        <View style={styles.pieCard}>
+          <PieChart slices={held.map((h) => ({ key: h.ticker, label: h.ticker, sub: h.company, pct: h.weightPct }))} />
+        </View>
+      ) : (
+        <Text style={styles.noHoldings}>No current disclosed holdings — every position here was net sold.</Text>
+      )}
       {composition.map((h) => {
         const perf = holdingPerf[h.ticker];
         return (
           <View key={h.ticker} style={styles.compRow}>
             <View style={[styles.compDot, { backgroundColor: verdictColor[h.label].solid }]} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.compTicker} numberOfLines={1}>
+              <Text style={[styles.compTicker, !h.held && styles.compTickerMuted]} numberOfLines={1}>
                 {h.ticker} <Text style={styles.compCompany}>· {h.company}</Text>
               </Text>
-              <View style={styles.compTrack}>
-                <View style={[styles.compFill, { width: `${(h.weightPct / maxWeight) * 100}%` }]} />
-              </View>
+              {h.held ? (
+                <View style={styles.compTrack}>
+                  <View style={[styles.compFill, { width: `${(h.weightPct / maxWeight) * 100}%` }]} />
+                </View>
+              ) : null}
             </View>
             <View style={styles.compRight}>
-              <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
+              {h.held ? (
+                <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
+              ) : (
+                <View style={styles.soldTag}>
+                  <Text style={styles.soldTagText}>Sold</Text>
+                </View>
+              )}
               {/* Per-name performance — up=blue / down=slate (a non-verdict tone). */}
               {perf?.since ? (
                 <Text style={[styles.compPerf, { color: perfColor[perf.tone] }]}>{perf.since} since</Text>
@@ -159,7 +173,8 @@ export function PortfolioDetailScreen() {
         );
       })}
       <Text style={styles.compNote}>
-        Share of the portfolio, with each name's move since it was disclosed (▲ up / ▼ down) —
+        Share of current disclosed holdings by value; names net sold in these filings are kept
+        and marked “Sold.” Each name shows its move since disclosed (▲ up / ▼ down) —
         informational, not a recommendation to buy.
       </Text>
 
@@ -298,7 +313,20 @@ const styles = StyleSheet.create({
   },
   compDot: { width: 9, height: 9, borderRadius: 5, flex: 0 },
   compTicker: { fontSize: font.body, fontWeight: font.weight.bold, color: color.ink },
+  compTickerMuted: { color: color.muted },
   compCompany: { fontSize: font.small, fontWeight: font.weight.regular, color: color.faint },
+  soldTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.sm, backgroundColor: color.surfaceAlt },
+  soldTagText: { fontSize: font.tiny, fontWeight: font.weight.heavy, color: color.muted, letterSpacing: 0.4 },
+  noHoldings: {
+    marginHorizontal: space.lg,
+    marginBottom: space.md,
+    padding: space.md,
+    borderRadius: radius.md,
+    backgroundColor: color.surfaceAlt,
+    fontSize: font.small,
+    color: color.muted,
+    lineHeight: 18,
+  },
   compTrack: { height: 6, borderRadius: 3, backgroundColor: color.surfaceAlt, marginTop: 5, overflow: 'hidden' },
   compFill: { height: '100%', borderRadius: 3, backgroundColor: color.brand },
   compRight: { alignItems: 'flex-end', minWidth: 74 },

@@ -109,18 +109,21 @@ export interface Holding {
   ticker: string;
   company: string;
   label: Label;
-  /** net disclosed dollars in this name (buys − sells, floored at 0). */
+  /** net disclosed dollars in this name (buys − sells). */
   net: number;
-  /** share of the whole portfolio, 0–100. */
+  /** share of the disclosed portfolio, 0–100 (0 for net-sold names). */
   weightPct: number;
+  /** true = a current disclosed position (net > 0); false = net-sold/exited in these filings. */
+  held: boolean;
 }
 
 /**
- * Portfolio composition — how much of a filer's disclosed portfolio each stock makes up,
- * so a user can see the allocation (informational, never a buy instruction). Weight is the
- * name's net disclosed amount (buys − sells) as a share of the total; if net positions sum to
- * zero (e.g. only sells on record) it falls back to gross disclosed amount so nothing vanishes.
- * `rows` should already be filtered to a single actor.
+ * Portfolio composition — how much of a filer's disclosed portfolio each stock makes up, so a
+ * user can see the allocation (informational, never a buy instruction). Held names (net buys >
+ * sells) are weighted by their net disclosed amount as a share of the total. Names that netted
+ * to a SALE are NOT dropped — they're kept with 0% and `held: false` (tagged "Sold" in the UI)
+ * so nothing silently vanishes. If a filer only ever sold (no net position at all), weights
+ * fall back to gross disclosed amount so the split is still visible. `rows` = one actor.
  */
 export function portfolioComposition(rows: Disclosure[]): Holding[] {
   const map = new Map<string, { ticker: string; company: string; label: Label; net: number; gross: number }>();
@@ -133,15 +136,21 @@ export function portfolioComposition(rows: Disclosure[]): Holding[] {
     m.label = t.label; // same per ticker; keep the latest
     map.set(t.ticker, m);
   }
-  const items = [...map.values()];
+  const items = [...map.values()].filter((i) => i.gross > 0);
   const totalPos = items.reduce((s, i) => s + Math.max(0, i.net), 0);
-  const usePos = totalPos > 0;
-  const basis = (i: { net: number; gross: number }) => (usePos ? Math.max(0, i.net) : i.gross);
-  const total = items.reduce((s, i) => s + basis(i), 0) || 1;
+  const denom = totalPos > 0 ? totalPos : 1;
+  // Held names (net > 0) weighted by net; net-sold names kept at 0% and held: false (tagged
+  // "Sold" in the UI) so nothing silently vanishes. Held first, then sold.
   return items
-    .map((i) => ({ ticker: i.ticker, company: i.company, label: i.label, net: i.net, weightPct: (basis(i) / total) * 100 }))
-    .filter((h) => h.weightPct > 0)
-    .sort((a, b) => b.weightPct - a.weightPct);
+    .map((i) => ({
+      ticker: i.ticker,
+      company: i.company,
+      label: i.label,
+      net: i.net,
+      held: i.net > 0,
+      weightPct: i.net > 0 ? (i.net / denom) * 100 : 0,
+    }))
+    .sort((a, b) => Number(b.held) - Number(a.held) || b.weightPct - a.weightPct || b.net - a.net);
 }
 
 /** A smart-money ranked stock row (Tab 2). Mirrors api/_lib/trends.js. */
