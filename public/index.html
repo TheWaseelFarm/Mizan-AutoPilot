@@ -66,6 +66,16 @@
   .mz-perf-hero[data-up="false"] { color: var(--mz-ink-600); }
   .mz-perf-hero svg { width: 0.72rem; height: 0.72rem; }
   .mz-perf-cell { display: flex; align-items: center; gap: 0.65rem; }
+  /* Diverging net-flow bar (Smart Money): gross sold on the start side, gross bought on the
+     end side, a center zero line, and an ink tick marking the net. */
+  .mz-flow-bar { position: relative; height: 14px; }
+  .mz-flow-axis { position: absolute; inset-inline: 0; top: 6px; height: 2px; background: var(--mz-ink-200); border-radius: 1px; }
+  .mz-flow-sell { position: absolute; inset-inline-end: 50%; top: 1px; height: 12px; background: var(--mz-ink-400);
+    border-start-start-radius: 12px; border-end-start-radius: 12px; }
+  .mz-flow-buy { position: absolute; inset-inline-start: 50%; top: 1px; height: 12px; background: var(--mz-ink-700);
+    border-start-end-radius: 12px; border-end-end-radius: 12px; }
+  .mz-flow-zero { position: absolute; inset-inline-start: 50%; top: -2px; height: 18px; width: 1.5px; background: var(--mz-ink-950); }
+  .mz-flow-net { position: absolute; top: -3px; height: 20px; width: 2px; background: var(--mz-cobalt-600); }
   .mz-linkbtn { white-space: nowrap; }
   #freshness { white-space: nowrap; }
   /* Toolbar rows: the time selector sits on its own row above the controls. */
