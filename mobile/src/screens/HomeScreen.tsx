@@ -43,11 +43,11 @@ const SORTS = [
   { key: 'followers', label: 'Followers' },
 ] as const;
 
-// Compliance FILTERS the list (it is not a sort) — v1-extend task #2.
+// Compliance FILTERS the list (it is not a sort). Self-explanatory labels (round-2 #4).
 const COMPLIANCE = [
   { key: 'all', label: 'All' },
-  { key: 'fully', label: 'Fully compliant' },
-  { key: 'exclude', label: 'Exclude non-compliant' },
+  { key: 'fully', label: 'Clean only' },
+  { key: 'exclude', label: 'Hide non-compliant' },
 ] as const;
 
 const INITIAL_SHOWN = 6;
@@ -150,22 +150,14 @@ export function HomeScreen() {
   // Most-followed board appears only when the counts describe a real leaderboard (decision #8).
   const showMostFollowed = hasMeaningfulFollowers(followerCounts);
 
-  const goStocks = () => nav.getParent()?.navigate('StocksTab' as never);
-
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <BrandHeader />
 
-      {/* Portfolios | Stocks segmented toggle + a search affordance. */}
+      {/* Screen title + a search affordance. (Stocks lives in the bottom tab — a single door;
+          the old top "Portfolios | Stocks" switcher was a confusing second one — round-2 #3.) */}
       <View style={styles.topBar}>
-        <View style={styles.segment}>
-          <View style={[styles.segItem, styles.segItemOn]}>
-            <Text style={[styles.segText, styles.segTextOn]}>Portfolios</Text>
-          </View>
-          <TouchableOpacity style={styles.segItem} onPress={goStocks} activeOpacity={0.7}>
-            <Text style={styles.segText}>Stocks</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.screenTitle}>Portfolios</Text>
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={() => setSearchOpen((s) => !s)}
@@ -376,22 +368,13 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: space.sm,
     paddingHorizontal: space.lg,
     paddingTop: space.xs,
     paddingBottom: space.sm,
   },
-  segment: {
-    flexDirection: 'row',
-    flex: 1,
-    backgroundColor: color.surfaceAlt,
-    borderRadius: radius.pill,
-    padding: 3,
-  },
-  segItem: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: radius.pill },
-  segItemOn: { backgroundColor: color.surface, ...shadow.card },
-  segText: { fontSize: font.label, fontWeight: font.weight.bold, color: color.muted },
-  segTextOn: { color: color.ink },
+  screenTitle: { fontSize: font.h2, fontWeight: font.weight.heavy, color: color.ink, letterSpacing: -0.3 },
   iconBtn: {
     width: 46,
     height: 46,

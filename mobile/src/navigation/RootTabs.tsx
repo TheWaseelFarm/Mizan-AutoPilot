@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, TouchableOpacity } from 'react-native';
 
 import { FollowingScreen } from '../screens/FollowingScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -26,6 +26,24 @@ const stackScreenOptions = {
   contentStyle: { backgroundColor: color.bg },
 } as const;
 
+/** An explicit, always-visible back chevron for detail screens (round-2 #1). */
+function HeaderBack({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} hitSlop={{ top: 12, bottom: 12, left: 12, right: 16 }} accessibilityRole="button" accessibilityLabel="Back">
+      <Text style={{ fontSize: 32, lineHeight: 34, color: color.ink, paddingRight: 10, marginTop: -3 }}>‹</Text>
+    </TouchableOpacity>
+  );
+}
+
+// Detail screens: explicit ‹ back button (not just the platform default) + swipe-back gesture.
+// The list screen underneath stays mounted, so its scroll position is preserved on return.
+const detailOptions = (title: string) => ({ navigation }: { navigation: { goBack: () => void; canGoBack: () => boolean } }) => ({
+  title,
+  gestureEnabled: true,
+  headerBackVisible: false,
+  headerLeft: () => (navigation.canGoBack() ? <HeaderBack onPress={() => navigation.goBack()} /> : null),
+});
+
 function HomeStackNav() {
   return (
     <HomeStack.Navigator screenOptions={stackScreenOptions}>
@@ -33,7 +51,7 @@ function HomeStackNav() {
       <HomeStack.Screen
         name="PortfolioDetail"
         component={PortfolioDetailScreen}
-        options={{ title: 'Portfolio' }}
+        options={detailOptions('Portfolio')}
       />
     </HomeStack.Navigator>
   );
@@ -46,7 +64,7 @@ function StocksStackNav() {
       <StocksStack.Screen
         name="StockDetail"
         component={StockDetailScreen}
-        options={{ title: 'Stock' }}
+        options={detailOptions('Stock')}
       />
     </StocksStack.Navigator>
   );

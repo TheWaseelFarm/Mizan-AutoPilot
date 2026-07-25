@@ -49,6 +49,9 @@ export function FilterSheet<A extends string, B extends string, C extends string
             value={compliance.value}
             onChange={compliance.onChange}
           />
+          <Text style={styles.help}>
+            Clean = own freely · Purify = charity owed at sale · Non-compliant = not permissible.
+          </Text>
 
           <Text style={styles.note}>
             Sorting on disclosed-holdings evidence only. It ranks past filings — never a
@@ -86,6 +89,14 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: font.h2, fontWeight: font.weight.heavy, color: color.ink },
   done: { fontSize: font.body, fontWeight: font.weight.heavy, color: color.brand },
+  help: {
+    fontSize: font.small,
+    color: color.muted,
+    lineHeight: 16,
+    paddingHorizontal: space.lg,
+    paddingTop: 6,
+    fontWeight: font.weight.medium,
+  },
   note: {
     fontSize: font.small,
     color: color.faint,
