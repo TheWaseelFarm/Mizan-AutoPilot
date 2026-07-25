@@ -1,10 +1,17 @@
 import React, { useId, useState } from 'react';
-import type { LayoutChangeEvent } from 'react-native';
+import type { GestureResponderEvent, LayoutChangeEvent } from 'react-native';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 
 import type { PricePoint } from '../lib/performance';
-import { color, font } from '../theme/tokens';
+import { color, font, radius } from '../theme/tokens';
+
+/** "Jun 17" style short date for the scrub tooltip. */
+function shortDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 /**
  * Performance chart (spec §4/§6): a clean, muted price line with a soft area fill, a "now"
@@ -23,6 +30,7 @@ export function PerformanceChart({
 }) {
   // Measure real width so the SVG draws 1:1 (no aspect-ratio stretch => crisp line + labels).
   const [w, setW] = useState(0);
+  const [active, setActive] = useState<number | null>(null); // scrubbed data-point index
   const gid = 'perffill' + useId().replace(/[^a-zA-Z0-9]/g, '');
   const onLayout = (e: LayoutChangeEvent) => {
     const next = Math.round(e.nativeEvent.layout.width);
@@ -64,6 +72,14 @@ export function PerformanceChart({
   const tradeI = idxOnOrAfter(transactionDate);
   const fileI = idxOnOrAfter(filingDate);
 
+  // Touch/drag scrubbing → nearest data-point index (works for touch and mouse-drag on web).
+  const scrub = (e: GestureResponderEvent) => {
+    const x = e.nativeEvent.locationX;
+    if (x == null || Number.isNaN(x)) return;
+    const frac = (x - padX) / Math.max(1, width - 2 * padX);
+    setActive(Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1)))));
+  };
+
   // Labels sit on opposite sides of their marker (trade → left, filed → right) so they never
   // collide when the trade and filing dates are only a few days apart.
   const Marker = ({
@@ -103,7 +119,14 @@ export function PerformanceChart({
 
   return (
     <View>
-      <View onLayout={onLayout}>
+      <View
+        onLayout={onLayout}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderTerminationRequest={() => false}
+        onResponderGrant={scrub}
+        onResponderMove={scrub}
+      >
         <Svg
           width={width}
           height={H}
@@ -136,7 +159,26 @@ export function PerformanceChart({
           {/* "now" — the latest close, emphasised with a soft halo */}
           <Circle cx={lastX} cy={lastY} r={7} fill={color.muted} opacity={0.14} />
           <Circle cx={lastX} cy={lastY} r={3.5} fill={color.ink} stroke={color.surface} strokeWidth={1.5} />
+
+          {/* scrub crosshair */}
+          {active != null ? (
+            <>
+              <Line x1={xAt(active)} y1={padTop} x2={xAt(active)} y2={baseY} stroke={color.ink} strokeWidth={1} opacity={0.35} />
+              <Circle cx={xAt(active)} cy={yAt(cs[active])} r={4.5} fill={color.ink} stroke={color.surface} strokeWidth={1.5} />
+            </>
+          ) : null}
         </Svg>
+
+        {/* scrub tooltip (value + date at the touched point) */}
+        {active != null ? (
+          <View
+            pointerEvents="none"
+            style={[styles.tip, { left: Math.min(Math.max(xAt(active) - 44, 0), Math.max(0, width - 88)) }]}
+          >
+            <Text style={styles.tipVal}>${cs[active].toFixed(2)}</Text>
+            <Text style={styles.tipDate}>{shortDate(history[active].d)}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* minimal price range labels */}
@@ -151,4 +193,15 @@ export function PerformanceChart({
 const styles = StyleSheet.create({
   axis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   axisText: { fontSize: font.tiny, color: color.faint, fontWeight: font.weight.medium, fontVariant: ['tabular-nums'] },
+  tip: {
+    position: 'absolute',
+    top: 0,
+    width: 88,
+    alignItems: 'center',
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    backgroundColor: color.ink,
+  },
+  tipVal: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.onBrand, fontVariant: ['tabular-nums'] },
+  tipDate: { fontSize: font.tiny, fontWeight: font.weight.medium, color: 'rgba(255,255,255,0.75)' },
 });

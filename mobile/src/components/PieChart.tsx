@@ -1,6 +1,6 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import React, { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Svg, { Circle, G, Path } from 'react-native-svg';
 
 import { color, font, radius, space } from '../theme/tokens';
 
@@ -49,6 +49,11 @@ export function PieChart({ slices, max = 7 }: { slices: PieSlice[]; max?: number
   const cx = size / 2;
   const cy = size / 2;
   const colorAt = (i: number, key: string) => (key === '__other' ? OTHER : PALETTE[i % PALETTE.length]);
+  const fmtPct = (p: number) => (p >= 9.5 ? Math.round(p) : p.toFixed(1));
+
+  const [selected, setSelected] = useState<string | null>(null);
+  const toggle = (key: string) => setSelected((s) => (s === key ? null : key));
+  const sel = items.find((it) => it.key === selected) || null;
 
   let angle = 0;
   const arcs = items.map((it, i) => {
@@ -58,43 +63,66 @@ export function PieChart({ slices, max = 7 }: { slices: PieSlice[]; max?: number
     angle = end;
     return { key: it.key, full: sweep >= 359.99, d: arcPath(cx, cy, ro, ri, start, end), fill: colorAt(i, it.key) };
   });
-  const topShare = items[0] ? (items[0].pct >= 9.5 ? Math.round(items[0].pct) : items[0].pct.toFixed(1)) : '0';
 
   return (
     <View style={styles.wrap}>
       <View>
-        <Svg width={size} height={size} accessibilityRole="image" accessibilityLabel="Portfolio value split by stock">
-          {arcs.map((a, i) =>
-            a.full ? (
-              <Circle key={a.key} cx={cx} cy={cy} r={(ro + ri) / 2} stroke={a.fill} strokeWidth={ro - ri} fill="none" />
-            ) : (
-              <Path key={a.key} d={a.d} fill={a.fill} />
-            ),
-          )}
+        <Svg width={size} height={size} accessibilityRole="image" accessibilityLabel="Portfolio value split by stock. Tap a slice for detail.">
+          {arcs.map((a) => {
+            const dim = selected != null && selected !== a.key ? 0.32 : 1;
+            return (
+              <G key={a.key} onPress={() => toggle(a.key)} opacity={dim}>
+                {a.full ? (
+                  <Circle cx={cx} cy={cy} r={(ro + ri) / 2} stroke={a.fill} strokeWidth={ro - ri} fill="none" />
+                ) : (
+                  <Path d={a.d} fill={a.fill} />
+                )}
+              </G>
+            );
+          })}
         </Svg>
         <View style={styles.center} pointerEvents="none">
-          <Text style={styles.centerNum}>{items.length}</Text>
-          <Text style={styles.centerLbl}>{items.length === 1 ? 'holding' : 'holdings'}</Text>
+          {sel ? (
+            <>
+              <Text style={styles.centerNum}>{fmtPct(sel.pct)}%</Text>
+              <Text style={styles.centerLbl} numberOfLines={1}>
+                {sel.label}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.centerNum}>{items.length}</Text>
+              <Text style={styles.centerLbl}>{items.length === 1 ? 'holding' : 'holdings'}</Text>
+            </>
+          )}
         </View>
       </View>
 
       <View style={styles.legend}>
-        {items.map((it, i) => (
-          <View key={it.key} style={styles.row}>
-            <View style={[styles.dot, { backgroundColor: colorAt(i, it.key) }]} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.label} numberOfLines={1}>
-                {it.label}
-              </Text>
-              {it.sub ? (
-                <Text style={styles.sub} numberOfLines={1}>
-                  {it.sub}
+        {items.map((it, i) => {
+          const on = selected === it.key;
+          return (
+            <TouchableOpacity
+              key={it.key}
+              style={[styles.row, on && styles.rowOn]}
+              activeOpacity={0.7}
+              onPress={() => toggle(it.key)}
+            >
+              <View style={[styles.dot, { backgroundColor: colorAt(i, it.key) }]} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.label, on && styles.labelOn]} numberOfLines={1}>
+                  {it.label}
                 </Text>
-              ) : null}
-            </View>
-            <Text style={styles.pct}>{it.pct >= 9.5 ? Math.round(it.pct) : it.pct.toFixed(1)}%</Text>
-          </View>
-        ))}
+                {it.sub ? (
+                  <Text style={styles.sub} numberOfLines={1}>
+                    {it.sub}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.pct}>{fmtPct(it.pct)}%</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
@@ -105,10 +133,12 @@ const styles = StyleSheet.create({
   center: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   centerNum: { fontSize: font.h2, fontWeight: font.weight.heavy, color: color.ink },
   centerLbl: { fontSize: font.tiny, color: color.faint, fontWeight: font.weight.bold, textTransform: 'uppercase', letterSpacing: 0.4 },
-  legend: { flex: 1, minWidth: 0, gap: 7 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  legend: { flex: 1, minWidth: 0, gap: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5, paddingHorizontal: 6, borderRadius: radius.sm },
+  rowOn: { backgroundColor: color.surfaceAlt },
   dot: { width: 9, height: 9, borderRadius: 3 },
   label: { fontSize: font.label, fontWeight: font.weight.bold, color: color.ink },
+  labelOn: { color: color.brandInk },
   sub: { fontSize: font.tiny, color: color.faint, marginTop: 1 },
   pct: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.muted, fontVariant: ['tabular-nums'] },
 });
