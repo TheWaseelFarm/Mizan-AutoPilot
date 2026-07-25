@@ -104,12 +104,13 @@ export function ProfileScreen() {
 
       <Text style={styles.sectionTitle}>Methodology</Text>
       <View style={styles.infoCard}>
-        <Text style={styles.rowTitle}>AAOIFI Standard No. 21</Text>
+        <Text style={styles.rowTitle}>AAOIFI Standard No. 21 · the “30/30/5” rule</Text>
         <Text style={styles.rowBody}>
           Two screens, both required: permissible business activity, and financial ratios vs. market
-          cap — interest-bearing debt &lt; 30%, cash + interest securities &lt; 30%, and impure income
-          &lt; 5%. Over any limit is Non-compliant. Some impure income (0–5%) is Compliant · purify —
-          you purify that share of dividends.
+          capitalization — interest-bearing debt &lt; 30%, cash + interest-bearing securities &lt; 30%,
+          and non-permissible income &lt; 5% of revenue. Over any limit is Non-compliant. Some impure
+          income (0–5%) is Compliant · purify — you purify that share of dividends. (The 33% ratio used
+          by some index providers is not AAOIFI.)
         </Text>
       </View>
 

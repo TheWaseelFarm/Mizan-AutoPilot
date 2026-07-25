@@ -6,19 +6,23 @@
 // Pure module: NO I/O, NO framework deps. Shared by the serverless functions AND the
 // frontend, so the verdict lives in exactly one place.
 //
-// A stock must pass BOTH screens to be Compliant:
+// A stock must pass BOTH screens to be Compliant. Thresholds are AAOIFI No. 21's "30/30/5"
+// rule (the current standard; verified 2026):
 //   1. Business activity (qualitative): fails if core revenue is from a prohibited sector.
-//   2. Financial ratios (quantitative), each vs. market cap:
-//        interest-bearing debt / market cap   < 30%   (over = NON-COMPLIANT — debt now FAILS)
-//        cash + interest securities / mkt cap  < 30%   (over = NON-COMPLIANT)
-//        impure income / total revenue         < 5%    (over = NON-COMPLIANT)
+//   2. Financial ratios (quantitative), each vs. market capitalization:
+//        interest-bearing debt / market cap        < 30%   (over = NON-COMPLIANT — debt FAILS)
+//        cash + interest-bearing securities / mcap < 30%   (over = NON-COMPLIANT)
+//        impure (non-permissible) income / revenue < 5%    (over = NON-COMPLIANT)
 //
 //   fail    -> impermissible business  OR  impure > 5%  OR  debt > 30%  OR  cash > 30%
 //   clean   -> passes both screens with ZERO impure income
 //   purify  -> passes both screens but has some impure income (0–5%) -> purify dividends
 //
-// NOTE: sources vary 30% vs 33% for the debt/cash ratios — defaulted to the stricter 30%;
-// scholarly review to confirm the threshold + the prohibited-sector list.
+// NOTE ON 30%: AAOIFI No. 21 specifies 30% for the debt/liquidity ratios. The 33% figure seen
+// elsewhere is the S&P/Dow Jones & MSCI index methodology, NOT AAOIFI — do not conflate them.
+// The debt ratio is measured against the trailing-12-month AVERAGE market cap; that averaging
+// is done upstream by the screening provider (this engine consumes the finished ratio).
+// A qualified scholar should still confirm the prohibited-sector list for the activity screen.
 
 export const AAOIFI = Object.freeze({ debtMax: 30, cashMax: 30, impureMax: 5 });
 

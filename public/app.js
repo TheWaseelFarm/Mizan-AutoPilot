@@ -56,7 +56,7 @@
       'meta.count': '{n} shown', 'live': 'Live data', 'sample': 'Sample data', 'freshUpdated': 'Updated',
       'empty.title': 'Nothing matches these filters', 'empty.body': 'Try clearing a filter or widening the time period.',
       'acct.title': 'Account', 'acct.lang': 'Language', 'follow.title': 'Following', 'alerts.title': 'Alerts',
-      'sec.methodology': 'Methodology', 'sec.mtext': 'Two screens, both required: permissible business activity, and financial ratios vs. market cap — interest-bearing debt < 30%, cash + interest securities < 30%, and impure income < 5%. Over any limit is Non-compliant. Some impure income (0–5%) is Compliant · purify.',
+      'sec.methodology': 'Methodology', 'sec.mtext': 'Screening follows AAOIFI Shariah Standard No. 21 — the current "30/30/5" rule. Two screens, both required: (1) permissible business activity, and (2) financial ratios vs. market capitalization — interest-bearing debt < 30%, cash + interest-bearing securities < 30%, and non-permissible income < 5% of revenue. Over any limit is Non-compliant. Some impure income (0–5%) is Compliant · purify — you purify that share of dividends. (The 33% figure used by some index providers is not AAOIFI.)',
     },
     ar: {
       'tab.portfolios': 'المحافظ', 'tab.stocks': 'الأسهم', 'tab.following': 'المتابَعون', 'tab.alerts': 'التنبيهات', 'tab.account': 'الحساب',
@@ -80,7 +80,7 @@
       'meta.count': '{n} معروض', 'live': 'بيانات حية', 'sample': 'بيانات تجريبية', 'freshUpdated': 'حُدِّث',
       'empty.title': 'لا شيء يطابق هذه المرشحات', 'empty.body': 'جرّب مسح مرشح أو توسيع الفترة الزمنية.',
       'acct.title': 'الحساب', 'acct.lang': 'اللغة', 'follow.title': 'المتابَعون', 'alerts.title': 'التنبيهات',
-      'sec.methodology': 'المنهجية', 'sec.mtext': 'فحصان، كلاهما مطلوب: نشاط تجاري مباح، ونسب مالية إلى القيمة السوقية — الدين بفائدة < 30%، النقد والأوراق ذات الفائدة < 30%، والدخل غير النقي < 5%. تجاوز أي حد = غير متوافق. دخل غير نقي يسير (0–5%) = متوافق · تطهير.',
+      'sec.methodology': 'المنهجية', 'sec.mtext': 'يتبع الفحص معيار AAOIFI الشرعي رقم 21 — قاعدة «30/30/5» الحالية. فحصان، كلاهما مطلوب: (1) نشاط تجاري مباح، و(2) نسب مالية إلى القيمة السوقية — الدين بفائدة < 30%، والنقد والأوراق ذات الفائدة < 30%، والدخل غير المباح < 5% من الإيراد. تجاوز أي حد = غير متوافق. دخل غير نقي يسير (0–5%) = متوافق · تطهير. (نسبة 33% لدى بعض مزوّدي المؤشرات ليست من AAOIFI.)',
     },
   };
   let LANG = 'en';
@@ -145,6 +145,60 @@
     return [...m.values()];
   }
   const portfolioFlag = (p) => p.mix.fail > 0 ? { text: 'Contains non-compliant names', tone: 'fail' } : p.mix.purify > 0 ? { text: `Mostly compliant · ${p.mix.purify} to purify`, tone: 'purify' } : { text: 'Fully compliant', tone: 'clean' };
+
+  /* --- Decision-support synthesis: turn the raw disclosures into a plain-language "read" +
+     scannable signal tags, so a user can judge a setup at a glance instead of parsing columns. */
+  const sideUp = (s) => String(s).toUpperCase() !== 'SELL';
+  const signalChip = (text, tone) => `<span class="mz-signal" data-tone="${tone || 'muted'}">${esc(text)}</span>`;
+  const signalRow = (tags) => tags.length ? `<span class="mz-signals">${tags.map(([txt, tone]) => signalChip(txt, tone)).join('')}</span>` : '';
+
+  function stockRead(ticker) {
+    const rows = S.rows.filter((r) => r.ticker === ticker);
+    if (!rows.length) return { sentence: '', tags: [] };
+    const buyers = new Set(rows.filter((r) => sideUp(r.side)).map((r) => r.actor)).size;
+    const sellers = new Set(rows.filter((r) => !sideUp(r.side)).map((r) => r.actor)).size;
+    const filers = new Set(rows.map((r) => r.actor)).size;
+    const buy = rows.filter((r) => sideUp(r.side)).reduce((a, r) => a + Math.abs(+r.amountMid || 0), 0);
+    const sell = rows.filter((r) => !sideUp(r.side)).reduce((a, r) => a + Math.abs(+r.amountMid || 0), 0);
+    const net = buy - sell;
+    const fresh = Math.min(...rows.map((r) => daysSince(r.filingDate) ?? 999));
+    const label = rows[0].label;
+    const dir = net > 0 ? 'accumulation' : net < 0 ? 'distribution' : 'mixed activity';
+    const breadth = filers >= 5 ? 'Broad' : filers >= 2 ? 'Moderate' : 'Single-filer';
+    let s = `${breadth} ${dir} — ${buyers ? `${buyers} buying` : ''}${buyers && sellers ? ', ' : ''}${sellers ? `${sellers} selling` : ''}, net ${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net))}.`;
+    s += fresh <= 30 ? ' Filings are recent.' : ` Most recent filing ${fresh}d ago.`;
+    s += label === 'fail' ? ' Non-compliant — shown for awareness only, not ownable.'
+      : label === 'purify' ? ' Compliant, with a small dividend-purification obligation.'
+      : label === 'clean' ? ' Fully compliant.' : '';
+    const tags = [];
+    if (filers >= 4 && sellers === 0) tags.push(['Cluster buy', 'up']);
+    else if (filers >= 4 && buyers === 0) tags.push(['Cluster sell', 'down']);
+    if (filers === 1) tags.push(['Sole filer', 'muted']);
+    if (buyers && sellers) tags.push(['Two-sided', 'muted']);
+    if (fresh <= 14) tags.push(['Fresh', 'up']);
+    return { sentence: s, tags, net, filers, fresh, label };
+  }
+
+  // Herfindahl concentration (0–1) of a portfolio's ownable holdings by disclosed value.
+  function concentration(p) {
+    const hs = {};
+    for (const r of p.rows) { if (r.label === 'fail') continue; hs[r.ticker] = (hs[r.ticker] || 0) + Math.abs(+r.amountMid || 0); }
+    const vals = Object.values(hs), tot = vals.reduce((a, b) => a + b, 0) || 1;
+    return vals.length ? vals.reduce((a, v) => a + (v / tot) ** 2, 0) : 0;
+  }
+  function portfolioRead(p) {
+    const flag = portfolioFlag(p), hhi = concentration(p);
+    const perfWord = p.perf == null ? 'Performance pending' : p.perf >= 10 ? 'Strong disclosed return' : p.perf >= 0 ? 'Modestly positive disclosed return' : 'Lagging disclosed return';
+    const compWord = flag.tone === 'clean' ? 'fully Sharia-compliant' : flag.tone === 'purify' ? 'compliant with a few names to purify' : 'holds non-compliant names';
+    let s = `${perfWord}${p.perf != null ? ` (${fmtPct(p.perf)})` : ''}, ${compWord}${p.count >= 5 ? ', and actively disclosing' : ''}.`;
+    const tags = [];
+    if (p.perf != null && p.perf >= 15) tags.push(['Top performer', 'up']);
+    if (flag.tone === 'clean') tags.push(['Fully compliant', 'up']);
+    if (p.count >= 5) tags.push(['Active', 'muted']);
+    if (hhi >= 0.4) tags.push(['Concentrated', 'muted']);
+    else if (hhi > 0 && hhi < 0.2) tags.push(['Diversified', 'muted']);
+    return { sentence: s, tags, hhi };
+  }
 
   function deriveStocks(rows, side) {
     const m = new Map();
@@ -380,7 +434,8 @@
         const flag = portfolioFlag(p), sel = S.selected.includes(p.name);
         const first = S.compareMode ? `<button class="mz-check-btn" data-select="${esc(p.name)}" data-on="${sel}" aria-label="Select">${sel ? I.check : ''}</button>` : `<span class="mz-rank">${i + 1}</span>`;
         const av = `<span style="color:var(--mz-cobalt-700);font-weight:800;font-size:.8rem">${esc(p.initials)}</span>`;
-        const meta = `<span style="display:inline-flex;gap:.35rem;align-items:center">${miniIcon(groupIcon(p.group))}${esc(typeLabel(p.kind))}</span>`;
+        const tags = portfolioRead(p).tags.slice(0, 2);
+        const meta = `<span style="display:inline-flex;gap:.4rem;align-items:center;flex-wrap:wrap">${miniIcon(groupIcon(p.group))}${esc(typeLabel(p.kind))}${signalRow(tags)}</span>`;
         return `<tr data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(av, p.name, meta)}</td><td><div class="mz-perf-cell">${perfHero(p.perf)}${sparkVals(portfolioIndexVals(p.rows))}</div></td><td class="mz-cell-num">${p.count}</td><td>${freshEl(p.fresh)}</td><td>${compliancePill(flag.tone)}</td><td>${starBtn(p.name)}</td></tr>`;
       }).join('') || emptyRow(7);
       cards.innerHTML = list.map((p, i) => portfolioCard(p, i)).join('');
@@ -390,7 +445,7 @@
       // Performance-led: Since-disclosed return is the hero column (3rd); status is a compact badge.
       thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.stock')}</th><th>${t('h.since')}</th><th>${t('h.signal')}</th><th>${t('h.evidence')}</th><th>${t('h.filers')}</th><th>${t('h.value')}</th><th>${t('h.status')}</th></tr>`;
       const signal = { bought: 'Accumulation', sold: 'Reduction', new: 'New position', incr: 'Position increased', red: 'Position reduced', exit: 'Exited' }[S.sMetric];
-      tbody.innerHTML = list.map((s, i) => `<tr data-row="stock" data-id="${esc(s.ticker)}"><td><span class="mz-rank">${i + 1}</span></td><td>${entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(s.ticker.slice(0, 4))}</span>`, s.ticker, `${esc(s.company)}${s.fresh != null ? ` · ${s.fresh}d` : ''}`, true)}</td><td><div class="mz-perf-cell">${perfHero(s.perf)}${spark(s.ticker)}</div></td><td class="mz-muted">${signal}</td><td style="font-weight:700">${t('ev.' + evStrength(s.filerCount))}</td><td class="mz-cell-num">${s.filerCount}</td><td class="mz-cell-num" style="font-weight:750">${fmtMoney(s.dollar)}</td><td>${badge(s.label)}</td></tr>`).join('') || emptyRow(8);
+      tbody.innerHTML = list.map((s, i) => `<tr data-row="stock" data-id="${esc(s.ticker)}"><td><span class="mz-rank">${i + 1}</span></td><td>${entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(s.ticker.slice(0, 4))}</span>`, s.ticker, `${esc(s.company)}${s.fresh != null ? ` · ${s.fresh}d` : ''}`, true)}</td><td><div class="mz-perf-cell">${perfHero(s.perf)}${spark(s.ticker)}</div></td><td><div class="mz-muted" style="margin-block-end:.2rem">${signal}</div>${signalRow(stockRead(s.ticker).tags.slice(0, 1))}</td><td style="font-weight:700">${t('ev.' + evStrength(s.filerCount))}</td><td class="mz-cell-num">${s.filerCount}</td><td class="mz-cell-num" style="font-weight:750">${fmtMoney(s.dollar)}</td><td>${badge(s.label)}</td></tr>`).join('') || emptyRow(8);
       cards.innerHTML = list.map((s, i) => stockCard(s, i)).join('');
     }
   }
@@ -533,7 +588,9 @@
     const reasons = [`${filers} independent disclosing filer${filers === 1 ? '' : 's'}`, 'Consistent direction across filings', fresh <= 30 ? 'Recent, fresh disclosures' : `Most recent filing ${fresh}d ago`];
     const top = [...rows].sort((a, b) => (+b.amountMid || 0) - (+a.amountMid || 0)).slice(0, 5);
     const perf = rows.map((r) => r.performance && r.performance.sinceDisclosed).find((x) => x != null && isFinite(x));
+    const read = stockRead(ticker);
     return drawerHead(t('ev.title', { t: ticker })) +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${LANG === 'ar' ? 'ما تُظهره الأدلة' : 'What the evidence shows'}</div><p class="mz-read" style="margin:0">${esc(read.sentence)}</p>${read.tags.length ? `<div style="margin-block-start:.6rem">${signalRow(read.tags)}</div>` : ''}</div>` +
       `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${LANG === 'ar' ? 'الأداء' : 'Performance'}</span>${perf != null ? `<span class="mz-performance">${fmtPct(perf)} ${t('h.since').toLowerCase()}</span>` : ''}</div>${lineChart(histVals(ticker))}</div>` +
       `<div class="mz-drawer__section"><h3 style="font-size:var(--mz-text-md)">${t('ev.why', { s: t('ev.' + str) })}</h3><ul class="mz-why-list">${reasons.map((r) => `<li><span style="width:1.1rem;color:var(--mz-cobalt-600)">${I.check}</span>${esc(r)}</li>`).join('')}</ul></div>` +
       `<div class="mz-drawer__section"><div class="mz-summary-grid" style="grid-template-columns:1fr 1fr 1fr;margin:0"><div class="mz-summary"><div class="mz-summary__label">${t('h.value')}</div><div class="mz-summary__value">${fmtMoney(dollar)}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('h.filers')}</div><div class="mz-summary__value">${filers}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('h.status')}</div><div style="margin-block-start:.35rem">${badge(label)}</div></div></div></div>` +
@@ -558,8 +615,9 @@
     const sideTag = (s) => String(s).toUpperCase() === 'SELL'
       ? `<span class="mz-badge mz-badge--noncompliant" style="min-height:1.3rem">Sold</span>`
       : `<span class="mz-badge mz-badge--compliant" style="min-height:1.3rem">Bought</span>`;
+    const read = portfolioRead(p);
     return drawerHead(name) +
-      `<div class="mz-drawer__section"><span class="mz-badge mz-badge--${flag.tone === 'clean' ? 'compliant' : flag.tone === 'purify' ? 'purify' : 'noncompliant'}">${flag.text}</span><div style="margin-block-start:.6rem">${allocBar(p.mix)}</div></div>` +
+      `<div class="mz-drawer__section"><p class="mz-read" style="margin:0 0 .6rem">${esc(read.sentence)}</p>${read.tags.length ? `<div style="margin-block-end:.7rem">${signalRow(read.tags)}</div>` : ''}<span class="mz-badge mz-badge--${flag.tone === 'clean' ? 'compliant' : flag.tone === 'purify' ? 'purify' : 'noncompliant'}">${flag.text}</span><div style="margin-block-start:.6rem">${allocBar(p.mix)}</div></div>` +
       `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${hasOrig ? (LANG === 'ar' ? 'الأصلي مقابل المُصفّى شرعيًا' : 'Original vs Halal-screened') : (LANG === 'ar' ? 'الأداء' : 'Performance')}</span>${effect != null && hasOrig ? `<span style="font-size:var(--mz-text-xs);font-weight:700;color:${effect >= 0 ? 'var(--mz-cobalt-700)' : 'var(--mz-ink-600)'}">${LANG === 'ar' ? 'أثر الفحص' : 'Screening effect'} ${effect >= 0 ? '+' : '−'}${Math.abs(effect).toFixed(1)} pts</span>` : ''}</div>${hasOrig ? dualChart(idx, origIdx) : lineChart(idx)}${hasOrig ? `<div style="display:flex;gap:1rem;margin-block-start:.4rem;font-size:var(--mz-text-xs)"><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:2px;background:var(--mz-cobalt-600);display:inline-block"></span>${LANG === 'ar' ? 'مُصفّى' : 'Halal-screened'} ${scrRet != null ? fmtPct(scrRet) : ''}</span><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:0;border-top:2px dashed var(--mz-ink-400);display:inline-block"></span>${LANG === 'ar' ? 'الأصلي' : 'Original'} ${origRet != null ? fmtPct(origRet) : ''}</span></div>` : ''}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? 'توضيحي — يطبّق الفحص الحالي على المجموعة المُفصَح عنها. أدلة، ليس نصيحة.' : 'Illustrative — applies today’s screen to the disclosed set. Evidence, not advice.'}</p></div>` +
       `<div class="mz-drawer__section"><div class="mz-summary-grid" style="grid-template-columns:1fr 1fr;margin:0"><div class="mz-summary"><div class="mz-summary__label">${t('h.return')}</div><div class="mz-summary__value">${fmtPct(p.perf) || '—'}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('cmp.disclosures')}</div><div class="mz-summary__value">${p.count}</div></div></div></div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('h.allocation')}</div>${hs.map((h) => { const w = h.label === 'fail' ? 0 : Math.round(h.v / ownTotal * 100); return `<div style="padding-block:.45rem;border-block-end:var(--mz-border)"><div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center"><div class="mz-ltr" style="font-weight:700;min-width:0"><span>${esc(h.ticker)}</span> <span class="mz-muted" style="font-weight:400">${esc(h.company || '')}</span></div><div style="display:flex;gap:.5rem;align-items:center;flex:0 0 auto">${h.label === 'fail' ? '' : `<span class="mz-cell-num" style="font-weight:700">${w}%</span>`}${badge(h.label)}</div></div>${h.label === 'fail' ? '' : `<div class="mz-allocation__bar" style="margin-block-start:.35rem"><span class="mz-allocation__segment--compliant" style="flex:${w}"></span><span style="flex:${100 - w};background:var(--mz-ink-100)"></span></div>`}</div>`; }).join('')}</div>` +

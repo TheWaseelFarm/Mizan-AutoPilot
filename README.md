@@ -92,7 +92,9 @@ npm test
 
 ## Guardrails (do not skip before anything real ships)
 - **Not a fatwa / not advice.** The verdict is an automated indicator; keep the disclaimer.
-  Have the AAOIFI sector list + 30% vs 33% threshold confirmed by a qualified scholar.
+  Screening follows AAOIFI No. 21 (the "30/30/5" rule — 30% debt / 30% cash+securities / 5%
+  impure income, all vs. market cap). Have the AAOIFI prohibited-sector list confirmed by a
+  qualified scholar. (The 33% ratio is the S&P/MSCI index methodology, not AAOIFI.)
 - **Secrets** live only in Vercel env vars. The `service_role` key must never reach the browser.
 - **RLS** is on; tables are reachable only via the server (service role).
 - Any security lacking screening data is treated as `watch` (manual review) — never defaulted to Clean.
