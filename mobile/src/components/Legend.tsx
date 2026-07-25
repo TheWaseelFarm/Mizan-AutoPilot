@@ -1,13 +1,15 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useI18n } from '../i18n';
+import type { StringKey } from '../i18n/strings';
 import { color, font, space, verdictColor } from '../theme/tokens';
 
 const ITEMS = [
-  { tone: 'clean', label: 'Compliant' },
-  { tone: 'purify', label: 'Compliant · purify' },
-  { tone: 'fail', label: 'Non-compliant' },
-  { tone: 'unscreened', label: 'Under review' },
+  { tone: 'clean', key: 'verdict.compliant' },
+  { tone: 'purify', key: 'verdict.purify' },
+  { tone: 'fail', key: 'verdict.noncompliant' },
+  { tone: 'unscreened', key: 'verdict.underReview' },
 ] as const;
 
 /**
@@ -15,12 +17,13 @@ const ITEMS = [
  * each reserved color with its text label so status is never communicated by color alone.
  */
 export function Legend() {
+  const { t } = useI18n();
   return (
     <View style={styles.wrap}>
       {ITEMS.map((it) => (
         <View key={it.tone} style={styles.item}>
           <View style={[styles.dot, { backgroundColor: verdictColor[it.tone].solid }]} />
-          <Text style={styles.label}>{it.label}</Text>
+          <Text style={styles.label}>{t(it.key as StringKey)}</Text>
         </View>
       ))}
     </View>

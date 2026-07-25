@@ -21,11 +21,13 @@ import { EvidenceBadge, EVIDENCE_LABEL } from '../components/EvidenceBadge';
 import { Icon } from '../components/Icon';
 import { Legend } from '../components/Legend';
 import { SearchBar } from '../components/SearchBar';
-import { Segmented, type SegmentOption } from '../components/Segmented';
+import { Segmented } from '../components/Segmented';
 import { SelectSheet } from '../components/SelectSheet';
 import { Sparkline } from '../components/Sparkline';
 import { TabSwitch } from '../components/TabSwitch';
 import { VerdictBadge } from '../components/VerdictBadge';
+import { useI18n } from '../i18n';
+import type { StringKey } from '../i18n/strings';
 import { actorDescriptor, deriveSmartMoney, fmtMoney, lagWord, daysBetween, type SmartRow } from '../lib/derive';
 import { fmtPctCompact, perfTone, windowReturn } from '../lib/performance';
 import type { Disclosure } from '../lib/types';
@@ -54,19 +56,19 @@ type SortMetric = 'volume' | 'weight' | 'filers';
 
 // Subviews (handoff §4). The mock feed distinguishes BUY/SELL; the position-change subviews
 // approximate new/increased/reduced/exited by pairing the side with a distinct ranking metric.
-const SUBVIEWS: readonly (SegmentOption<SubKey> & { side: 'BUY' | 'SELL'; sort: SortMetric })[] = [
-  { key: 'bought', label: 'Most bought', side: 'BUY', sort: 'volume' },
-  { key: 'sold', label: 'Most sold', side: 'SELL', sort: 'volume' },
-  { key: 'new', label: 'New positions', side: 'BUY', sort: 'filers' },
-  { key: 'increased', label: 'Increased', side: 'BUY', sort: 'weight' },
-  { key: 'reduced', label: 'Reduced', side: 'SELL', sort: 'weight' },
-  { key: 'exited', label: 'Exited', side: 'SELL', sort: 'filers' },
+const SUBVIEWS: readonly { key: SubKey; labelKey: StringKey; side: 'BUY' | 'SELL'; sort: SortMetric }[] = [
+  { key: 'bought', labelKey: 'sub.mostBought', side: 'BUY', sort: 'volume' },
+  { key: 'sold', labelKey: 'sub.mostSold', side: 'SELL', sort: 'volume' },
+  { key: 'new', labelKey: 'sub.newPositions', side: 'BUY', sort: 'filers' },
+  { key: 'increased', labelKey: 'sub.increased', side: 'BUY', sort: 'weight' },
+  { key: 'reduced', labelKey: 'sub.reduced', side: 'SELL', sort: 'weight' },
+  { key: 'exited', labelKey: 'sub.exited', side: 'SELL', sort: 'filers' },
 ];
 
-const SORT_LABEL: Record<SortMetric, string> = {
-  volume: 'Disclosed value',
-  weight: 'Position weight',
-  filers: 'Number of filers',
+const SORT_LABEL_KEY: Record<SortMetric, StringKey> = {
+  volume: 'sort.disclosedValue',
+  weight: 'sort.positionWeight',
+  filers: 'sort.numberOfFilers',
 };
 
 function evidenceStrength(s: SmartRow): EvidenceStrength {
@@ -81,6 +83,8 @@ export function StocksScreen() {
   const { rows, prices, loading, live, refresh } = useFeed();
   const { followed } = useFollows();
   const { compliance, setCompliance } = usePreferences();
+  const { t } = useI18n();
+  const subviewOptions = SUBVIEWS.map((s) => ({ key: s.key, label: t(s.labelKey) }));
   const [sub, setSub] = useState<SubKey>('bought');
   const [tf, setTf] = useState<string>('ALL');
   const [query, setQuery] = useState('');
@@ -153,11 +157,11 @@ export function StocksScreen() {
 
       <View style={styles.titleRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.screenTitle}>Stock intelligence</Text>
-          <Text style={styles.screenSub}>Explore disclosed activity with evidence and Sharia context.</Text>
+          <Text style={styles.screenTitle}>{t('stocks.title')}</Text>
+          <Text style={styles.screenSub}>{t('stocks.subtitle')}</Text>
         </View>
       </View>
-      <SearchBar value={query} onChange={setQuery} placeholder="Search a ticker or company" />
+      <SearchBar value={query} onChange={setQuery} placeholder={t('search.stocks')} />
 
       <FlatList
         data={stocks}
@@ -177,13 +181,13 @@ export function StocksScreen() {
         ListHeaderComponent={
           <View>
             <View style={{ paddingTop: space.sm, paddingBottom: space.sm }}>
-              <Segmented options={SUBVIEWS} value={sub} onChange={setSub} ariaLabel="Stock subviews" />
+              <Segmented options={subviewOptions} value={sub} onChange={setSub} ariaLabel="Stock subviews" />
             </View>
             <View style={styles.controls}>
-              <ControlPill icon="sort" label={SORT_LABEL[config.sort]} onPress={() => setWhyOpen(true)} caret />
-              <ControlPill icon="filter" label="Filter" count={activeFilters || undefined} active={activeFilters > 0} onPress={() => setFilterOpen(true)} />
-              <ControlPill icon="shield" label={evFilter === 'all' ? 'Evidence' : `${EVIDENCE_LABEL[evFilter]}`} active={evFilter !== 'all'} caret onPress={() => setEvFilterOpen(true)} />
-              <ControlPill icon="star" label="Followed" active={followedOnly} onPress={() => setFollowedOnly((f) => !f)} />
+              <ControlPill icon="sort" label={t(SORT_LABEL_KEY[config.sort])} onPress={() => setWhyOpen(true)} caret />
+              <ControlPill icon="filter" label={t('ctrl.filter')} count={activeFilters || undefined} active={activeFilters > 0} onPress={() => setFilterOpen(true)} />
+              <ControlPill icon="shield" label={evFilter === 'all' ? t('ctrl.evidence') : EVIDENCE_LABEL[evFilter]} active={evFilter !== 'all'} caret onPress={() => setEvFilterOpen(true)} />
+              <ControlPill icon="star" label={t('ctrl.followed')} active={followedOnly} onPress={() => setFollowedOnly((f) => !f)} />
             </View>
             <AppliedChips chips={chips} onClearAll={() => { setCompliance('all'); setEvFilter('all'); setFollowedOnly(false); }} />
             <View style={styles.timeWrap}>
@@ -253,7 +257,7 @@ export function StocksScreen() {
         visible={whyOpen}
         onClose={() => setWhyOpen(false)}
         title="How this is ranked"
-        note={`Ranked by ${SORT_LABEL[config.sort].toLowerCase()} for the "${config.label}" board. Disclosed value is the summed disclosed dollar amount; position weight is the trade as a share of the filer's disclosed position; filers is the number of independent disclosing investors.`}
+        note={`Ranked by ${t(SORT_LABEL_KEY[config.sort]).toLowerCase()} for the "${t(config.labelKey)}" board. Disclosed value is the summed disclosed dollar amount; position weight is the trade as a share of the filer's disclosed position; filers is the number of independent disclosing investors.`}
         options={[]}
         onSelect={() => {}}
       />
@@ -273,7 +277,7 @@ export function StocksScreen() {
                 nav.navigate('StockDetail', { ticker: t });
               }}
             >
-              <Text style={styles.reviewBtnText}>Review full evidence</Text>
+              <Text style={styles.reviewBtnText}>{t('common.reviewEvidence')}</Text>
               <Icon name="externalLink" size={16} color={color.onBrand} />
             </TouchableOpacity>
           ) : null

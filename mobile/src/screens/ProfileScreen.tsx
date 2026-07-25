@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandHeader } from '../components/BrandHeader';
 import { ComplianceFilter } from '../components/ComplianceFilter';
+import { useI18n } from '../i18n';
 import { usePreferences } from '../state/preferences';
 import { color, font, radius, space } from '../theme/tokens';
 
@@ -18,6 +19,7 @@ const SECTORS = ['Technology', 'Energy', 'Healthcare', 'Consumer', 'Industrials'
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { compliance, setCompliance } = usePreferences();
+  const { lang, setLang, t } = useI18n();
   const [risk, setRisk] = useState<(typeof RISK)[number]>('Balanced');
   const [sectors, setSectors] = useState<string[]>(['Technology']);
   const [emailAlerts, setEmailAlerts] = useState(false);
@@ -30,7 +32,30 @@ export function ProfileScreen() {
       style={styles.screen}
       contentContainerStyle={{ paddingTop: insets.top, paddingBottom: space.xxl }}
     >
-      <BrandHeader subtitle="Profile" />
+      <BrandHeader subtitle={t('tab.account')} />
+
+      {/* Language / direction — switches the UI chrome and flips layout to RTL for Arabic. */}
+      <Text style={styles.label}>{t('account.language')}</Text>
+      <View style={styles.segment}>
+        <TouchableOpacity
+          onPress={() => setLang('en')}
+          activeOpacity={0.8}
+          style={[styles.segBtn, lang === 'en' && styles.segBtnOn]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: lang === 'en' }}
+        >
+          <Text style={[styles.segText, lang === 'en' && styles.segTextOn]}>{t('account.languageEnglish')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setLang('ar')}
+          activeOpacity={0.8}
+          style={[styles.segBtn, lang === 'ar' && styles.segBtnOn]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: lang === 'ar' }}
+        >
+          <Text style={[styles.segText, lang === 'ar' && styles.segTextOn]}>{t('account.languageArabic')}</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* The one control here that actually drives the app today: the default verdict tolerance,
           shared with the Home & Stocks filters (change it in either place). */}

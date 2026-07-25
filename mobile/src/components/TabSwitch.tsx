@@ -3,6 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useI18n } from '../i18n';
 import type { TabParamList } from '../navigation/types';
 import { color, font, radius, space } from '../theme/tokens';
 
@@ -13,15 +14,16 @@ import { color, font, radius, space } from '../theme/tokens';
  */
 export function TabSwitch({ active }: { active: 'portfolios' | 'stocks' }) {
   const nav = useNavigation<BottomTabNavigationProp<TabParamList>>();
+  const { t } = useI18n();
   return (
     <View style={styles.wrap} accessibilityRole="tablist">
       <Segment
-        label="Portfolios"
+        label={t('tab.portfolios')}
         on={active === 'portfolios'}
         onPress={() => nav.navigate('HomeTab', { screen: 'Home' })}
       />
       <Segment
-        label="Stocks"
+        label={t('tab.stocks')}
         on={active === 'stocks'}
         onPress={() => nav.navigate('StocksTab', { screen: 'Stocks' })}
       />
