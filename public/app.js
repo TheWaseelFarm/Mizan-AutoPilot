@@ -38,7 +38,8 @@
       'tab.portfolios': 'Portfolios', 'tab.stocks': 'Stocks', 'tab.following': 'Following', 'tab.alerts': 'Alerts', 'tab.account': 'Account',
       'p.title': 'Portfolio intelligence', 'p.sub': 'Compare disclosed portfolios through performance, activity and Sharia exposure.',
       's.title': 'Stock intelligence', 's.sub': 'Explore disclosed activity with evidence and Sharia context.',
-      'sv.top': 'Top performers', 'sv.active': 'Most active', 'sv.followed': 'Most followed', 'sv.alloc': 'Highest compliant allocation',
+      'sv.top': 'Top performers', 'sv.active': 'Most active', 'sv.followed': 'Most followed', 'sv.alloc': 'Highest compliant allocation', 'sv.conc': 'Most concentrated', 'sv.lag': 'Fastest to disclose',
+      'so.conc': 'Concentration (HHI)', 'so.lag': 'Disclosure lag',
       'sv.bought': 'Most bought', 'sv.sold': 'Most sold', 'sv.flow': 'Net flow', 'sv.new': 'New positions', 'sv.incr': 'Increased', 'sv.red': 'Reduced', 'sv.exit': 'Exited',
       'so.net': 'Absolute net flow', 'flow.note': 'Net flow = gross buying − gross selling over the disclosed window. Non-compliant names stay visible for market awareness but are never actionable. Informational only — not advice.',
       'c.filter': 'Filter', 'c.sort': 'Sort', 'c.compare': 'Compare', 'c.why': 'Why this ranking?', 'c.clear': 'Clear all', 'c.search': 'Search portfolios, investors or stocks',
@@ -62,7 +63,8 @@
       'tab.portfolios': 'المحافظ', 'tab.stocks': 'الأسهم', 'tab.following': 'المتابَعون', 'tab.alerts': 'التنبيهات', 'tab.account': 'الحساب',
       'p.title': 'ذكاء المحافظ', 'p.sub': 'قارن المحافظ المُفصَح عنها من حيث الأداء والنشاط والالتزام الشرعي.',
       's.title': 'ذكاء الأسهم', 's.sub': 'استكشف النشاط المُفصَح عنه مع الأدلة والسياق الشرعي.',
-      'sv.top': 'الأفضل أداءً', 'sv.active': 'الأكثر نشاطًا', 'sv.followed': 'الأكثر متابعة', 'sv.alloc': 'أعلى تخصيص متوافق',
+      'sv.top': 'الأفضل أداءً', 'sv.active': 'الأكثر نشاطًا', 'sv.followed': 'الأكثر متابعة', 'sv.alloc': 'أعلى تخصيص متوافق', 'sv.conc': 'الأكثر تركيزًا', 'sv.lag': 'الأسرع إفصاحًا',
+      'so.conc': 'التركيز (HHI)', 'so.lag': 'زمن الإفصاح',
       'sv.bought': 'الأكثر شراءً', 'sv.sold': 'الأكثر بيعًا', 'sv.flow': 'صافي التدفق', 'sv.new': 'مراكز جديدة', 'sv.incr': 'زيادة', 'sv.red': 'تخفيض', 'sv.exit': 'خروج',
       'so.net': 'صافي التدفق المطلق', 'flow.note': 'صافي التدفق = إجمالي الشراء − إجمالي البيع خلال نافذة الإفصاح. تبقى الأسماء غير المتوافقة ظاهرة للوعي بالسوق لكنها غير قابلة للتنفيذ. لأغراض معلوماتية فقط — ليست نصيحة.',
       'c.filter': 'تصفية', 'c.sort': 'ترتيب', 'c.compare': 'مقارنة', 'c.why': 'لماذا هذا الترتيب؟', 'c.clear': 'مسح الكل', 'c.search': 'ابحث عن محفظة أو مستثمر أو سهم',
@@ -141,6 +143,9 @@
       p.purifyPct = own.length ? +(own.reduce((a, r) => a + (+r.impurePct || 0), 0) / own.length).toFixed(1) : 0;
       const perfs = p.rows.map((r) => r.performance && r.performance.sinceDisclosed).filter((x) => x != null && isFinite(x));
       p.perf = perfs.length ? +(perfs.reduce((a, b) => a + b, 0) / perfs.length).toFixed(1) : null;
+      p.hhi = concentration(p); // Herfindahl concentration of ownable holdings (0–1)
+      const lags = p.rows.map((r) => daysBetween(r.transactionDate, r.filingDate)).filter((x) => x != null);
+      p.avgLag = lags.length ? Math.round(lags.reduce((a, b) => a + b, 0) / lags.length) : null; // avg filing lag (days)
     }
     return [...m.values()];
   }
@@ -241,9 +246,9 @@
     selected: [], follows: new Set(), drawer: null, // {type:'compare'|'evidence'|'detail', ...}
     openMenu: null, rows: SAMPLE, live: false, prices: {},
   };
-  const P_SUB = [['top', 'sv.top'], ['active', 'sv.active'], ['followed', 'sv.followed'], ['alloc', 'sv.alloc']];
+  const P_SUB = [['top', 'sv.top'], ['active', 'sv.active'], ['followed', 'sv.followed'], ['alloc', 'sv.alloc'], ['conc', 'sv.conc'], ['lag', 'sv.lag']];
   const S_SUB = [['bought', 'sv.bought', 'BUY', 'value'], ['sold', 'sv.sold', 'SELL', 'value'], ['flow', 'sv.flow', '', 'net'], ['new', 'sv.new', 'BUY', 'filers'], ['incr', 'sv.incr', 'BUY', 'weight'], ['red', 'sv.red', 'SELL', 'weight'], ['exit', 'sv.exit', 'SELL', 'filers']];
-  const P_SORT = { top: 'so.return', active: 'so.activity', followed: 'so.followers', alloc: 'so.alloc' };
+  const P_SORT = { top: 'so.return', active: 'so.activity', followed: 'so.followers', alloc: 'so.alloc', conc: 'so.conc', lag: 'so.lag' };
   const S_SORT = { value: 'so.value', weight: 'so.weight', filers: 'so.filers', net: 'so.net' };
   const TFS = [['1M', '1M'], ['3M', '3M'], ['6M', '6M'], ['1Y', '1Y'], ['3Y', '3Y'], ['5Y', '5Y'], ['ALL', 'All']];
 
@@ -283,8 +288,15 @@
       if (S.query) { const q = S.query.toLowerCase(); list = list.filter((p) => p.name.toLowerCase().includes(q) || p.rows.some((r) => (r.ticker || '').toLowerCase().includes(q))); }
       if (S.compliance !== 'all') list = list.filter((p) => { const tone = portfolioFlag(p).tone; return S.compliance === 'fully' ? tone === 'clean' : tone !== 'fail'; });
       if (S.followedOnly) list = list.filter((p) => S.follows.has(p.name));
-      const cmp = { top: (a, b) => (b.perf ?? -1e9) - (a.perf ?? -1e9), active: (a, b) => b.count - a.count, followed: (a, b) => (b._f || 0) - (a._f || 0) || b.count - a.count, alloc: (a, b) => b.cleanPct - a.cleanPct || b.count - a.count };
-      return list.sort(cmp[S.pMetric]);
+      const cmp = {
+        top: (a, b) => (b.perf ?? -1e9) - (a.perf ?? -1e9),
+        active: (a, b) => b.count - a.count,
+        followed: (a, b) => (b._f || 0) - (a._f || 0) || b.count - a.count,
+        alloc: (a, b) => b.cleanPct - a.cleanPct || b.count - a.count,
+        conc: (a, b) => (b.hhi ?? 0) - (a.hhi ?? 0), // most concentrated first
+        lag: (a, b) => (a.avgLag ?? 1e9) - (b.avgLag ?? 1e9), // fastest to disclose first (nulls last)
+      };
+      return list.sort(cmp[S.pMetric] || cmp.top);
     }
     // Net-flow board (Smart Money) — its own derivation; non-compliant names stay visible.
     if (S.sMetric === 'flow') {
