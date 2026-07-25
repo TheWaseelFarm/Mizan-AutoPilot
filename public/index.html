@@ -76,6 +76,13 @@
     border-start-end-radius: 12px; border-end-end-radius: 12px; }
   .mz-flow-zero { position: absolute; inset-inline-start: 50%; top: -2px; height: 18px; width: 1.5px; background: var(--mz-ink-950); }
   .mz-flow-net { position: absolute; top: -3px; height: 20px; width: 2px; background: var(--mz-cobalt-600); }
+  /* Decision-support signal tags — cobalt/ink only (never a Sharia hue). */
+  .mz-signals { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+  .mz-signal { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: var(--mz-radius-pill);
+    font-size: 0.65rem; font-weight: 700; border: 1px solid; white-space: nowrap; }
+  .mz-signal[data-tone="up"] { color: var(--mz-cobalt-700); background: var(--mz-cobalt-50); border-color: var(--mz-cobalt-100); }
+  .mz-signal[data-tone="down"], .mz-signal[data-tone="muted"] { color: var(--mz-ink-600); background: var(--mz-ink-50); border-color: var(--mz-ink-200); }
+  .mz-read { font-size: var(--mz-text-sm); line-height: 1.5; color: var(--mz-ink-800); font-weight: 600; }
   .mz-linkbtn { white-space: nowrap; }
   #freshness { white-space: nowrap; }
   /* Toolbar rows: the time selector sits on its own row above the controls. */
