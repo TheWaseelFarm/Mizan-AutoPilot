@@ -3,10 +3,11 @@ import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandHeader } from '../components/BrandHeader';
+import { ComplianceFilter } from '../components/ComplianceFilter';
+import { usePreferences } from '../state/preferences';
 import { color, font, radius, space } from '../theme/tokens';
 
 const RISK = ['Conservative', 'Balanced', 'Growth'] as const;
-const VERDICT_TOLERANCE = ['Clean only', 'Clean + Purify', 'All'] as const;
 const SECTORS = ['Technology', 'Energy', 'Healthcare', 'Consumer', 'Industrials'] as const;
 
 /**
@@ -16,8 +17,8 @@ const SECTORS = ['Technology', 'Energy', 'Healthcare', 'Consumer', 'Industrials'
  */
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const { compliance, setCompliance } = usePreferences();
   const [risk, setRisk] = useState<(typeof RISK)[number]>('Balanced');
-  const [tolerance, setTolerance] = useState<(typeof VERDICT_TOLERANCE)[number]>('Clean + Purify');
   const [sectors, setSectors] = useState<string[]>(['Technology']);
   const [emailAlerts, setEmailAlerts] = useState(false);
 
@@ -31,13 +32,12 @@ export function ProfileScreen() {
     >
       <BrandHeader subtitle="Profile" />
 
+      {/* The one control here that actually drives the app today: the default verdict tolerance,
+          shared with the Home & Stocks filters (change it in either place). */}
+      <ComplianceFilter label="Verdict tolerance" value={compliance} onChange={setCompliance} />
+      <Text style={styles.caption}>Sets the default for every list. You can still override it per-list on Home & Stocks.</Text>
+
       <Segment label="Risk appetite" options={RISK} value={risk} onChange={setRisk} />
-      <Segment
-        label="Verdict tolerance"
-        options={VERDICT_TOLERANCE}
-        value={tolerance}
-        onChange={setTolerance}
-      />
 
       <Text style={styles.label}>Sectors of interest</Text>
       <View style={styles.chips}>
@@ -55,6 +55,7 @@ export function ProfileScreen() {
           );
         })}
       </View>
+      <Text style={styles.caption}>Risk &amp; sectors are saved for upcoming personalization — they don’t change your results yet.</Text>
 
       <Text style={styles.sectionTitle}>Notifications</Text>
       <View style={styles.rowCard}>
@@ -150,6 +151,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     marginTop: space.xl,
     marginBottom: space.sm,
+  },
+  caption: {
+    fontSize: font.small,
+    color: color.faint,
+    lineHeight: 16,
+    paddingHorizontal: space.lg,
+    marginTop: space.sm,
   },
   segment: { flexDirection: 'row', gap: space.sm, paddingHorizontal: space.lg },
   segBtn: {

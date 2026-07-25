@@ -28,13 +28,15 @@ const LEGEND: { tone: Label; word: string; desc: string }[] = [
 export function ComplianceFilter({
   value,
   onChange,
+  label = 'Compliance',
 }: {
   value: ComplianceKey;
   onChange: (k: ComplianceKey) => void;
+  label?: string;
 }) {
   return (
     <View style={styles.group}>
-      <Text style={styles.groupLabel}>Compliance</Text>
+      <Text style={styles.groupLabel}>{label}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {COMPLIANCE_OPTIONS.map((o) => {
           const on = o.key === value;

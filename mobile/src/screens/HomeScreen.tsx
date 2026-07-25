@@ -26,6 +26,7 @@ import { portfolioIndex } from '../lib/portfolioPerf';
 import type { Disclosure, Portfolio } from '../lib/types';
 import type { HomeStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
+import { usePreferences } from '../state/preferences';
 import { color, font, perfColor, radius, shadow, space, verdictColor } from '../theme/tokens';
 
 const TIMEFRAMES = [
@@ -93,7 +94,8 @@ export function HomeScreen() {
   const { rows, prices, followerCounts, loading, live, refresh } = useFeed();
   const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('1M');
   const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('performance');
-  const [compliance, setCompliance] = useState<ComplianceKey>('all');
+  // Compliance is a shared, app-wide preference (also set from Profile) — one verdict tolerance.
+  const { compliance, setCompliance } = usePreferences();
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
