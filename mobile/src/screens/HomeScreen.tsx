@@ -13,13 +13,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandHeader } from '../components/BrandHeader';
-import { ChipRow } from '../components/Chips';
 import { Disclaimer } from '../components/Disclaimer';
-import { FollowButton } from '../components/FollowButton';
+import { Emblem } from '../components/Emblem';
+import { FilterSheet } from '../components/FilterSheet';
 import { MixBar } from '../components/MixBar';
 import { SearchBar } from '../components/SearchBar';
-import { derivePortfolios, portfolioFlag, typeLabel } from '../lib/derive';
-import type { Portfolio } from '../lib/types';
+import { derivePortfolios, portfolioComposition, portfolioFlag, typeLabel } from '../lib/derive';
+import { fmtPctCompact } from '../lib/performance';
+import { portfolioIndex } from '../lib/portfolioPerf';
+import type { Disclosure, Portfolio } from '../lib/types';
 import type { HomeStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
 import { color, font, radius, shadow, space, verdictColor } from '../theme/tokens';
@@ -47,65 +49,167 @@ const COMPLIANCE = [
   { key: 'exclude', label: 'Exclude non-compliant' },
 ] as const;
 
+const INITIAL_SHOWN = 6;
+
+// Most-followed board stays hidden until follower counts are meaningful (decision #8): the app
+// has no real follower graph yet, so ranking by it would be noise. The section is built and
+// gated here so it lights up the day follower data lands.
+const SHOW_MOST_FOLLOWED = false;
+
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Home'>;
+
+/** One ranked portfolio with its neutral (evidence-only) performance figure attached. */
+interface Ranked {
+  p: Portfolio;
+  who: string;
+  perf: number | null;
+  illustrative: boolean;
+}
+
+/** A plain "who is this" subtitle from the filer's group + filing source (no invented titles). */
+function whoLine(p: Portfolio, source?: string): string {
+  const lead =
+    p.group === 'official'
+      ? /senate/i.test(source || '')
+        ? 'US Senator'
+        : /house/i.test(source || '')
+          ? 'US Representative'
+          : 'US lawmaker'
+      : p.group === 'insider'
+        ? 'Corporate insider'
+        : 'Institutional';
+  const src = (source || '').trim();
+  const form = /^13f/i.test(src) ? '13F' : src;
+  return form ? `${lead} · ${form}` : lead;
+}
 
 export function HomeScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const { rows, loading, live, refresh } = useFeed();
+  const { rows, prices, loading, live, refresh } = useFeed();
   const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('1M');
   const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('performance');
   const [compliance, setCompliance] = useState<(typeof COMPLIANCE)[number]['key']>('all');
   const [query, setQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
-  const portfolios = useMemo(() => {
-    let list = derivePortfolios(rows);
+  // Group the (already gated) feed by actor once, so each portfolio can compute its own
+  // composition + weighted performance index.
+  const byActor = useMemo(() => {
+    const m = new Map<string, Disclosure[]>();
+    for (const r of rows) {
+      const k = r.actor || 'Unknown source';
+      (m.get(k) || m.set(k, []).get(k)!).push(r);
+    }
+    return m;
+  }, [rows]);
+
+  const ranked = useMemo<Ranked[]>(() => {
+    let list = derivePortfolios(rows).map((p): Ranked => {
+      const actorRows = byActor.get(p.name) || [];
+      const idx = portfolioIndex(portfolioComposition(actorRows), actorRows, prices);
+      const source = actorRows.find((r) => r.source)?.source;
+      return {
+        p,
+        who: whoLine(p, source),
+        perf: idx?.sinceDisclosed ?? null,
+        illustrative: idx?.illustrative ?? true,
+      };
+    });
+
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       list = list.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.tickers.some((t) => t.ticker.toLowerCase().includes(q)),
+        (r) =>
+          r.p.name.toLowerCase().includes(q) ||
+          r.p.tickers.some((t) => t.ticker.toLowerCase().includes(q)),
       );
     }
-    // Compliance filter (not a sort): by the portfolio Sharia flag.
     if (compliance !== 'all') {
-      list = list.filter((p) => {
-        const tone = portfolioFlag(p).tone;
+      list = list.filter((r) => {
+        const tone = portfolioFlag(r.p).tone;
         return compliance === 'fully' ? tone === 'clean' : tone !== 'fail';
       });
     }
-    // 'performance' (default) and 'followers' keep the count-based order until
-    // the price cache / follower counts land.
+
+    if (sort === 'performance') {
+      // Rank by the neutral evidence figure; names with no price fall to the bottom.
+      list = list.sort((a, b) => (b.perf ?? -Infinity) - (a.perf ?? -Infinity));
+    } else {
+      list = list.sort((a, b) => b.p.count - a.p.count);
+    }
     return list;
-  }, [rows, query, sort, compliance]);
+  }, [rows, byActor, prices, query, sort, compliance]);
+
+  const shown = showAll ? ranked : ranked.slice(0, INITIAL_SHOWN);
+  const activeFilters = (sort !== 'performance' ? 1 : 0) + (compliance !== 'all' ? 1 : 0);
+
+  const goStocks = () => nav.getParent()?.navigate('StocksTab' as never);
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <BrandHeader subtitle="Portfolios" />
-      <SearchBar value={query} onChange={setQuery} placeholder="Search a stock or portfolio" />
+      <BrandHeader />
+
+      {/* Portfolios | Stocks segmented toggle + a search affordance. */}
+      <View style={styles.topBar}>
+        <View style={styles.segment}>
+          <View style={[styles.segItem, styles.segItemOn]}>
+            <Text style={[styles.segText, styles.segTextOn]}>Portfolios</Text>
+          </View>
+          <TouchableOpacity style={styles.segItem} onPress={goStocks} activeOpacity={0.7}>
+            <Text style={styles.segText}>Stocks</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity
+          style={styles.iconBtn}
+          onPress={() => setSearchOpen((s) => !s)}
+          activeOpacity={0.7}
+          accessibilityLabel="Search"
+        >
+          <Text style={styles.icon}>⌕</Text>
+        </TouchableOpacity>
+      </View>
+
+      {searchOpen ? (
+        <View style={{ paddingBottom: space.sm }}>
+          <SearchBar value={query} onChange={setQuery} placeholder="Search a stock or portfolio" />
+        </View>
+      ) : null}
 
       <FlatList
-        data={portfolios}
-        keyExtractor={(p) => p.name}
+        data={shown}
+        keyExtractor={(r) => r.p.name}
         renderItem={({ item, index }) => (
-          <PortfolioCard
-            p={item}
+          <PerformerRow
+            r={item}
             rank={index + 1}
-            onPress={() => nav.navigate('PortfolioDetail', { name: item.name })}
+            onPress={() => nav.navigate('PortfolioDetail', { name: item.p.name })}
           />
         )}
         ListHeaderComponent={
           <View>
-            <ChipRow label="Time" options={TIMEFRAMES} value={tf} onChange={setTf} />
-            <ChipRow label="Sort by" options={SORTS} value={sort} onChange={setSort} />
-            <ChipRow label="Compliance" options={COMPLIANCE} value={compliance} onChange={setCompliance} />
-            <View style={styles.listHead}>
-              <Text style={styles.listHeadTitle}>Ranked portfolios</Text>
-              <Text style={styles.listHeadMeta}>
-                {portfolios.length} shown{live ? '' : ' · sample data'}
-              </Text>
+            <View style={styles.sectionHead}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>Top performers</Text>
+                <Text style={styles.sectionMeta}>
+                  {ranked.length} portfolio{ranked.length === 1 ? '' : 's'}
+                  {live ? '' : ' · sample performance'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.filterPill, activeFilters ? styles.filterPillOn : null]}
+                onPress={() => setFilterOpen(true)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.filterPillText, activeFilters ? styles.filterPillTextOn : null]}>
+                  ⚙ {activeFilters ? `${activeFilters} filter${activeFilters === 1 ? '' : 's'}` : 'Filter'}
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            <TimeBar value={tf} onChange={setTf} />
           </View>
         }
         ListEmptyComponent={
@@ -115,98 +219,259 @@ export function HomeScreen() {
             <Text style={styles.empty}>No portfolios match this search.</Text>
           )
         }
-        ListFooterComponent={<Disclaimer />}
+        ListFooterComponent={
+          <View>
+            {ranked.length > INITIAL_SHOWN ? (
+              <TouchableOpacity
+                style={styles.more}
+                onPress={() => setShowAll((s) => !s)}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.moreText}>
+                  {showAll ? 'Show less' : `More — ${ranked.length - INITIAL_SHOWN} more`}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {SHOW_MOST_FOLLOWED ? <MostFollowed ranked={ranked} /> : null}
+
+            <View style={styles.guardrail}>
+              <Text style={styles.guardrailText}>
+                Ranked on past disclosed-holdings evidence — delayed by up to 45 days and shown for
+                information only. Performance is never colored like a Sharia verdict, and this is not
+                advice to buy or sell.
+              </Text>
+            </View>
+            <Disclaimer />
+          </View>
+        }
         contentContainerStyle={{ paddingBottom: space.xxl }}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={color.brand} />
         }
       />
+
+      <FilterSheet
+        visible={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        time={{ label: 'Time', options: TIMEFRAMES, value: tf, onChange: setTf }}
+        sort={{ label: 'Sort by', options: SORTS, value: sort, onChange: setSort }}
+        compliance={{ label: 'Compliance', options: COMPLIANCE, value: compliance, onChange: setCompliance }}
+      />
     </View>
   );
 }
 
-function PortfolioCard({ p, rank, onPress }: { p: Portfolio; rank: number; onPress: () => void }) {
-  const flag = portfolioFlag(p);
+/** Compact horizontal time selector — active = solid ink pill (concept). */
+function TimeBar({
+  value,
+  onChange,
+}: {
+  value: (typeof TIMEFRAMES)[number]['key'];
+  onChange: (k: (typeof TIMEFRAMES)[number]['key']) => void;
+}) {
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.card}>
-      <View style={styles.cardTop}>
-        <Text style={styles.rank}>{rank}</Text>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{p.initials}</Text>
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.name} numberOfLines={1}>
-            {p.name}
+    <View style={styles.timeBar}>
+      {TIMEFRAMES.map((t) => {
+        const on = t.key === value;
+        return (
+          <TouchableOpacity
+            key={t.key}
+            onPress={() => onChange(t.key)}
+            activeOpacity={0.7}
+            style={[styles.timeChip, on && styles.timeChipOn]}
+          >
+            <Text style={[styles.timeText, on && styles.timeTextOn]}>{t.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function PerformerRow({ r, rank, onPress }: { r: Ranked; rank: number; onPress: () => void }) {
+  const flag = portfolioFlag(r.p);
+  const perf = fmtPctCompact(r.perf);
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.row}>
+      <Text style={styles.rank}>{rank}</Text>
+      <Emblem p={r.p} />
+
+      <View style={styles.rowMid}>
+        <Text style={styles.name} numberOfLines={1}>
+          {r.p.name}
+        </Text>
+        <Text style={styles.who} numberOfLines={1}>
+          {r.who}
+        </Text>
+        {/* Sharia flag — louder than performance (spec §2). */}
+        <View style={styles.flagRow}>
+          <View style={[styles.flagDot, { backgroundColor: verdictColor[flag.tone].solid }]} />
+          <Text style={[styles.flagText, { color: verdictColor[flag.tone].text }]} numberOfLines={1}>
+            {flag.text}
           </Text>
-          <Text style={styles.type}>
-            {typeLabel(p.kind)} · {p.count} disclosure{p.count === 1 ? '' : 's'}
-          </Text>
         </View>
-        <FollowButton name={p.name} />
+        <View style={styles.mixWrap}>
+          <MixBar mix={r.p.mix} />
+        </View>
       </View>
 
-      {/* Sharia flag — louder than performance (spec §2). */}
-      <View style={styles.flagRow}>
-        <View style={[styles.flagDot, { backgroundColor: verdictColor[flag.tone].solid }]} />
-        <Text style={[styles.flagText, { color: verdictColor[flag.tone].text }]}>{flag.text}</Text>
-        <Text style={styles.perf}>▲▼ perf pending</Text>
-      </View>
-      <MixBar mix={p.mix} />
-
-      {/* Verdict-colored ticker chips (no logos). */}
-      <View style={styles.chips}>
-        {p.tickers.slice(0, 6).map((t) => (
-          <View key={t.ticker} style={[styles.tickerChip, { borderColor: verdictColor[t.label].solid }]}>
-            <Text style={[styles.tickerText, { color: verdictColor[t.label].text }]}>{t.ticker}</Text>
-          </View>
-        ))}
+      <View style={styles.rowRight}>
+        {/* Neutral performance chip — grey ▲/▼, never a verdict color. */}
+        <View style={styles.perfChip}>
+          <Text style={styles.perfText}>{perf ?? 'perf pending'}</Text>
+        </View>
+        {r.illustrative && perf ? <Text style={styles.perfNote}>sample</Text> : null}
+        <Text style={styles.chevron}>›</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
+/** Most-followed board — built but gated off until follower data is meaningful (decision #8). */
+function MostFollowed({ ranked }: { ranked: Ranked[] }) {
+  return (
+    <View>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>Most followed</Text>
+      </View>
+      {ranked.slice(0, 3).map((r, i) => (
+        <View key={r.p.name} style={styles.row}>
+          <Text style={styles.rank}>{i + 1}</Text>
+          <Emblem p={r.p} />
+          <View style={styles.rowMid}>
+            <Text style={styles.name} numberOfLines={1}>
+              {r.p.name}
+            </Text>
+            <Text style={styles.who} numberOfLines={1}>
+              {r.who}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: color.bg },
-  listHead: {
+
+  topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
+    gap: space.sm,
     paddingHorizontal: space.lg,
-    paddingTop: space.sm,
+    paddingTop: space.xs,
     paddingBottom: space.sm,
   },
-  listHeadTitle: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.muted, textTransform: 'uppercase' },
-  listHeadMeta: { fontSize: font.small, color: color.faint, fontWeight: font.weight.medium },
-  card: {
+  segment: {
+    flexDirection: 'row',
+    flex: 1,
+    backgroundColor: color.surfaceAlt,
+    borderRadius: radius.pill,
+    padding: 3,
+  },
+  segItem: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: radius.pill },
+  segItemOn: { backgroundColor: color.surface, ...shadow.card },
+  segText: { fontSize: font.label, fontWeight: font.weight.bold, color: color.muted },
+  segTextOn: { color: color.ink },
+  iconBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.md,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.line2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: { fontSize: 20, color: color.muted },
+
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+    paddingBottom: space.sm,
+  },
+  sectionTitle: { fontSize: font.h1, fontWeight: font.weight.heavy, color: color.ink, letterSpacing: -0.3 },
+  sectionMeta: { fontSize: font.small, color: color.faint, fontWeight: font.weight.medium, marginTop: 2 },
+
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: color.line2,
+    backgroundColor: color.surface,
+  },
+  filterPillOn: { backgroundColor: color.brandSoft, borderColor: color.brand },
+  filterPillText: { fontSize: font.label, fontWeight: font.weight.bold, color: color.muted },
+  filterPillTextOn: { color: color.brandInk },
+
+  timeBar: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.md,
+    flexWrap: 'wrap',
+  },
+  timeChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
+  timeChipOn: { backgroundColor: color.ink },
+  timeText: { fontSize: font.label, fontWeight: font.weight.bold, color: color.faint },
+  timeTextOn: { color: color.onBrand },
+
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
     marginHorizontal: space.lg,
     marginBottom: space.md,
-    padding: space.lg,
+    padding: space.md,
     borderRadius: radius.lg,
     backgroundColor: color.surface,
     borderWidth: 1,
     borderColor: color.line,
     ...shadow.card,
   },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  rank: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.faint, width: 16 },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: color.brandSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontSize: font.small, fontWeight: font.weight.heavy, color: color.brandInk },
+  rank: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.faint, width: 16, textAlign: 'center' },
+  rowMid: { flex: 1, minWidth: 0 },
   name: { fontSize: font.body, fontWeight: font.weight.bold, color: color.ink },
-  type: { fontSize: font.small, color: color.faint, marginTop: 2 },
-  flagRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: space.md, marginBottom: space.sm },
-  flagDot: { width: 9, height: 9, borderRadius: 5 },
-  flagText: { fontSize: font.label, fontWeight: font.weight.heavy, flex: 1 },
-  perf: { fontSize: font.small, color: color.faint, fontWeight: font.weight.medium },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
-  tickerChip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.sm, borderWidth: 1 },
-  tickerText: { fontSize: font.small, fontWeight: font.weight.bold },
+  who: { fontSize: font.small, color: color.faint, marginTop: 1, fontWeight: font.weight.medium },
+  flagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  flagDot: { width: 8, height: 8, borderRadius: 4 },
+  flagText: { fontSize: font.small, fontWeight: font.weight.heavy, flex: 1 },
+  mixWrap: { marginTop: 6 },
+
+  rowRight: { alignItems: 'flex-end', gap: 3, minWidth: 62 },
+  perfChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radius.sm,
+    backgroundColor: color.surfaceAlt,
+  },
+  perfText: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.muted },
+  perfNote: { fontSize: font.tiny, color: color.faint, fontWeight: font.weight.medium },
+  chevron: { fontSize: 22, color: color.faint, marginTop: 2 },
+
+  more: {
+    marginHorizontal: space.lg,
+    marginTop: space.xs,
+    marginBottom: space.lg,
+    paddingVertical: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: color.line2,
+    alignItems: 'center',
+    backgroundColor: color.surface,
+  },
+  moreText: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.brand },
+
+  guardrail: { paddingHorizontal: space.lg, paddingTop: space.sm },
+  guardrailText: { fontSize: font.small, color: color.faint, lineHeight: 16 },
+
   empty: {
     marginHorizontal: space.lg,
     marginTop: space.xl,
