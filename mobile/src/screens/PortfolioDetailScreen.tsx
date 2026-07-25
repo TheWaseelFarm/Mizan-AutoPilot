@@ -27,7 +27,7 @@ import { color, font, perfColor, radius, shadow, space, verdictColor } from '../
 export function PortfolioDetailScreen() {
   const route = useRoute<RouteProp<HomeStackParamList, 'PortfolioDetail'>>();
   const { name } = route.params;
-  const { rows, prices } = useFeed();
+  const { rows, prices, followerCounts } = useFeed();
 
   const activity = useMemo(
     () =>
@@ -49,6 +49,7 @@ export function PortfolioDetailScreen() {
   const flag = portfolioFlag(portfolio);
   const descriptor = actorDescriptor(activity[0] ?? { kind: portfolio.kind });
   const avgLag = averageLag(activity);
+  const followers = followerCounts[name] || 0;
   const composition = useMemo(() => portfolioComposition(activity), [activity]);
   const held = composition.filter((h) => h.held);
   const maxWeight = held[0]?.weightPct || 1;
@@ -76,7 +77,10 @@ export function PortfolioDetailScreen() {
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.name}>{name}</Text>
-          <Text style={styles.descriptor}>{descriptor}</Text>
+          <Text style={styles.descriptor}>
+            {descriptor}
+            {followers > 0 ? ` · ${fmtFollowers(followers)} followers` : ''}
+          </Text>
         </View>
         <FollowButton name={name} />
       </View>
@@ -90,21 +94,12 @@ export function PortfolioDetailScreen() {
         <MixBar mix={portfolio.mix} showLegend />
       </View>
 
-      {/* Key indicators (compact stat row). */}
+      {/* Key indicators — real figures only. Performance lives in the chart below (not
+          duplicated here); empty placeholders (risk / followers) are omitted until they exist. */}
       <View style={styles.stats}>
-        <Stat label="Holdings" value={String(portfolio.tickers.length)} />
+        <Stat label="Holdings" value={String(held.length)} />
         <Stat label="Disclosures" value={String(portfolio.count)} />
         <Stat label="Avg filing lag" value={avgLag != null ? `${avgLag}d` : '—'} muted />
-      </View>
-      <View style={styles.stats}>
-        <Stat label="Risk appetite" value="Pending" muted />
-        <Stat
-          label="Performance"
-          value={ppSince || 'Pending'}
-          muted
-          valueColor={ppSince ? perfColor[perfTone(pp?.sinceDisclosed ?? null)] : undefined}
-        />
-        <Stat label="Followers" value="—" muted />
       </View>
 
       {/* Portfolio performance — a weighted index of the holdings (spec §4). Muted. */}
@@ -217,6 +212,11 @@ function Stat({ label, value, muted, valueColor }: { label: string; value: strin
 
 function sideWord(side: string): string {
   return String(side).toUpperCase() === 'SELL' ? 'Sold' : 'Bought';
+}
+
+/** Compact follower label (e.g. 1.2k). */
+function fmtFollowers(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
 }
 
 function averageLag(rows: { transactionDate?: string; filingDate?: string }[]): number | null {
