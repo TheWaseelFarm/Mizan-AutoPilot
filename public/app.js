@@ -39,7 +39,8 @@
       'p.title': 'Portfolio intelligence', 'p.sub': 'Compare disclosed portfolios through performance, activity and Sharia exposure.',
       's.title': 'Stock intelligence', 's.sub': 'Explore disclosed activity with evidence and Sharia context.',
       'sv.top': 'Top performers', 'sv.active': 'Most active', 'sv.followed': 'Most followed', 'sv.alloc': 'Highest compliant allocation',
-      'sv.bought': 'Most bought', 'sv.sold': 'Most sold', 'sv.new': 'New positions', 'sv.incr': 'Increased', 'sv.red': 'Reduced', 'sv.exit': 'Exited',
+      'sv.bought': 'Most bought', 'sv.sold': 'Most sold', 'sv.flow': 'Net flow', 'sv.new': 'New positions', 'sv.incr': 'Increased', 'sv.red': 'Reduced', 'sv.exit': 'Exited',
+      'so.net': 'Absolute net flow', 'flow.note': 'Net flow = gross buying − gross selling over the disclosed window. Non-compliant names stay visible for market awareness but are never actionable. Informational only — not advice.',
       'c.filter': 'Filter', 'c.sort': 'Sort', 'c.compare': 'Compare', 'c.why': 'Why this ranking?', 'c.clear': 'Clear all', 'c.search': 'Search portfolios, investors or stocks',
       'so.return': 'Disclosed return', 'so.activity': 'Disclosed activity', 'so.followers': 'Followers', 'so.alloc': 'Compliant allocation',
       'so.value': 'Disclosed value', 'so.weight': 'Position weight', 'so.filers': 'Number of filers',
@@ -62,7 +63,8 @@
       'p.title': 'ذكاء المحافظ', 'p.sub': 'قارن المحافظ المُفصَح عنها من حيث الأداء والنشاط والالتزام الشرعي.',
       's.title': 'ذكاء الأسهم', 's.sub': 'استكشف النشاط المُفصَح عنه مع الأدلة والسياق الشرعي.',
       'sv.top': 'الأفضل أداءً', 'sv.active': 'الأكثر نشاطًا', 'sv.followed': 'الأكثر متابعة', 'sv.alloc': 'أعلى تخصيص متوافق',
-      'sv.bought': 'الأكثر شراءً', 'sv.sold': 'الأكثر بيعًا', 'sv.new': 'مراكز جديدة', 'sv.incr': 'زيادة', 'sv.red': 'تخفيض', 'sv.exit': 'خروج',
+      'sv.bought': 'الأكثر شراءً', 'sv.sold': 'الأكثر بيعًا', 'sv.flow': 'صافي التدفق', 'sv.new': 'مراكز جديدة', 'sv.incr': 'زيادة', 'sv.red': 'تخفيض', 'sv.exit': 'خروج',
+      'so.net': 'صافي التدفق المطلق', 'flow.note': 'صافي التدفق = إجمالي الشراء − إجمالي البيع خلال نافذة الإفصاح. تبقى الأسماء غير المتوافقة ظاهرة للوعي بالسوق لكنها غير قابلة للتنفيذ. لأغراض معلوماتية فقط — ليست نصيحة.',
       'c.filter': 'تصفية', 'c.sort': 'ترتيب', 'c.compare': 'مقارنة', 'c.why': 'لماذا هذا الترتيب؟', 'c.clear': 'مسح الكل', 'c.search': 'ابحث عن محفظة أو مستثمر أو سهم',
       'so.return': 'العائد المُفصَح', 'so.activity': 'النشاط المُفصَح', 'so.followers': 'المتابِعون', 'so.alloc': 'التخصيص المتوافق',
       'so.value': 'القيمة المُفصَح عنها', 'so.weight': 'وزن المركز', 'so.filers': 'عدد المُفصِحين',
@@ -160,6 +162,24 @@
   }
   const evStrength = (n) => n >= 8 ? 'high' : n >= 3 ? 'medium' : 'low';
 
+  // Smart-money NET FLOW per ticker: gross buying vs gross selling and the net (complements the
+  // Stocks tab — pure market intelligence, no execution). Non-compliant names stay VISIBLE for
+  // macro awareness (shown struck-through), never actionable.
+  function deriveFlow(rows) {
+    const m = new Map();
+    for (const r of rows) {
+      let f = m.get(r.ticker);
+      if (!f) { f = { ticker: r.ticker, company: r.company || r.ticker, label: r.label, buy: 0, sell: 0, filers: new Set(), fresh: null }; m.set(r.ticker, f); }
+      const amt = Math.abs(+r.amountMid || 0);
+      if (String(r.side).toUpperCase() === 'SELL') f.sell += amt; else f.buy += amt;
+      f.filers.add(r.actor); f.label = r.label;
+      const ds = daysSince(r.filingDate); if (ds != null && (f.fresh == null || ds < f.fresh)) f.fresh = ds;
+    }
+    return [...m.values()]
+      .map((f) => ({ ...f, net: f.buy - f.sell, gross: f.buy + f.sell, filerCount: f.filers.size }))
+      .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  }
+
   /* ---------------------------------------------------------------- state */
   const S = {
     tab: 'portfolios', pMetric: 'top', sMetric: 'bought', tf: 'ALL', query: '',
@@ -168,9 +188,9 @@
     openMenu: null, rows: SAMPLE, live: false, prices: {},
   };
   const P_SUB = [['top', 'sv.top'], ['active', 'sv.active'], ['followed', 'sv.followed'], ['alloc', 'sv.alloc']];
-  const S_SUB = [['bought', 'sv.bought', 'BUY', 'value'], ['sold', 'sv.sold', 'SELL', 'value'], ['new', 'sv.new', 'BUY', 'filers'], ['incr', 'sv.incr', 'BUY', 'weight'], ['red', 'sv.red', 'SELL', 'weight'], ['exit', 'sv.exit', 'SELL', 'filers']];
+  const S_SUB = [['bought', 'sv.bought', 'BUY', 'value'], ['sold', 'sv.sold', 'SELL', 'value'], ['flow', 'sv.flow', '', 'net'], ['new', 'sv.new', 'BUY', 'filers'], ['incr', 'sv.incr', 'BUY', 'weight'], ['red', 'sv.red', 'SELL', 'weight'], ['exit', 'sv.exit', 'SELL', 'filers']];
   const P_SORT = { top: 'so.return', active: 'so.activity', followed: 'so.followers', alloc: 'so.alloc' };
-  const S_SORT = { value: 'so.value', weight: 'so.weight', filers: 'so.filers' };
+  const S_SORT = { value: 'so.value', weight: 'so.weight', filers: 'so.filers', net: 'so.net' };
   const TFS = [['1M', '1M'], ['3M', '3M'], ['6M', '6M'], ['1Y', '1Y'], ['3Y', '3Y'], ['5Y', '5Y'], ['ALL', 'All']];
 
   /* ---------------------------------------------------------------- routing */
@@ -211,6 +231,16 @@
       if (S.followedOnly) list = list.filter((p) => S.follows.has(p.name));
       const cmp = { top: (a, b) => (b.perf ?? -1e9) - (a.perf ?? -1e9), active: (a, b) => b.count - a.count, followed: (a, b) => (b._f || 0) - (a._f || 0) || b.count - a.count, alloc: (a, b) => b.cleanPct - a.cleanPct || b.count - a.count };
       return list.sort(cmp[S.pMetric]);
+    }
+    // Net-flow board (Smart Money) — its own derivation; non-compliant names stay visible.
+    if (S.sMetric === 'flow') {
+      let list = deriveFlow(rows);
+      if (S.query) { const q = S.query.toLowerCase(); list = list.filter((s) => s.ticker.toLowerCase().includes(q) || s.company.toLowerCase().includes(q)); }
+      // Compliance filter still applies (except 'all', which keeps non-compliant visible for macro awareness).
+      if (S.compliance === 'fully') list = list.filter((s) => s.label === 'clean');
+      else if (S.compliance === 'exclude') list = list.filter((s) => s.label !== 'fail');
+      if (S.followedOnly) list = list.filter((s) => S.follows.has(s.ticker));
+      return list;
     }
     const cfg = S_SUB.find((x) => x[0] === S.sMetric);
     let list = deriveStocks(rows, cfg[2]);
@@ -258,14 +288,25 @@
     return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block;overflow:visible"><polyline points="${chartPath(vals, W, H)}" fill="none" stroke="var(--mz-cobalt-600)" stroke-width="1.6" stroke-linejoin="round"/></svg>
       <div style="display:flex;justify-content:space-between;margin-block-start:.4rem;font-size:var(--mz-text-xs)"><span class="mz-muted mz-ltr">$${Math.min(...vals).toFixed(0)}</span><span class="mz-performance">${fmtPct(ret * 100)} over range</span><span class="mz-muted mz-ltr">$${Math.max(...vals).toFixed(0)}</span></div>`;
   }
-  // Equal-weight normalized index across a portfolio's ownable (non-fail) held tickers.
-  function portfolioIndexVals(rows) {
-    const tickers = [...new Set(rows.filter((r) => r.label !== 'fail').map((r) => r.ticker))];
+  // Equal-weight normalized index across a portfolio's held tickers. `includeAll` keeps the
+  // non-compliant names (the "original" portfolio) so we can show the screening effect.
+  function portfolioIndexVals(rows, includeAll) {
+    const tickers = [...new Set(rows.filter((r) => includeAll || r.label !== 'fail').map((r) => r.ticker))];
     const series = tickers.map(histVals).filter((a) => a.length >= 2);
     if (!series.length) return [];
     const len = Math.min(...series.map((a) => a.length)), out = [];
     for (let i = 0; i < len; i++) { let s = 0; for (const a of series) s += a[a.length - len + i] / a[a.length - len]; out.push(s / series.length * 100); }
     return out;
+  }
+  const seriesReturn = (v) => v && v.length >= 2 ? (v[v.length - 1] / v[0] - 1) * 100 : null;
+  // Original (all holdings) vs Halal-screened (ownable only) — the "screening effect" (handoff /
+  // Mussaed PRD). Illustrative: applies today's screen to the disclosed set, not point-in-time.
+  function dualChart(screened, original) {
+    const all = [...screened, ...original];
+    if (all.length < 2) return '<div class="mz-muted" style="padding:1.25rem 0;text-align:center;font-size:var(--mz-text-xs)">Price data pending.</div>';
+    const H = 120, W = 320, mn = Math.min(...all), mx = Math.max(...all), r = (mx - mn) || 1;
+    const path = (v) => v.map((y, i) => `${(i / (v.length - 1) * W).toFixed(2)},${(H - (y - mn) / r * H).toFixed(2)}`).join(' ');
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block">${original.length >= 2 ? `<polyline points="${path(original)}" fill="none" stroke="var(--mz-ink-400)" stroke-width="1.2" stroke-dasharray="3 3"/>` : ''}${screened.length >= 2 ? `<polyline points="${path(screened)}" fill="none" stroke="var(--mz-cobalt-600)" stroke-width="1.8"/>` : ''}</svg>`;
   }
 
   /* ---------------------------------------------------------------- chrome */
@@ -343,6 +384,8 @@
         return `<tr data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(av, p.name, meta)}</td><td><div class="mz-perf-cell">${perfHero(p.perf)}${sparkVals(portfolioIndexVals(p.rows))}</div></td><td class="mz-cell-num">${p.count}</td><td>${freshEl(p.fresh)}</td><td>${compliancePill(flag.tone)}</td><td>${starBtn(p.name)}</td></tr>`;
       }).join('') || emptyRow(7);
       cards.innerHTML = list.map((p, i) => portfolioCard(p, i)).join('');
+    } else if (S.sMetric === 'flow') {
+      renderFlowBoard(list, thead, tbody, cards);
     } else {
       // Performance-led: Since-disclosed return is the hero column (3rd); status is a compact badge.
       thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.stock')}</th><th>${t('h.since')}</th><th>${t('h.signal')}</th><th>${t('h.evidence')}</th><th>${t('h.filers')}</th><th>${t('h.value')}</th><th>${t('h.status')}</th></tr>`;
@@ -350,6 +393,24 @@
       tbody.innerHTML = list.map((s, i) => `<tr data-row="stock" data-id="${esc(s.ticker)}"><td><span class="mz-rank">${i + 1}</span></td><td>${entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(s.ticker.slice(0, 4))}</span>`, s.ticker, `${esc(s.company)}${s.fresh != null ? ` · ${s.fresh}d` : ''}`, true)}</td><td><div class="mz-perf-cell">${perfHero(s.perf)}${spark(s.ticker)}</div></td><td class="mz-muted">${signal}</td><td style="font-weight:700">${t('ev.' + evStrength(s.filerCount))}</td><td class="mz-cell-num">${s.filerCount}</td><td class="mz-cell-num" style="font-weight:750">${fmtMoney(s.dollar)}</td><td>${badge(s.label)}</td></tr>`).join('') || emptyRow(8);
       cards.innerHTML = list.map((s, i) => stockCard(s, i)).join('');
     }
+  }
+
+  // Net-flow board — the diverging gross-buy vs gross-sell visualization (Smart Money).
+  function renderFlowBoard(list, thead, tbody, cards) {
+    const scale = Math.max(1, ...list.map((f) => Math.max(f.buy, f.sell)));
+    const netCell = (f) => { const up = f.net >= 0; return `<span class="mz-perf-hero" data-up="${up}" style="font-size:var(--mz-text-md)">${up ? I.caretUp : I.caretDown}${fmtMoney(Math.abs(f.net))}</span>`; };
+    const tickerCell = (f) => { const bad = f.label === 'fail'; return entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem${bad ? ';text-decoration:line-through' : ''}">${esc(f.ticker.slice(0, 4))}</span>`, f.ticker, `${esc(f.company)}${f.fresh != null ? ` · ${f.fresh}d` : ''}`, true); };
+    thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.stock')}</th><th>${LANG === 'ar' ? 'صافي التدفق' : 'Net flow'}</th><th>${LANG === 'ar' ? 'صافي' : 'Net'}</th><th>${LANG === 'ar' ? 'إجمالي' : 'Gross'}</th><th>${t('h.filers')}</th><th>${t('h.status')}</th></tr>`;
+    tbody.innerHTML = list.map((f, i) => `<tr data-row="stock" data-id="${esc(f.ticker)}"${f.label === 'fail' ? ' style="opacity:.85"' : ''}><td><span class="mz-rank">${i + 1}</span></td><td>${tickerCell(f)}</td><td style="min-width:14rem">${netFlowBar(f, scale)}<div style="display:flex;justify-content:space-between;margin-block-start:.25rem;font-size:var(--mz-text-xs)" class="mz-muted"><span>${LANG === 'ar' ? 'بيع' : 'sold'} ${fmtMoney(f.sell)}</span><span>${LANG === 'ar' ? 'شراء' : 'bought'} ${fmtMoney(f.buy)}</span></div></td><td>${netCell(f)}</td><td class="mz-cell-num mz-muted">${fmtMoney(f.gross)}</td><td class="mz-cell-num">${f.filerCount}</td><td>${badge(f.label)}</td></tr>`).join('') || emptyRow(7);
+    cards.innerHTML = list.map((f, i) => `<article class="mz-stock-card" data-row="stock" data-id="${esc(f.ticker)}"${f.label === 'fail' ? ' style="opacity:.85"' : ''}><div style="display:flex;gap:.75rem;align-items:center"><span class="mz-rank">${i + 1}</span><div style="flex:1;min-width:0"><div class="mz-entity__name mz-ltr"${f.label === 'fail' ? ' style="text-decoration:line-through"' : ''}>${esc(f.ticker)}</div><div class="mz-entity__meta">${esc(f.company)}</div></div><div style="text-align:end">${netCell(f)}</div></div><div style="margin-block-start:.6rem">${netFlowBar(f, scale)}</div><div style="display:flex;justify-content:space-between;margin-block-start:.5rem;gap:.5rem;align-items:center">${badge(f.label)}<span class="mz-muted" style="font-size:var(--mz-text-xs)">${LANG === 'ar' ? 'بيع' : 'sold'} ${fmtMoney(f.sell)} · ${LANG === 'ar' ? 'شراء' : 'bought'} ${fmtMoney(f.buy)}</span></div></article>`).join('');
+    // Add a note that non-compliant names are visible but blocked from screening.
+    document.getElementById('guardrail').textContent = t('flow.note');
+  }
+  function netFlowBar(f, scale) {
+    const half = 50;
+    const bw = Math.min(1, f.buy / scale) * half, sw = Math.min(1, f.sell / scale) * half, nw = Math.min(1, Math.abs(f.net) / scale) * half;
+    const muted = f.label === 'fail' ? 'opacity:.55;' : '';
+    return `<div class="mz-flow-bar"><span class="mz-flow-axis"></span><span class="mz-flow-sell" style="width:${sw}%;${muted}"></span><span class="mz-flow-buy" style="width:${bw}%;${muted}"></span><span class="mz-flow-zero"></span>${Math.abs(f.net) > 0 ? `<span class="mz-flow-net" style="${f.net >= 0 ? `inset-inline-start:calc(50% + ${nw}%)` : `inset-inline-start:calc(50% - ${nw}%)`}"></span>` : ''}</div>`;
   }
   const emptyRow = (cols) => `<tr><td colspan="${cols}"><div class="mz-state"><div class="mz-state__content"><h3>${t('empty.title')}</h3><p class="mz-muted">${t('empty.body')}</p></div></div></td></tr>`;
 
@@ -488,6 +549,10 @@
     const hs = Object.values(holdings).sort((a, b) => b.v - a.v);
     const ownTotal = hs.filter((h) => h.label !== 'fail').reduce((a, h) => a + h.v, 0) || 1;
     const idx = portfolioIndexVals(p.rows);
+    const origIdx = portfolioIndexVals(p.rows, true);
+    const scrRet = seriesReturn(idx), origRet = seriesReturn(origIdx);
+    const effect = (scrRet != null && origRet != null) ? scrRet - origRet : null;
+    const hasOrig = origIdx.length >= 2 && p.mix.fail > 0;
     // Activity log — recent disclosed trades, newest first.
     const acts = [...p.rows].sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || '')).slice(0, 6);
     const sideTag = (s) => String(s).toUpperCase() === 'SELL'
@@ -495,7 +560,7 @@
       : `<span class="mz-badge mz-badge--compliant" style="min-height:1.3rem">Bought</span>`;
     return drawerHead(name) +
       `<div class="mz-drawer__section"><span class="mz-badge mz-badge--${flag.tone === 'clean' ? 'compliant' : flag.tone === 'purify' ? 'purify' : 'noncompliant'}">${flag.text}</span><div style="margin-block-start:.6rem">${allocBar(p.mix)}</div></div>` +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${LANG === 'ar' ? 'الأداء' : 'Performance'}</div>${lineChart(idx)}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? 'مؤشر متساوي الوزن للأسماء المملوكة — أدلة، ليس نصيحة.' : 'Equal-weight index of the ownable holdings — evidence, not advice.'}</p></div>` +
+      `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${hasOrig ? (LANG === 'ar' ? 'الأصلي مقابل المُصفّى شرعيًا' : 'Original vs Halal-screened') : (LANG === 'ar' ? 'الأداء' : 'Performance')}</span>${effect != null && hasOrig ? `<span style="font-size:var(--mz-text-xs);font-weight:700;color:${effect >= 0 ? 'var(--mz-cobalt-700)' : 'var(--mz-ink-600)'}">${LANG === 'ar' ? 'أثر الفحص' : 'Screening effect'} ${effect >= 0 ? '+' : '−'}${Math.abs(effect).toFixed(1)} pts</span>` : ''}</div>${hasOrig ? dualChart(idx, origIdx) : lineChart(idx)}${hasOrig ? `<div style="display:flex;gap:1rem;margin-block-start:.4rem;font-size:var(--mz-text-xs)"><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:2px;background:var(--mz-cobalt-600);display:inline-block"></span>${LANG === 'ar' ? 'مُصفّى' : 'Halal-screened'} ${scrRet != null ? fmtPct(scrRet) : ''}</span><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:0;border-top:2px dashed var(--mz-ink-400);display:inline-block"></span>${LANG === 'ar' ? 'الأصلي' : 'Original'} ${origRet != null ? fmtPct(origRet) : ''}</span></div>` : ''}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? 'توضيحي — يطبّق الفحص الحالي على المجموعة المُفصَح عنها. أدلة، ليس نصيحة.' : 'Illustrative — applies today’s screen to the disclosed set. Evidence, not advice.'}</p></div>` +
       `<div class="mz-drawer__section"><div class="mz-summary-grid" style="grid-template-columns:1fr 1fr;margin:0"><div class="mz-summary"><div class="mz-summary__label">${t('h.return')}</div><div class="mz-summary__value">${fmtPct(p.perf) || '—'}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('cmp.disclosures')}</div><div class="mz-summary__value">${p.count}</div></div></div></div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('h.allocation')}</div>${hs.map((h) => { const w = h.label === 'fail' ? 0 : Math.round(h.v / ownTotal * 100); return `<div style="padding-block:.45rem;border-block-end:var(--mz-border)"><div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center"><div class="mz-ltr" style="font-weight:700;min-width:0"><span>${esc(h.ticker)}</span> <span class="mz-muted" style="font-weight:400">${esc(h.company || '')}</span></div><div style="display:flex;gap:.5rem;align-items:center;flex:0 0 auto">${h.label === 'fail' ? '' : `<span class="mz-cell-num" style="font-weight:700">${w}%</span>`}${badge(h.label)}</div></div>${h.label === 'fail' ? '' : `<div class="mz-allocation__bar" style="margin-block-start:.35rem"><span class="mz-allocation__segment--compliant" style="flex:${w}"></span><span style="flex:${100 - w};background:var(--mz-ink-100)"></span></div>`}</div>`; }).join('')}</div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${LANG === 'ar' ? 'سجل النشاط' : 'Activity log'}</div>${acts.map((r) => { const lag = daysBetween(r.transactionDate, r.filingDate); return `<div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;padding-block:.4rem;border-block-end:var(--mz-border)"><div style="min-width:0"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${esc(r.amount || (r.amountMid ? fmtMoney(+r.amountMid) : ''))}${lag != null ? ` · filed ${lag}d later` : ''}</div></div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
