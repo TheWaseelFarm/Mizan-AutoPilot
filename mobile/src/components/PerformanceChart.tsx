@@ -217,7 +217,7 @@ export function PerformanceChart({
         ) : (
           // Discoverability hint — fades out once the user starts scrubbing.
           <View pointerEvents="none" style={styles.hint}>
-            <Text style={styles.hintText}>↔ Drag to explore</Text>
+            <Text style={styles.hintText}>Drag to explore</Text>
           </View>
         )}
       </View>
@@ -226,9 +226,12 @@ export function PerformanceChart({
       <View style={styles.axis}>
         <Text style={styles.axisText}>${min.toFixed(0)}</Text>
         {hasEvents ? (
-          <Text style={styles.legendText}>
-            ● bought{'  '}○ sold
-          </Text>
+          <View style={styles.legendRow}>
+            <View style={[styles.legendDot, { backgroundColor: color.muted }]} />
+            <Text style={styles.legendText}>bought</Text>
+            <View style={[styles.legendDot, styles.legendDotOpen]} />
+            <Text style={styles.legendText}>sold</Text>
+          </View>
         ) : null}
         <Text style={styles.axisText}>${max.toFixed(0)}</Text>
       </View>
@@ -239,7 +242,10 @@ export function PerformanceChart({
 const styles = StyleSheet.create({
   axis: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   axisText: { fontSize: font.tiny, color: color.faint, fontWeight: font.weight.medium, fontVariant: ['tabular-nums'] },
-  legendText: { fontSize: font.tiny, color: color.muted, fontWeight: font.weight.medium },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 7, height: 7, borderRadius: 4 },
+  legendDotOpen: { backgroundColor: 'transparent', borderWidth: 1.3, borderColor: color.muted },
+  legendText: { fontSize: font.tiny, color: color.muted, fontWeight: font.weight.medium, marginRight: 4 },
   hint: {
     position: 'absolute',
     right: 8,

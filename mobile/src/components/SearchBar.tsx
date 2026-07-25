@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleSheet, TextInput, View, Text } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { color, font, radius, space } from '../theme/tokens';
+import { Icon } from './Icon';
 
 /** Instant-search input used at the top of Home and Stocks. */
 export function SearchBar({
@@ -15,7 +16,7 @@ export function SearchBar({
 }) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.icon}>⌕</Text>
+      <Icon name="search" size={18} color={color.faint} />
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -44,6 +45,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     marginHorizontal: space.lg,
   },
-  icon: { fontSize: 18, color: color.faint },
   input: { flex: 1, fontSize: font.body, color: color.ink, paddingVertical: 0 },
 });

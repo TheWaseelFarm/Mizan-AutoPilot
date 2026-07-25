@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { Disclaimer } from '../components/Disclaimer';
 import { FollowButton } from '../components/FollowButton';
+import { Icon } from '../components/Icon';
 import { MixBar } from '../components/MixBar';
 import { PerformanceChart } from '../components/PerformanceChart';
 import { PieChart } from '../components/PieChart';
@@ -158,7 +159,7 @@ export function PortfolioDetailScreen() {
             activeOpacity={0.7}
             onPress={() => setShowSold((s) => !s)}
           >
-            <Text style={styles.soldHeadChevron}>{showSold ? '▾' : '▸'}</Text>
+            <Icon name={showSold ? 'chevronDown' : 'chevronRight'} size={16} color={color.muted} />
             <Text style={styles.soldHeadText}>Sold / exited · {sold.length}</Text>
           </TouchableOpacity>
           {showSold ? sold.map((h) => <CompRow key={h.ticker} h={h} maxWeight={maxWeight} perf={holdingPerf[h.ticker]} />) : null}
@@ -167,7 +168,7 @@ export function PortfolioDetailScreen() {
 
       <Text style={styles.compNote}>
         Share of current disclosed holdings by value; names net sold in these filings are kept
-        under “Sold / exited.” Each name shows its move since disclosed (▲ up / ▼ down) —
+        under “Sold / exited.” Each name shows its move since disclosed (+ up / − down) —
         informational, not a recommendation to buy.
       </Text>
 

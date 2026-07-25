@@ -1,8 +1,10 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 
+import { Icon, type IconName } from '../components/Icon';
+import { AlertsScreen } from '../screens/AlertsScreen';
 import { FollowingScreen } from '../screens/FollowingScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { PortfolioDetailScreen } from '../screens/PortfolioDetailScreen';
@@ -11,7 +13,7 @@ import { StockDetailScreen } from '../screens/StockDetailScreen';
 import { StocksScreen } from '../screens/StocksScreen';
 import { useFeed } from '../state/feed';
 import { useFollows } from '../state/follows';
-import { color, font } from '../theme/tokens';
+import { color, font, layout } from '../theme/tokens';
 import type { HomeStackParamList, StocksStackParamList, TabParamList } from './types';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -26,11 +28,17 @@ const stackScreenOptions = {
   contentStyle: { backgroundColor: color.bg },
 } as const;
 
-/** An explicit, always-visible back chevron for detail screens (round-2 #1). */
+/** An explicit, always-visible back chevron for detail screens (professional icon, no glyph). */
 function HeaderBack({ onPress }: { onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} hitSlop={{ top: 12, bottom: 12, left: 12, right: 16 }} accessibilityRole="button" accessibilityLabel="Back">
-      <Text style={{ fontSize: 32, lineHeight: 34, color: color.ink, paddingRight: 10, marginTop: -3 }}>‹</Text>
+    <TouchableOpacity
+      onPress={onPress}
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 16 }}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+      style={{ paddingRight: 8 }}
+    >
+      <Icon name="chevronLeft" size={26} color={color.ink} strokeWidth={2} />
     </TouchableOpacity>
   );
 }
@@ -70,15 +78,15 @@ function StocksStackNav() {
   );
 }
 
-/** A tiny glyph tab icon — no external icon lib needed for the scaffold. */
-function tabIcon(glyph: string) {
+/** A professional SVG tab-bar icon. */
+function tabIcon(name: IconName) {
   return ({ color: c, focused }: { color: string; focused: boolean }) => (
-    <Text style={{ fontSize: 18, color: c, opacity: focused ? 1 : 0.7 }}>{glyph}</Text>
+    <Icon name={name} size={22} color={c} strokeWidth={focused ? 2 : 1.75} />
   );
 }
 
 export function RootTabs() {
-  // In-app Alerts badge: disclosures from the portfolios the user follows (spec §4 Tab 3).
+  // In-app Alerts badge: disclosures from the portfolios the user follows (spec §4).
   const { rows } = useFeed();
   const { followed } = useFollows();
   const alerts = followed.length ? rows.filter((r) => followed.includes(r.actor)).length : 0;
@@ -89,26 +97,37 @@ export function RootTabs() {
         headerShown: false,
         tabBarActiveTintColor: color.brand,
         tabBarInactiveTintColor: color.faint,
-        tabBarStyle: { backgroundColor: color.surface, borderTopColor: color.line },
-        tabBarLabelStyle: { fontSize: font.tiny, fontWeight: font.weight.medium as '600' },
+        tabBarStyle: {
+          backgroundColor: color.surface,
+          borderTopColor: color.line,
+          height: layout.mobileNavHeight,
+          paddingTop: 6,
+          paddingBottom: 10,
+        },
+        tabBarLabelStyle: { fontSize: font.tiny, fontWeight: font.weight.bold as '700' },
       }}
     >
       <Tab.Screen
         name="HomeTab"
         component={HomeStackNav}
-        options={{ title: 'Home', tabBarIcon: tabIcon('◈') }}
+        options={{ title: 'Portfolios', tabBarIcon: tabIcon('portfolios') }}
       />
       <Tab.Screen
         name="StocksTab"
         component={StocksStackNav}
-        options={{ title: 'Stocks', tabBarIcon: tabIcon('◎') }}
+        options={{ title: 'Stocks', tabBarIcon: tabIcon('stocks') }}
       />
       <Tab.Screen
         name="FollowingTab"
         component={FollowingScreen}
+        options={{ title: 'Following', tabBarIcon: tabIcon('star') }}
+      />
+      <Tab.Screen
+        name="AlertsTab"
+        component={AlertsScreen}
         options={{
-          title: 'Following',
-          tabBarIcon: tabIcon('★'),
+          title: 'Alerts',
+          tabBarIcon: tabIcon('bell'),
           tabBarBadge: alerts || undefined,
           tabBarBadgeStyle: { backgroundColor: color.brand, fontSize: 10 },
         }}
@@ -116,7 +135,7 @@ export function RootTabs() {
       <Tab.Screen
         name="ProfileTab"
         component={ProfileScreen}
-        options={{ title: 'Profile', tabBarIcon: tabIcon('☰') }}
+        options={{ title: 'Account', tabBarIcon: tabIcon('user') }}
       />
     </Tab.Navigator>
   );

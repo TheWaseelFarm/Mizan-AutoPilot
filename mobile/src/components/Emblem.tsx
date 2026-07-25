@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import type { Portfolio } from '../lib/types';
-import { font } from '../theme/tokens';
+import { color, font } from '../theme/tokens';
+import { Icon, type IconName } from './Icon';
 
 /**
  * A generated emblem — a deterministic gradient tile with the portfolio's monogram and a
@@ -24,10 +25,11 @@ const PALETTE: readonly [string, string][] = [
   ['#3C4A63', '#5A6B88'],
 ];
 
-const GLYPH: Record<Portfolio['group'], string> = {
-  fund: '🏦',
-  official: '🏛️',
-  insider: '👤',
+// Professional line-icon marks per filer group (no emoji — handoff §6).
+const GLYPH: Record<Portfolio['group'], IconName> = {
+  fund: 'building',
+  official: 'landmark',
+  insider: 'briefcase',
 };
 
 function hashStr(s: string): number {
@@ -44,7 +46,7 @@ export function Emblem({ p, size = 56 }: { p: Portfolio; size?: number }) {
   const gid = 'emb' + useId().replace(/[^a-zA-Z0-9]/g, '');
   const [c0, c1] = PALETTE[hashStr(p.name) % PALETTE.length];
   const initials = (p.initials || p.name.slice(0, 2) || '·').slice(0, 2).toUpperCase();
-  const glyph = GLYPH[p.group] ?? '🏦';
+  const glyph = GLYPH[p.group] ?? 'building';
 
   return (
     <View style={{ width: size, height: size }}>
@@ -61,7 +63,7 @@ export function Emblem({ p, size = 56 }: { p: Portfolio; size?: number }) {
         <Text style={[styles.mono, { fontSize: size * 0.32 }]}>{initials}</Text>
       </View>
       <View style={[styles.glyphWrap, { width: size * 0.42, height: size * 0.42 }]}>
-        <Text style={{ fontSize: size * 0.22 }}>{glyph}</Text>
+        <Icon name={glyph} size={size * 0.24} color={color.ink800} strokeWidth={1.9} />
       </View>
     </View>
   );

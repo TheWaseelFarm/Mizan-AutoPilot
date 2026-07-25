@@ -95,10 +95,13 @@ export function freshnessNote(
   return null;
 }
 
-/** ▲/▼ compact percent. */
+/**
+ * Compact percent with an explicit + / − sign (design handoff §6: performance is shown in
+ * cobalt/neutral ink "with an explicit + or −", never a ▲/▼ that could read as a verdict).
+ */
 export function fmtPctCompact(v: number | null): string | null {
   if (v == null || !isFinite(v)) return null;
-  return (v >= 0 ? '▲' : '▼') + Math.abs(v).toFixed(1) + '%';
+  return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%';
 }
 
 /** Performance direction — drives the (non-verdict) up/down/flat color. */
