@@ -116,6 +116,7 @@
   const groupIcon = (g) => ({ fund: I.building, official: I.landmark, insider: I.briefcase }[g] || I.building);
   const fmtMoney = (v) => { const n = Math.abs(v); return n >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : n >= 1e3 ? '$' + Math.round(v / 1e3) + 'K' : '$' + Math.round(v); };
   const daysSince = (d) => { const x = Date.parse(d || ''); return isFinite(x) ? Math.max(0, Math.round((Date.now() - x) / 864e5)) : null; };
+  const daysBetween = (a, b) => { const t1 = Date.parse(a || ''), t2 = Date.parse(b || ''); return (isFinite(t1) && isFinite(t2)) ? Math.max(0, Math.round((t2 - t1) / 864e5)) : null; };
   const fmtPct = (v) => v == null || !isFinite(v) ? null : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%';
 
   function derivePortfolios(rows) {
@@ -130,7 +131,10 @@
     for (const p of m.values()) {
       const total = p.mix.clean + p.mix.purify + p.mix.fail + p.mix.unscreened || 1;
       p.cleanPct = p.mix.clean / total;
-      p.purifyPct = +(p.rows.reduce((a, r) => a + (+r.impurePct || 0), 0) / p.rows.length).toFixed(1);
+      // Purification exposure = mean impure-income % across OWNABLE names (compliant / purify).
+      // Non-compliant names are excluded — you don't own them, so they carry no purification.
+      const own = p.rows.filter((r) => r.label !== 'fail' && r.label !== 'unscreened');
+      p.purifyPct = own.length ? +(own.reduce((a, r) => a + (+r.impurePct || 0), 0) / own.length).toFixed(1) : 0;
       const perfs = p.rows.map((r) => r.performance && r.performance.sinceDisclosed).filter((x) => x != null && isFinite(x));
       p.perf = perfs.length ? +(perfs.reduce((a, b) => a + b, 0) / perfs.length).toFixed(1) : null;
     }
@@ -159,7 +163,7 @@
     tab: 'portfolios', pMetric: 'top', sMetric: 'bought', tf: 'ALL', query: '',
     compliance: 'all', evFilter: 'all', followedOnly: false, compareMode: false,
     selected: [], follows: new Set(), drawer: null, // {type:'compare'|'evidence'|'detail', ...}
-    openMenu: null, rows: SAMPLE, live: false,
+    openMenu: null, rows: SAMPLE, live: false, prices: {},
   };
   const P_SUB = [['top', 'sv.top'], ['active', 'sv.active'], ['followed', 'sv.followed'], ['alloc', 'sv.alloc']];
   const S_SUB = [['bought', 'sv.bought', 'BUY', 'value'], ['sold', 'sv.sold', 'SELL', 'value'], ['new', 'sv.new', 'BUY', 'filers'], ['incr', 'sv.incr', 'BUY', 'weight'], ['red', 'sv.red', 'SELL', 'weight'], ['exit', 'sv.exit', 'SELL', 'filers']];
@@ -185,12 +189,13 @@
 
   /* ---------------------------------------------------------------- data load */
   async function load() {
-    try {
-      const res = await fetch('/api/feed?performance=1', { headers: { accept: 'application/json' } });
-      if (!res.ok) throw new Error(res.status);
-      const data = await res.json();
-      if (Array.isArray(data) && data.length) { S.rows = data.map((r) => ({ ...r, label: r.label || labelOf(r) })); S.live = true; }
-    } catch (e) { S.live = false; /* keep SAMPLE */ }
+    const j = (u) => fetch(u, { headers: { accept: 'application/json' } }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    const [feed, prices] = await Promise.allSettled([j('/api/feed?performance=1'), j('/api/prices')]);
+    if (feed.status === 'fulfilled' && Array.isArray(feed.value) && feed.value.length) {
+      S.rows = feed.value.map((r) => ({ ...r, label: r.label || labelOf(r) }));
+      S.live = true;
+    }
+    if (prices.status === 'fulfilled' && prices.value && typeof prices.value === 'object') S.prices = prices.value;
     render();
   }
 
@@ -227,8 +232,29 @@
   const entity = (avatarHtml, name, metaHtml, nameLtr) => `<div class="mz-entity"><span class="mz-entity__avatar">${avatarHtml}</span><div><div class="mz-entity__name${nameLtr ? ' mz-ltr' : ''}">${esc(name)}</div><div class="mz-entity__meta">${metaHtml}</div></div></div>`;
   const miniIcon = (svg) => `<span style="width:.9rem;height:.9rem;display:inline-flex">${svg}</span>`;
   const perfCell = (v) => v == null ? '<span class="mz-muted">—</span>' : `<span class="mz-performance">${fmtPct(v)}</span>`;
-  const spark = (rows) => { const h = (rows.find((r) => r.performance && r.performance) || {}); const hist = (h.performance && h.performance) || null; return `<svg class="mz-spark" viewBox="0 0 80 28" preserveAspectRatio="none"><polyline fill="none" stroke="var(--mz-cobalt-500)" stroke-width="1.5" points="0,20 12,18 24,21 36,12 48,14 60,6 72,9 80,4"/></svg>`; };
   const starBtn = (id) => `<button class="mz-star" data-star="${esc(id)}" data-on="${S.follows.has(id)}" aria-label="Follow">${S.follows.has(id) ? I.starOn : I.star}</button>`;
+
+  /* --- real performance charts, restored from the native app (dual-anchor / index) --- */
+  const chartPath = (v, W, H) => { const mn = Math.min(...v), mx = Math.max(...v), r = (mx - mn) || 1; return v.map((y, i) => `${(i / (v.length - 1) * W).toFixed(2)},${(H - (y - mn) / r * H).toFixed(2)}`).join(' '); };
+  const histVals = (ticker) => ((S.prices[ticker] && S.prices[ticker].history) || []).map((p) => +p.c).filter((x) => isFinite(x));
+  // Real sparkline from the ticker's cached price history (empty string when no data).
+  const spark = (ticker) => { const v = histVals(ticker); return v.length < 2 ? '' : `<svg class="mz-spark" viewBox="0 0 80 28" preserveAspectRatio="none"><polyline fill="none" stroke="var(--mz-cobalt-500)" stroke-width="1.5" points="${chartPath(v, 80, 28)}"/></svg>`; };
+  // A bigger line chart for detail drawers; `vals` is a numeric close series.
+  function lineChart(vals) {
+    if (!vals || vals.length < 2) return `<div class="mz-muted" style="padding:1.25rem 0;text-align:center;font-size:var(--mz-text-xs)">Price data pending — will populate once the cache fills.</div>`;
+    const H = 120, W = 320, ret = vals[vals.length - 1] / vals[0] - 1;
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block;overflow:visible"><polyline points="${chartPath(vals, W, H)}" fill="none" stroke="var(--mz-cobalt-600)" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <div style="display:flex;justify-content:space-between;margin-block-start:.4rem;font-size:var(--mz-text-xs)"><span class="mz-muted mz-ltr">$${Math.min(...vals).toFixed(0)}</span><span class="mz-performance">${fmtPct(ret * 100)} over range</span><span class="mz-muted mz-ltr">$${Math.max(...vals).toFixed(0)}</span></div>`;
+  }
+  // Equal-weight normalized index across a portfolio's ownable (non-fail) held tickers.
+  function portfolioIndexVals(rows) {
+    const tickers = [...new Set(rows.filter((r) => r.label !== 'fail').map((r) => r.ticker))];
+    const series = tickers.map(histVals).filter((a) => a.length >= 2);
+    if (!series.length) return [];
+    const len = Math.min(...series.map((a) => a.length)), out = [];
+    for (let i = 0; i < len; i++) { let s = 0; for (const a of series) s += a[a.length - len + i] / a[a.length - len]; out.push(s / series.length * 100); }
+    return out;
+  }
 
   /* ---------------------------------------------------------------- chrome */
   function renderChrome() {
@@ -307,7 +333,7 @@
     } else {
       thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.stock')}</th><th>${t('h.signal')}</th><th>${t('h.evidence')}</th><th>${t('h.filers')}</th><th>${t('h.value')}</th><th>${t('h.freshness')}</th><th>${t('h.since')}</th><th>${t('h.status')}</th></tr>`;
       const signal = { bought: 'Accumulation', sold: 'Reduction', new: 'New position', incr: 'Position increased', red: 'Position reduced', exit: 'Exited' }[S.sMetric];
-      tbody.innerHTML = list.map((s, i) => `<tr data-row="stock" data-id="${esc(s.ticker)}"><td><span class="mz-rank">${i + 1}</span></td><td>${entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(s.ticker.slice(0, 4))}</span>`, s.ticker, esc(s.company), true)}</td><td class="mz-muted">${signal}</td><td style="font-weight:700">${t('ev.' + evStrength(s.filerCount))}</td><td class="mz-cell-num">${s.filerCount}</td><td class="mz-cell-num" style="font-weight:750">${fmtMoney(s.dollar)}</td><td>${freshEl(s.fresh)}</td><td>${perfCell(s.perf)}</td><td>${badge(s.label)}</td></tr>`).join('') || emptyRow(9);
+      tbody.innerHTML = list.map((s, i) => `<tr data-row="stock" data-id="${esc(s.ticker)}"><td><span class="mz-rank">${i + 1}</span></td><td>${entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(s.ticker.slice(0, 4))}</span>`, s.ticker, esc(s.company), true)}</td><td><div class="mz-muted">${signal}</div>${spark(s.ticker)}</td><td style="font-weight:700">${t('ev.' + evStrength(s.filerCount))}</td><td class="mz-cell-num">${s.filerCount}</td><td class="mz-cell-num" style="font-weight:750">${fmtMoney(s.dollar)}</td><td>${freshEl(s.fresh)}</td><td>${perfCell(s.perf)}</td><td>${badge(s.label)}</td></tr>`).join('') || emptyRow(9);
       cards.innerHTML = list.map((s, i) => stockCard(s, i)).join('');
     }
   }
@@ -335,6 +361,7 @@
       <div style="display:flex;gap:.75rem;align-items:center">
         <span class="mz-rank">${i + 1}</span>
         <div style="flex:1;min-width:0"><div class="mz-entity__name mz-ltr">${esc(s.ticker)}</div><div class="mz-entity__meta">${esc(s.company)}</div></div>
+        ${spark(s.ticker)}
         ${badge(s.label)}
       </div>
       <div class="mz-card-metrics"><div><div class="mz-metric__label">${t('h.evidence')}</div><div class="mz-metric__value">${t('ev.' + evStrength(s.filerCount))}</div></div><div><div class="mz-metric__label">${t('h.value')}</div><div class="mz-metric__value">${fmtMoney(s.dollar)}</div></div><div><div class="mz-metric__label">${t('h.since')}</div><div class="mz-metric__value">${fmtPct(s.perf) || '—'}</div></div></div>
@@ -343,33 +370,45 @@
   }
 
   /* ---------------------------------------------------------------- secondary screens */
+  function emptyState(icon, title, body) {
+    return `<div class="mz-surface mz-state"><div class="mz-state__content"><div style="width:2.2rem;margin-inline:auto;color:var(--mz-ink-300)">${icon}</div><h3 style="margin-block:.6rem .3rem">${esc(title)}</h3><p class="mz-muted" style="margin:0">${esc(body)}</p></div></div>`;
+  }
   function renderSecondary() {
     document.getElementById('tableWrap').style.display = 'none';
     document.getElementById('cards').innerHTML = '';
     document.getElementById('legend').innerHTML = '';
     document.getElementById('subtabs').innerHTML = '';
-    document.querySelector('.mz-toolbar').style.display = 'none';
+    setToolbarVisible(false);
     document.getElementById('chips').innerHTML = '';
     document.getElementById('resultMeta').textContent = '';
     const host = document.getElementById('tbody').closest('.mz-content-grid').firstElementChild;
+    host.querySelector('#acctPanel')?.remove();
+    const div = document.createElement('div'); div.id = 'acctPanel';
+    const title = { following: 'follow.title', alerts: 'alerts.title', account: 'acct.title' }[S.tab];
+    document.getElementById('pageTitle').textContent = t(title);
+    document.getElementById('pageSub').textContent = '';
+    document.getElementById('guardrail').textContent = S.tab === 'account' ? t('g.disclaimer') : '';
+
     if (S.tab === 'account') {
-      document.getElementById('pageTitle').textContent = t('acct.title'); document.getElementById('pageSub').textContent = '';
-      document.getElementById('guardrail').textContent = t('g.disclaimer');
-      host.querySelector('#acctPanel')?.remove();
-      const div = document.createElement('div'); div.id = 'acctPanel';
-      div.innerHTML = `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)"><h3>${t('acct.lang')}</h3><div class="mz-segmented" id="langSeg"><button class="mz-segmented__item" data-lang="en" aria-selected="${LANG === 'en'}">English</button><button class="mz-segmented__item" data-lang="ar" aria-selected="${LANG === 'ar'}">العربية</button></div></section>
-        <section class="mz-surface" style="padding:var(--mz-space-5)"><h3>${t('sec.methodology')}</h3><p class="mz-muted" style="margin:0">${t('sec.mtext')}</p></section>`;
-      host.insertBefore(div, host.querySelector('.mz-guardrail'));
-    } else {
-      document.getElementById('pageTitle').textContent = t(S.tab === 'following' ? 'follow.title' : 'alerts.title'); document.getElementById('pageSub').textContent = '';
-      document.getElementById('guardrail').textContent = '';
-      host.querySelector('#acctPanel')?.remove();
-      const names = S.tab === 'following' ? [...S.follows] : [];
-      const div = document.createElement('div'); div.id = 'acctPanel';
-      div.innerHTML = names.length ? `<div class="mz-card-list" style="display:grid">${names.map((n) => `<article class="mz-portfolio-card">${esc(n)}</article>`).join('')}</div>`
-        : `<div class="mz-surface mz-state"><div class="mz-state__content"><div style="width:2rem;margin-inline:auto;color:var(--mz-ink-300)">${S.tab === 'following' ? I.star : I.bell}</div><h3>${S.tab === 'following' ? t('follow.title') : t('alerts.title')}</h3><p class="mz-muted">${t('empty.body')}</p></div></div>`;
-      host.insertBefore(div, host.querySelector('.mz-guardrail'));
+      const seg = (val, cur, opts) => `<div class="mz-segmented">${opts.map(([k, l]) => `<button class="mz-segmented__item" ${val}="${k}" aria-selected="${cur === k}">${l}</button>`).join('')}</div>`;
+      div.innerHTML =
+        `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)"><h3>${t('acct.lang')}</h3>${seg('data-lang', LANG, [['en', 'English'], ['ar', 'العربية']])}</section>` +
+        `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)"><h3>${LANG === 'ar' ? 'حساسية الحكم' : 'Verdict tolerance'}</h3><p class="mz-muted" style="margin:.25rem 0 .75rem;font-size:var(--mz-text-sm)">${LANG === 'ar' ? 'يضبط الافتراضي لكل القوائم.' : 'Sets the default across every list.'}</p>${seg('data-fc', S.compliance, [['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('v.compliant') + (LANG === 'ar' ? ' فقط' : ' only')], ['exclude', t('v.compliant') + ' + ' + t('v.purify')]])}</section>` +
+        `<section class="mz-surface" style="padding:var(--mz-space-5)"><h3>${t('sec.methodology')}</h3><p class="mz-muted" style="margin:0;line-height:1.55">${t('sec.mtext')}</p></section>`;
+    } else if (S.tab === 'following') {
+      const followed = derivePortfolios(S.rows).filter((p) => S.follows.has(p.name));
+      div.innerHTML = followed.length
+        ? `<div class="mz-card-list" style="display:grid">${followed.map((p, i) => portfolioCard(p, i)).join('')}</div>`
+        : emptyState(I.star, LANG === 'ar' ? 'لا تتابع أحدًا بعد' : "You're not following anyone yet",
+          LANG === 'ar' ? 'تابِع محفظة من تبويب المحافظ لإبقائها هنا.' : 'Follow a portfolio from the Portfolios tab to keep it here.');
+    } else { // alerts
+      const notes = S.rows.filter((r) => S.follows.has(r.actor)).sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || ''));
+      div.innerHTML = notes.length
+        ? `<div class="mz-card-list" style="display:grid">${notes.map((r) => { const lag = daysBetween(r.transactionDate, r.filingDate); return `<article class="mz-stock-card" data-row="stock" data-id="${esc(r.ticker)}"><div style="display:flex;gap:.75rem;align-items:center"><div style="flex:1;min-width:0"><div class="mz-entity__name">${esc(r.actor)}</div><div class="mz-entity__meta">${String(r.side).toUpperCase() === 'SELL' ? 'Sold' : 'Bought'} <span class="mz-ltr">${esc(r.ticker)}</span> · ${esc(r.amount || (r.amountMid ? fmtMoney(+r.amountMid) : '—'))}${lag != null ? ` · filed ${lag}d later` : ''}</div></div>${badge(r.label)}${I.chevronRight ? `<span style="width:1rem;color:var(--mz-ink-400)">${I.chevronRight}</span>` : ''}</div></article>`; }).join('')}</div>`
+        : emptyState(I.bell, S.follows.size ? (LANG === 'ar' ? 'أنت مُطّلع على كل شيء' : "You're all caught up") : (LANG === 'ar' ? 'لا توجد تنبيهات بعد' : 'No alerts yet'),
+          LANG === 'ar' ? 'تابِع محافظ لتصلك التنبيهات هنا عند نشر إفصاحات جديدة.' : 'Follow portfolios to be notified here when they file new disclosures.');
     }
+    host.insertBefore(div, host.querySelector('.mz-guardrail'));
   }
 
   /* ---------------------------------------------------------------- drawer */
@@ -388,8 +427,11 @@
     } else if (S.drawer && S.drawer.type === 'compare') {
       S.drawer = null;
     }
-    if (!S.drawer) { grid.classList.remove('mz-content-grid--drawer-open'); d.hidden = true; d.innerHTML = ''; return; }
+    const scrim = document.getElementById('scrim');
+    if (!S.drawer) { grid.classList.remove('mz-content-grid--drawer-open'); d.hidden = true; d.innerHTML = ''; scrim.hidden = true; return; }
     grid.classList.add('mz-content-grid--drawer-open'); d.hidden = false;
+    // Scrim only under the sheet/side-panel on tablet & mobile (desktop drawer is in-grid).
+    scrim.hidden = window.matchMedia('(min-width: 75rem)').matches;
     if (S.drawer.type === 'compare') d.innerHTML = compareDrawer();
     else if (S.drawer.type === 'evidence') d.innerHTML = evidenceDrawer(S.drawer.ticker);
     else if (S.drawer.type === 'detail') d.innerHTML = portfolioDrawer(S.drawer.name);
@@ -414,7 +456,9 @@
     const label = rows[0] ? rows[0].label : 'unscreened', dollar = rows.reduce((a, r) => a + Math.abs(+r.amountMid || 0), 0);
     const reasons = [`${filers} independent disclosing filer${filers === 1 ? '' : 's'}`, 'Consistent direction across filings', fresh <= 30 ? 'Recent, fresh disclosures' : `Most recent filing ${fresh}d ago`];
     const top = [...rows].sort((a, b) => (+b.amountMid || 0) - (+a.amountMid || 0)).slice(0, 5);
+    const perf = rows.map((r) => r.performance && r.performance.sinceDisclosed).find((x) => x != null && isFinite(x));
     return drawerHead(t('ev.title', { t: ticker })) +
+      `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${LANG === 'ar' ? 'الأداء' : 'Performance'}</span>${perf != null ? `<span class="mz-performance">${fmtPct(perf)} ${t('h.since').toLowerCase()}</span>` : ''}</div>${lineChart(histVals(ticker))}</div>` +
       `<div class="mz-drawer__section"><h3 style="font-size:var(--mz-text-md)">${t('ev.why', { s: t('ev.' + str) })}</h3><ul class="mz-why-list">${reasons.map((r) => `<li><span style="width:1.1rem;color:var(--mz-cobalt-600)">${I.check}</span>${esc(r)}</li>`).join('')}</ul></div>` +
       `<div class="mz-drawer__section"><div class="mz-summary-grid" style="grid-template-columns:1fr 1fr 1fr;margin:0"><div class="mz-summary"><div class="mz-summary__label">${t('h.value')}</div><div class="mz-summary__value">${fmtMoney(dollar)}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('h.filers')}</div><div class="mz-summary__value">${filers}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('h.status')}</div><div style="margin-block-start:.35rem">${badge(label)}</div></div></div></div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('ev.recent')}</div>${top.map((r) => `<div style="display:flex;justify-content:space-between;gap:.5rem;padding-block:.4rem;border-block-end:var(--mz-border)"><div><div style="font-weight:650">${esc(r.actor)}</div><div class="mz-entity__meta">${String(r.side).toUpperCase() === 'SELL' ? 'Sold' : 'Bought'} · ${esc(r.source || r.kind || '')}</div></div><div class="mz-cell-num" style="font-weight:700">${fmtMoney(+r.amountMid || 0)}</div></div>`).join('')}</div>` +
@@ -423,18 +467,32 @@
   function portfolioDrawer(name) {
     const p = derivePortfolios(S.rows).find((x) => x.name === name); if (!p) return drawerHead(name);
     const flag = portfolioFlag(p);
-    const holdings = {}; for (const r of p.rows) { holdings[r.ticker] = holdings[r.ticker] || { ticker: r.ticker, company: r.company, label: r.label, v: 0 }; holdings[r.ticker].v += Math.abs(+r.amountMid || 0); }
+    // Composition: value-weight the ownable (non-fail) held names.
+    const holdings = {};
+    for (const r of p.rows) { holdings[r.ticker] = holdings[r.ticker] || { ticker: r.ticker, company: r.company, label: r.label, v: 0 }; holdings[r.ticker].v += Math.abs(+r.amountMid || 0); }
     const hs = Object.values(holdings).sort((a, b) => b.v - a.v);
+    const ownTotal = hs.filter((h) => h.label !== 'fail').reduce((a, h) => a + h.v, 0) || 1;
+    const idx = portfolioIndexVals(p.rows);
+    // Activity log — recent disclosed trades, newest first.
+    const acts = [...p.rows].sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || '')).slice(0, 6);
+    const sideTag = (s) => String(s).toUpperCase() === 'SELL'
+      ? `<span class="mz-badge mz-badge--noncompliant" style="min-height:1.3rem">Sold</span>`
+      : `<span class="mz-badge mz-badge--compliant" style="min-height:1.3rem">Bought</span>`;
     return drawerHead(name) +
       `<div class="mz-drawer__section"><span class="mz-badge mz-badge--${flag.tone === 'clean' ? 'compliant' : flag.tone === 'purify' ? 'purify' : 'noncompliant'}">${flag.text}</span><div style="margin-block-start:.6rem">${allocBar(p.mix)}</div></div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${LANG === 'ar' ? 'الأداء' : 'Performance'}</div>${lineChart(idx)}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? 'مؤشر متساوي الوزن للأسماء المملوكة — أدلة، ليس نصيحة.' : 'Equal-weight index of the ownable holdings — evidence, not advice.'}</p></div>` +
       `<div class="mz-drawer__section"><div class="mz-summary-grid" style="grid-template-columns:1fr 1fr;margin:0"><div class="mz-summary"><div class="mz-summary__label">${t('h.return')}</div><div class="mz-summary__value">${fmtPct(p.perf) || '—'}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('cmp.disclosures')}</div><div class="mz-summary__value">${p.count}</div></div></div></div>` +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('h.allocation')}</div>${hs.map((h) => `<div style="display:flex;justify-content:space-between;gap:.5rem;padding-block:.4rem;border-block-end:var(--mz-border)"><div class="mz-ltr" style="font-weight:700">${esc(h.ticker)} <span class="mz-muted" style="font-weight:400">${esc(h.company)}</span></div>${badge(h.label)}</div>`).join('')}</div>` +
-      `<div class="mz-drawer__footer"><button class="mz-button mz-button--secondary" data-open-stock-none style="width:100%" id="drawerFollow" data-follow="${esc(name)}">${S.follows.has(name) ? I.starOn : I.star}${S.follows.has(name) ? t('tab.following') : 'Follow'}</button></div>`;
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('h.allocation')}</div>${hs.map((h) => { const w = h.label === 'fail' ? 0 : Math.round(h.v / ownTotal * 100); return `<div style="padding-block:.45rem;border-block-end:var(--mz-border)"><div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center"><div class="mz-ltr" style="font-weight:700;min-width:0"><span>${esc(h.ticker)}</span> <span class="mz-muted" style="font-weight:400">${esc(h.company || '')}</span></div><div style="display:flex;gap:.5rem;align-items:center;flex:0 0 auto">${h.label === 'fail' ? '' : `<span class="mz-cell-num" style="font-weight:700">${w}%</span>`}${badge(h.label)}</div></div>${h.label === 'fail' ? '' : `<div class="mz-allocation__bar" style="margin-block-start:.35rem"><span class="mz-allocation__segment--compliant" style="flex:${w}"></span><span style="flex:${100 - w};background:var(--mz-ink-100)"></span></div>`}</div>`; }).join('')}</div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${LANG === 'ar' ? 'سجل النشاط' : 'Activity log'}</div>${acts.map((r) => { const lag = daysBetween(r.transactionDate, r.filingDate); return `<div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;padding-block:.4rem;border-block-end:var(--mz-border)"><div style="min-width:0"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${esc(r.amount || (r.amountMid ? fmtMoney(+r.amountMid) : ''))}${lag != null ? ` · filed ${lag}d later` : ''}</div></div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
+      `<div class="mz-drawer__footer"><button class="mz-button mz-button--secondary" style="width:100%" data-follow="${esc(name)}">${S.follows.has(name) ? I.starOn : I.star}${S.follows.has(name) ? t('common.following') : t('common.follow')}</button></div>`;
   }
 
   /* ---------------------------------------------------------------- main render */
+  function setToolbarVisible(show) {
+    ['timeRow', 'controlRow'].forEach((id) => { const e = document.getElementById(id); if (e) e.style.display = show ? '' : 'none'; });
+  }
   function render() {
-    document.querySelector('.mz-toolbar').style.display = ['following', 'alerts', 'account'].includes(S.tab) ? 'none' : '';
+    setToolbarVisible(!['following', 'alerts', 'account'].includes(S.tab));
     renderChrome(); renderToolbar(); renderList(); renderDrawer();
     // deferred deep-link drawer opens
     if (S._openStock) { S.drawer = { type: 'evidence', ticker: S._openStock }; S._openStock = null; renderDrawer(); }
@@ -462,7 +520,7 @@
     if (el.id === 'sortBtn') { toggleMenu('sort'); return; }
     if (el.id === 'filterBtn') { toggleMenu('filter'); return; }
     if (el.id === 'whyBtn') { toggleMenu('why'); return; }
-    if (el.id === 'drawerClose') { S.drawer = null; renderDrawer(); return; }
+    if (el.id === 'drawerClose') { closeDrawer(); return; }
     if (el.id === 'clearChips') { S.compliance = 'all'; S.evFilter = 'all'; S.followedOnly = false; render(); return; }
     if (el.dataset.chip != null) { const chips = document.getElementById('chips')._chips; chips && chips[+el.dataset.chip] && chips[+el.dataset.chip][1](); return; }
     if (el.dataset.openStock) { S.drawer = { type: 'evidence', ticker: el.dataset.openStock }; go('/stock/' + encodeURIComponent(el.dataset.openStock)); return; }
@@ -474,6 +532,16 @@
     }
   });
   document.getElementById('search').addEventListener('input', (e) => { S.query = e.target.value; renderList(); });
+  document.getElementById('scrim').addEventListener('click', closeDrawer);
+
+  // Close a drawer and, if we're on a detail route, return to the tab's list URL.
+  function closeDrawer() {
+    S.drawer = null;
+    const p = location.pathname;
+    if (p.startsWith('/stock/')) history.pushState({}, '', '/stocks');
+    else if (p.startsWith('/portfolio/')) history.pushState({}, '', '/portfolios');
+    renderDrawer();
+  }
 
   function toggleFollow(id) { S.follows.has(id) ? S.follows.delete(id) : S.follows.add(id); }
   function toggleSelect(name) { const i = S.selected.indexOf(name); if (i >= 0) S.selected.splice(i, 1); else if (S.selected.length < 2) S.selected.push(name); render(); }
