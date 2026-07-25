@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useI18n } from '../i18n';
 import { color, evidenceColor, font, radius, type EvidenceStrength } from '../theme/tokens';
 import { Icon } from './Icon';
 
@@ -25,6 +26,7 @@ export function EvidenceBadge({
   onWhy?: () => void;
   compact?: boolean;
 }) {
+  const { t } = useI18n();
   const c = evidenceColor[strength];
   return (
     <View style={styles.wrap}>
@@ -40,7 +42,7 @@ export function EvidenceBadge({
           accessibilityLabel={`Why ${EVIDENCE_LABEL[strength]} evidence`}
           style={styles.why}
         >
-          <Text style={styles.whyText}>Why?</Text>
+          <Text style={styles.whyText}>{t('ctrl.why')}</Text>
           <Icon name="info" size={13} color={color.brand} />
         </TouchableOpacity>
       ) : null}

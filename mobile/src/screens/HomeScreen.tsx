@@ -26,6 +26,8 @@ import { SearchBar } from '../components/SearchBar';
 import { Segmented, type SegmentOption } from '../components/Segmented';
 import { SelectSheet } from '../components/SelectSheet';
 import { TabSwitch } from '../components/TabSwitch';
+import { useI18n } from '../i18n';
+import type { StringKey } from '../i18n/strings';
 import { derivePortfolios, portfolioComposition, portfolioFlag, typeLabel } from '../lib/derive';
 import { hasMeaningfulFollowers } from '../lib/followers';
 import { fmtPctCompact, perfTone, windowReturn } from '../lib/performance';
@@ -58,12 +60,19 @@ const TF_DAYS: Record<string, number> = {
 
 type Metric = 'performance' | 'activity' | 'followers' | 'allocation';
 
-const SUBVIEWS: readonly SegmentOption<Metric>[] = [
-  { key: 'performance', label: 'Top performers' },
-  { key: 'activity', label: 'Most active' },
-  { key: 'followers', label: 'Most followed' },
-  { key: 'allocation', label: 'Highest compliant allocation' },
-];
+const SUB_LABEL: Record<Metric, StringKey> = {
+  performance: 'sub.topPerformers',
+  activity: 'sub.mostActive',
+  followers: 'sub.mostFollowed',
+  allocation: 'sub.highestAllocation',
+};
+const SORT_LABEL_KEY: Record<Metric, StringKey> = {
+  performance: 'sort.disclosedReturn',
+  activity: 'sort.disclosedActivity',
+  followers: 'sort.followers',
+  allocation: 'sort.compliantAllocation',
+};
+const METRICS: readonly Metric[] = ['performance', 'activity', 'followers', 'allocation'];
 
 const METRIC_META: Record<Metric, { sort: string; why: string }> = {
   performance: {
@@ -152,6 +161,8 @@ interface SavedView {
 export function HomeScreen() {
   const nav = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
+  const subviewOptions = METRICS.map((k) => ({ key: k, label: t(SUB_LABEL[k]) }));
   const { rows, prices, followerCounts, loading, refresh } = useFeed();
   const [metric, setMetric] = useState<Metric>('performance');
   const [tf, setTf] = useState<string>('1M');
@@ -256,8 +267,8 @@ export function HomeScreen() {
 
       <View style={styles.titleRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.screenTitle}>Portfolio intelligence</Text>
-          <Text style={styles.screenSub}>Compare disclosed portfolios by performance, activity and Sharia exposure.</Text>
+          <Text style={styles.screenTitle}>{t('portfolios.title')}</Text>
+          <Text style={styles.screenSub}>{t('portfolios.subtitle')}</Text>
         </View>
         <TouchableOpacity
           style={styles.iconBtn}
@@ -271,7 +282,7 @@ export function HomeScreen() {
 
       {searchOpen ? (
         <View style={{ paddingBottom: space.sm }}>
-          <SearchBar value={query} onChange={setQuery} placeholder="Search a portfolio or stock" />
+          <SearchBar value={query} onChange={setQuery} placeholder={t('search.portfolios')} />
         </View>
       ) : null}
 
@@ -300,24 +311,24 @@ export function HomeScreen() {
         ListHeaderComponent={
           <View>
             <View style={{ paddingTop: space.xs, paddingBottom: space.sm }}>
-              <Segmented options={SUBVIEWS} value={metric} onChange={setMetric} ariaLabel="Portfolio subviews" />
+              <Segmented options={subviewOptions} value={metric} onChange={setMetric} ariaLabel="Portfolio subviews" />
             </View>
 
             {/* Control bar: sort + why-ranking + saved view + view toggle + compare + filter */}
             <View style={styles.controls}>
-              <ControlPill icon="sort" label={METRIC_META[metric].sort} caret onPress={() => setSortOpen(true)} />
+              <ControlPill icon="sort" label={t(SORT_LABEL_KEY[metric])} caret onPress={() => setSortOpen(true)} />
               <TouchableOpacity style={styles.whyLink} onPress={() => setWhyOpen(true)} activeOpacity={0.7}>
                 <Icon name="info" size={14} color={color.brand} />
-                <Text style={styles.whyText}>Why this ranking?</Text>
+                <Text style={styles.whyText}>{t('ctrl.whyRanking')}</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.controls}>
-              <ControlPill icon="filter" label="Filter" count={activeFilters || undefined} active={activeFilters > 0} onPress={() => setFilterOpen(true)} />
-              <ControlPill icon="star" label="Saved view" caret onPress={() => setSavedOpen(true)} />
+              <ControlPill icon="filter" label={t('ctrl.filter')} count={activeFilters || undefined} active={activeFilters > 0} onPress={() => setFilterOpen(true)} />
+              <ControlPill icon="star" label={t('ctrl.savedView')} caret onPress={() => setSavedOpen(true)} />
               <ViewToggle value={view} onChange={setView} />
               <ControlPill
                 icon="compare"
-                label={compareMode ? `Compare (${selected.length})` : 'Compare'}
+                label={compareMode ? `${t('ctrl.compare')} (${selected.length})` : t('ctrl.compare')}
                 active={compareMode}
                 onPress={() => {
                   setCompareMode((m) => !m);
@@ -358,7 +369,7 @@ export function HomeScreen() {
             {ranked.length > INITIAL_SHOWN ? (
               <TouchableOpacity style={styles.more} onPress={() => setShowAll((s) => !s)} activeOpacity={0.75}>
                 <Text style={styles.moreText}>
-                  {showAll ? 'Show less' : `Show all ${ranked.length}`}
+                  {showAll ? t('ctrl.showLess') : `${t('ctrl.showAll')} ${ranked.length}`}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -382,7 +393,7 @@ export function HomeScreen() {
       {compareMode && selected.length > 0 ? (
         <View style={[styles.tray, { paddingBottom: insets.bottom + space.sm }]}>
           <Text style={styles.trayText}>
-            {selected.length} selected{selected.length < 2 ? ' · pick one more' : ''}
+            {selected.length} {t('cmp.selected')}{selected.length < 2 ? ` · ${t('cmp.pickOneMore')}` : ''}
           </Text>
           <TouchableOpacity
             style={[styles.trayBtn, selected.length < 2 && styles.trayBtnOff]}
@@ -390,7 +401,7 @@ export function HomeScreen() {
             onPress={() => setCompareOpen(true)}
             activeOpacity={0.85}
           >
-            <Text style={styles.trayBtnText}>Compare {selected.length} portfolios</Text>
+            <Text style={styles.trayBtnText}>{t('cmp.compareN', { n: selected.length })}</Text>
             <Icon name="chevronRight" size={16} color={color.onBrand} />
           </TouchableOpacity>
         </View>
@@ -400,15 +411,15 @@ export function HomeScreen() {
         visible={filterOpen}
         onClose={() => setFilterOpen(false)}
         time={{ label: 'Time', options: TIMEFRAMES, value: tf as (typeof TIMEFRAMES)[number]['key'], onChange: (k) => setTf(k) }}
-        sort={{ label: 'Sort by', options: SUBVIEWS.map((s) => ({ key: s.key, label: s.label })), value: metric, onChange: (k) => setMetric(k as Metric) }}
+        sort={{ label: 'Sort by', options: subviewOptions, value: metric, onChange: (k) => setMetric(k as Metric) }}
         compliance={{ value: compliance, onChange: setCompliance }}
       />
 
       <SelectSheet
         visible={sortOpen}
         onClose={() => setSortOpen(false)}
-        title="Sort portfolios by"
-        options={SUBVIEWS.map((s) => ({ key: s.key, label: METRIC_META[s.key].sort, desc: s.label }))}
+        title={t('ctrl.sort')}
+        options={METRICS.map((k) => ({ key: k, label: t(SORT_LABEL_KEY[k]), desc: t(SUB_LABEL[k]) }))}
         value={metric}
         onSelect={(k) => setMetric(k)}
       />
@@ -416,7 +427,7 @@ export function HomeScreen() {
       <SelectSheet
         visible={whyOpen}
         onClose={() => setWhyOpen(false)}
-        title="Why this ranking?"
+        title={t('ctrl.whyRanking')}
         note={METRIC_META[metric].why}
         options={[]}
         onSelect={() => {}}
@@ -429,7 +440,7 @@ export function HomeScreen() {
         note="Saved views remember the current sort, period and compliance filter for this session."
         options={[
           { key: '__save__', label: 'Save current view', desc: 'Sort, period and filters' },
-          ...savedViews.map((v, i) => ({ key: String(i), label: v.name, desc: `${METRIC_META[v.metric].sort} · ${v.tf}` })),
+          ...savedViews.map((v, i) => ({ key: String(i), label: v.name, desc: `${t(SORT_LABEL_KEY[v.metric])} · ${v.tf}` })),
         ]}
         onSelect={(k) => {
           if (k === '__save__') saveCurrentView();
@@ -440,7 +451,7 @@ export function HomeScreen() {
       <Drawer
         visible={compareOpen}
         onClose={() => setCompareOpen(false)}
-        title="Compare portfolios"
+        title={t('cmp.title')}
       >
         <CompareBody items={selectedRanked} tf={tf} />
       </Drawer>
@@ -605,7 +616,8 @@ function PerformerTableRow({ r, rank, onPress }: { r: Ranked; rank: number; onPr
 }
 
 function CompareBody({ items, tf }: { items: Ranked[]; tf: string }) {
-  const tfLabel = TIMEFRAMES.find((t) => t.key === tf)?.label || tf;
+  const { t } = useI18n();
+  const tfLabel = TIMEFRAMES.find((x) => x.key === tf)?.label || tf;
   return (
     <View style={{ gap: space.lg }}>
       <View style={styles.cmpHeadRow}>
@@ -617,14 +629,14 @@ function CompareBody({ items, tf }: { items: Ranked[]; tf: string }) {
           </View>
         ))}
       </View>
-      <CmpMetric label={`Disclosed return (${tfLabel})`} items={items} render={(r) => {
-        const t = perfTone(r.perf);
-        return <Text style={[styles.cmpVal, { color: perfColor[t] }]}>{fmtPctCompact(r.perf) ?? '—'}</Text>;
+      <CmpMetric label={`${t('sort.disclosedReturn')} (${tfLabel})`} items={items} render={(r) => {
+        const tone = perfTone(r.perf);
+        return <Text style={[styles.cmpVal, { color: perfColor[tone] }]}>{fmtPctCompact(r.perf) ?? '—'}</Text>;
       }} />
-      <CmpMetric label="Disclosures" items={items} render={(r) => <Text style={styles.cmpVal}>{r.p.count}</Text>} />
-      <CmpMetric label="Compliant allocation" items={items} render={(r) => <Text style={styles.cmpVal}>{Math.round(r.cleanPct * 100)}%</Text>} />
-      <CmpMetric label="Purify exposure" items={items} render={(r) => <Text style={[styles.cmpVal, { color: verdictColor.purify.text }]}>{r.purifyPct}%</Text>} />
-      <CmpMetric label="Followers" items={items} render={(r) => <Text style={styles.cmpVal}>{fmtFollowers(r.followers)}</Text>} />
+      <CmpMetric label={t('cmp.disclosures')} items={items} render={(r) => <Text style={styles.cmpVal}>{r.p.count}</Text>} />
+      <CmpMetric label={t('cmp.compliantAllocation')} items={items} render={(r) => <Text style={styles.cmpVal}>{Math.round(r.cleanPct * 100)}%</Text>} />
+      <CmpMetric label={t('cmp.purifyExposure')} items={items} render={(r) => <Text style={[styles.cmpVal, { color: verdictColor.purify.text }]}>{r.purifyPct}%</Text>} />
+      <CmpMetric label={t('cmp.followers')} items={items} render={(r) => <Text style={styles.cmpVal}>{fmtFollowers(r.followers)}</Text>} />
       <View style={styles.cmpAlloc}>
         {items.map((r) => (
           <View key={r.p.name} style={{ flex: 1, gap: 4 }}>
@@ -632,7 +644,7 @@ function CompareBody({ items, tf }: { items: Ranked[]; tf: string }) {
           </View>
         ))}
       </View>
-      <Text style={styles.cmpNote}>All metrics use the latest disclosed filings. Not investment advice.</Text>
+      <Text style={styles.cmpNote}>{t('cmp.note')}</Text>
     </View>
   );
 }

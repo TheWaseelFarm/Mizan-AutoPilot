@@ -8,6 +8,7 @@ import { BrandHeader } from '../components/BrandHeader';
 import { Emblem } from '../components/Emblem';
 import { Icon } from '../components/Icon';
 import { MixBar } from '../components/MixBar';
+import { useI18n } from '../i18n';
 import { derivePortfolios, portfolioFlag, typeLabel } from '../lib/derive';
 import type { Portfolio } from '../lib/types';
 import type { TabParamList } from '../navigation/types';
@@ -24,6 +25,7 @@ export function FollowingScreen() {
   const nav = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const { rows } = useFeed();
   const { followed } = useFollows();
+  const { t } = useI18n();
 
   const portfolios = useMemo(() => {
     const m = new Map<string, Portfolio>();
@@ -38,21 +40,18 @@ export function FollowingScreen() {
       style={styles.screen}
       contentContainerStyle={{ paddingTop: insets.top, paddingBottom: space.xxl }}
     >
-      <BrandHeader subtitle="Following" />
+      <BrandHeader subtitle={t('tab.following')} />
 
       <View style={styles.head}>
-        <Text style={styles.title}>Following</Text>
+        <Text style={styles.title}>{t('following.title')}</Text>
         {followed.length > 0 ? <Text style={styles.count}>{followed.length}</Text> : null}
       </View>
 
       {followed.length === 0 ? (
         <View style={styles.empty}>
           <Icon name="star" size={26} color={color.ghost} />
-          <Text style={styles.emptyTitle}>You're not following anyone yet</Text>
-          <Text style={styles.emptyBody}>
-            Follow portfolios on the Portfolios tab to keep them here and get alerts when they
-            file new disclosures.
-          </Text>
+          <Text style={styles.emptyTitle}>{t('following.emptyTitle')}</Text>
+          <Text style={styles.emptyBody}>{t('following.emptyBody')}</Text>
         </View>
       ) : (
         followed.map((name) => {

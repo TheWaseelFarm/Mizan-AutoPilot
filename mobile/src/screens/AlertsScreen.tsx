@@ -8,6 +8,7 @@ import { BrandHeader } from '../components/BrandHeader';
 import { Disclaimer } from '../components/Disclaimer';
 import { Icon } from '../components/Icon';
 import { VerdictBadge } from '../components/VerdictBadge';
+import { useI18n } from '../i18n';
 import { daysBetween, lagWord } from '../lib/derive';
 import type { TabParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
@@ -23,6 +24,7 @@ export function AlertsScreen() {
   const nav = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const { rows } = useFeed();
   const { followed } = useFollows();
+  const { t } = useI18n();
 
   const notifications = useMemo(
     () =>
@@ -39,10 +41,10 @@ export function AlertsScreen() {
       style={styles.screen}
       contentContainerStyle={{ paddingTop: insets.top, paddingBottom: space.xxl }}
     >
-      <BrandHeader subtitle="Alerts" />
+      <BrandHeader subtitle={t('tab.alerts')} />
 
       <View style={styles.head}>
-        <Text style={styles.title}>Alerts</Text>
+        <Text style={styles.title}>{t('alerts.title')}</Text>
         {notifications.length > 0 ? (
           <View style={styles.badge}>
             <Icon name="bell" size={13} color={color.brandInk} />
@@ -52,15 +54,9 @@ export function AlertsScreen() {
       </View>
 
       {followed.length === 0 ? (
-        <EmptyState
-          title="No alerts yet"
-          body="Follow portfolios to be notified here when they file new disclosures."
-        />
+        <EmptyState title={t('alerts.emptyTitle')} body={t('alerts.emptyBody')} />
       ) : notifications.length === 0 ? (
-        <EmptyState
-          title="You're all caught up"
-          body="No new disclosures from the portfolios you follow."
-        />
+        <EmptyState title={t('alerts.caughtUp')} body={t('alerts.noNew')} />
       ) : (
         notifications.map((t) => {
           const lag = daysBetween(t.transactionDate, t.filingDate);

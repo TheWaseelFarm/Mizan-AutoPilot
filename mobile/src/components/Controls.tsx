@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { useI18n } from '../i18n';
 import { color, font, radius, space } from '../theme/tokens';
 import { Icon, type IconName } from './Icon';
 
@@ -51,6 +52,7 @@ export interface AppliedChip {
 
 /** Applied-filter chips with a Clear all action (handoff §7). Horizontally scrollable. */
 export function AppliedChips({ chips, onClearAll }: { chips: AppliedChip[]; onClearAll: () => void }) {
+  const { t } = useI18n();
   if (chips.length === 0) return null;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -69,7 +71,7 @@ export function AppliedChips({ chips, onClearAll }: { chips: AppliedChip[]; onCl
       ))}
       {chips.length > 1 ? (
         <TouchableOpacity style={styles.clearAll} onPress={onClearAll} activeOpacity={0.75}>
-          <Text style={styles.clearAllText}>Clear all</Text>
+          <Text style={styles.clearAllText}>{t('ctrl.clearAll')}</Text>
         </TouchableOpacity>
       ) : null}
     </ScrollView>
