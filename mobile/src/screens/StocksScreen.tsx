@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandHeader } from '../components/BrandHeader';
 import { ChipRow } from '../components/Chips';
+import { ComplianceFilter, type ComplianceKey } from '../components/ComplianceFilter';
 import { Disclaimer } from '../components/Disclaimer';
 import { SearchBar } from '../components/SearchBar';
 import { VerdictBadge } from '../components/VerdictBadge';
@@ -43,15 +44,6 @@ const SORTS = [
   { key: 'weight', label: 'Weight' },
 ] as const;
 
-// Self-explanatory compliance filter (round-2 #4).
-const COMPLIANCE = [
-  { key: 'all', label: 'All' },
-  { key: 'fully', label: 'Clean only' },
-  { key: 'exclude', label: 'Hide non-compliant' },
-] as const;
-
-const COMPLIANCE_HELP =
-  'Clean = own freely · Purify = charity owed at sale · Non-compliant = not permissible.';
 
 export function StocksScreen() {
   const nav = useNavigation<Nav>();
@@ -60,7 +52,7 @@ export function StocksScreen() {
   const [side, setSide] = useState<Side>('bought');
   const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('ALL');
   const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('volume');
-  const [compliance, setCompliance] = useState<(typeof COMPLIANCE)[number]['key']>('all');
+  const [compliance, setCompliance] = useState<ComplianceKey>('all');
   const [query, setQuery] = useState('');
 
   const stocks = useMemo(() => {
@@ -110,8 +102,7 @@ export function StocksScreen() {
           <View>
             <ChipRow label="Time" options={TIMEFRAMES} value={tf} onChange={setTf} />
             <ChipRow label="Sort by" options={SORTS} value={sort} onChange={setSort} />
-            <ChipRow label="Compliance" options={COMPLIANCE} value={compliance} onChange={setCompliance} />
-            <Text style={styles.complianceHelp}>{COMPLIANCE_HELP}</Text>
+            <ComplianceFilter value={compliance} onChange={setCompliance} />
             <View style={styles.listHead}>
               <Text style={styles.listHeadTitle}>{side === 'bought' ? 'Most bought' : 'Most sold'}</Text>
               <Text style={styles.listHeadMeta}>
@@ -181,13 +172,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingTop: space.sm,
     paddingBottom: space.sm,
-  },
-  complianceHelp: {
-    fontSize: font.small,
-    color: color.faint,
-    lineHeight: 15,
-    paddingHorizontal: space.lg,
-    paddingTop: 4,
   },
   listHeadTitle: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.muted, textTransform: 'uppercase' },
   listHeadMeta: { fontSize: font.small, color: color.faint, fontWeight: font.weight.medium },

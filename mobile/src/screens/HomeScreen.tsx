@@ -16,6 +16,7 @@ import { BrandHeader } from '../components/BrandHeader';
 import { Disclaimer } from '../components/Disclaimer';
 import { Emblem } from '../components/Emblem';
 import { FilterSheet } from '../components/FilterSheet';
+import type { ComplianceKey } from '../components/ComplianceFilter';
 import { MixBar } from '../components/MixBar';
 import { SearchBar } from '../components/SearchBar';
 import { derivePortfolios, portfolioComposition, portfolioFlag, typeLabel } from '../lib/derive';
@@ -43,12 +44,6 @@ const SORTS = [
   { key: 'followers', label: 'Followers' },
 ] as const;
 
-// Compliance FILTERS the list (it is not a sort). Self-explanatory labels (round-2 #4).
-const COMPLIANCE = [
-  { key: 'all', label: 'All' },
-  { key: 'fully', label: 'Clean only' },
-  { key: 'exclude', label: 'Hide non-compliant' },
-] as const;
 
 const INITIAL_SHOWN = 6;
 
@@ -86,7 +81,7 @@ export function HomeScreen() {
   const { rows, prices, followerCounts, loading, live, refresh } = useFeed();
   const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('1M');
   const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('performance');
-  const [compliance, setCompliance] = useState<(typeof COMPLIANCE)[number]['key']>('all');
+  const [compliance, setCompliance] = useState<ComplianceKey>('all');
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -252,7 +247,7 @@ export function HomeScreen() {
         onClose={() => setFilterOpen(false)}
         time={{ label: 'Time', options: TIMEFRAMES, value: tf, onChange: setTf }}
         sort={{ label: 'Sort by', options: SORTS, value: sort, onChange: setSort }}
-        compliance={{ label: 'Compliance', options: COMPLIANCE, value: compliance, onChange: setCompliance }}
+        compliance={{ value: compliance, onChange: setCompliance }}
       />
     </View>
   );
