@@ -1,0 +1,123 @@
+:root {
+  color-scheme: light;
+
+  /* Brand and semantic color */
+  --mz-ink-950: #101828;
+  --mz-ink-800: #1d2939;
+  --mz-ink-700: #344054;
+  --mz-ink-600: #475467;
+  --mz-ink-500: #667085;
+  --mz-ink-400: #98a2b3;
+  --mz-ink-300: #d0d5dd;
+  --mz-ink-200: #e4e7ec;
+  --mz-ink-100: #f2f4f7;
+  --mz-ink-50: #f9fafb;
+
+  --mz-canvas: #f6f7fa;
+  --mz-surface: #ffffff;
+  --mz-surface-raised: #ffffff;
+  --mz-surface-selected: #f3f7ff;
+
+  --mz-cobalt-700: #1849a9;
+  --mz-cobalt-600: #2457d6;
+  --mz-cobalt-500: #356ae6;
+  --mz-cobalt-100: #dbe7ff;
+  --mz-cobalt-50: #f2f6ff;
+
+  --mz-compliant-700: #08644f;
+  --mz-compliant-600: #14866d;
+  --mz-compliant-100: #d7f3eb;
+  --mz-compliant-50: #eefaf6;
+
+  --mz-purify-700: #946200;
+  --mz-purify-600: #c88719;
+  --mz-purify-100: #f8e7bd;
+  --mz-purify-50: #fff8e8;
+
+  --mz-noncompliant-700: #a62f3a;
+  --mz-noncompliant-600: #d94b55;
+  --mz-noncompliant-100: #ffd9dc;
+  --mz-noncompliant-50: #fff2f3;
+
+  --mz-review-700: #475467;
+  --mz-review-100: #e4e7ec;
+  --mz-review-50: #f9fafb;
+
+  --mz-info-700: var(--mz-cobalt-700);
+  --mz-info-50: var(--mz-cobalt-50);
+  --mz-warning-700: #b54708;
+  --mz-warning-50: #fffaeb;
+  --mz-danger-700: #b42318;
+  --mz-danger-50: #fef3f2;
+
+  /* Typography */
+  --mz-font-sans: Inter, "IBM Plex Sans Arabic", "Noto Sans Arabic",
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mz-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --mz-text-xs: 0.75rem;
+  --mz-text-sm: 0.875rem;
+  --mz-text-md: 1rem;
+  --mz-text-lg: 1.125rem;
+  --mz-text-xl: 1.375rem;
+  --mz-text-2xl: 1.75rem;
+  --mz-text-3xl: 2.25rem;
+
+  --mz-leading-tight: 1.2;
+  --mz-leading-normal: 1.5;
+  --mz-leading-relaxed: 1.65;
+
+  /* Spacing */
+  --mz-space-1: 0.25rem;
+  --mz-space-2: 0.5rem;
+  --mz-space-3: 0.75rem;
+  --mz-space-4: 1rem;
+  --mz-space-5: 1.25rem;
+  --mz-space-6: 1.5rem;
+  --mz-space-8: 2rem;
+  --mz-space-10: 2.5rem;
+  --mz-space-12: 3rem;
+
+  /* Shape */
+  --mz-radius-sm: 0.5rem;
+  --mz-radius-md: 0.75rem;
+  --mz-radius-lg: 0.875rem;
+  --mz-radius-pill: 999px;
+
+  /* Borders and elevation */
+  --mz-border: 1px solid var(--mz-ink-200);
+  --mz-shadow-sm: 0 1px 2px rgb(16 24 40 / 0.04);
+  --mz-shadow-drawer: -12px 0 32px rgb(16 24 40 / 0.10);
+  --mz-focus-ring: 0 0 0 3px rgb(36 87 214 / 0.22);
+
+  /* Layout */
+  --mz-utility-rail: 5rem;
+  --mz-header-height: 4.5rem;
+  --mz-mobile-nav-height: 4.75rem;
+  --mz-drawer-width: 24rem;
+  --mz-content-max: 100rem;
+
+  /* Motion */
+  --mz-duration-fast: 120ms;
+  --mz-duration-normal: 200ms;
+  --mz-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --mz-canvas: #0c111d;
+  --mz-surface: #161b26;
+  --mz-surface-raised: #1d2433;
+  --mz-surface-selected: #18264a;
+  --mz-ink-950: #f9fafb;
+  --mz-ink-800: #f2f4f7;
+  --mz-ink-700: #eaecf0;
+  --mz-ink-600: #d0d5dd;
+  --mz-ink-500: #98a2b3;
+  --mz-ink-400: #667085;
+  --mz-ink-300: #475467;
+  --mz-ink-200: #344054;
+  --mz-ink-100: #1d2939;
+  --mz-ink-50: #161b26;
+}
+
