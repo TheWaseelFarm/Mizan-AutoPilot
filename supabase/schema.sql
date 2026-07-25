@@ -16,6 +16,8 @@ create table if not exists disclosures (
   sector           text,
   amount           text,
   amount_mid       numeric,
+  position_value   numeric,          -- reported 13F holding value (position snapshot); drives exact
+                                     -- fund composition. NULL for transaction filings (PTR/insider).
   shares           integer,
   shares_label     text,
   transaction_date text,

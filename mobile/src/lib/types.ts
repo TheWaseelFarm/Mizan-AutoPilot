@@ -13,6 +13,9 @@ export interface Disclosure {
   sector?: string;
   amount?: string;
   amountMid?: number;
+  /** Reported 13F holding value (a position snapshot). Present for fund filings; drives exact
+   *  fund composition. Absent for transaction filings (Congress / insider). */
+  positionValue?: number;
   transactionDate?: string;
   filingDate?: string;
   purchasePrice?: number;

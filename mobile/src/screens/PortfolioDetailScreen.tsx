@@ -16,6 +16,7 @@ import {
   lagWord,
   portfolioComposition,
   portfolioFlag,
+  reportsPositions,
 } from '../lib/derive';
 import { resolvePrice } from '../lib/illustrative';
 import { dualAnchor, fmtPctCompact, perfTone } from '../lib/performance';
@@ -126,7 +127,11 @@ export function PortfolioDetailScreen() {
       {/* Composition — how much of the portfolio each stock makes up (informational). */}
       <View style={styles.compHead}>
         <Text style={styles.sectionTitle}>Composition</Text>
-        <Text style={styles.compSub}>Share of the disclosed portfolio, by value invested</Text>
+        <Text style={styles.compSub}>
+          {reportsPositions(activity)
+            ? 'Reported 13F holdings, by value (latest filing)'
+            : 'Share of disclosed trades, by net value'}
+        </Text>
       </View>
       {/* Donut: value split by CURRENT holdings (net-sold names carry 0% and drop out of the
           pie, but still appear below tagged "Sold"). Neutral colors — verdict colors reserved. */}

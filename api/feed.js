@@ -14,6 +14,9 @@ function toClient(row) {
     actor: row.actor, kind: row.kind, initials: row.initials, source: row.source, side: row.side,
     ticker: row.ticker, company: row.company, sector: row.sector,
     amount: row.amount, amountMid: row.amount_mid,
+    // Reported 13F holding value (position snapshot) when present — drives exact fund weights.
+    // Migration-free: absent column -> undefined -> composition falls back to amountMid.
+    positionValue: row.position_value == null ? undefined : Number(row.position_value),
     shares: row.shares, sharesLabel: row.shares_label,
     transactionDate: row.transaction_date, filingDate: row.filing_date,
     purchasePrice: Number(row.purchase_price), fallbackPrice: Number(row.fallback_price),
