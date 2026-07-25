@@ -1,16 +1,22 @@
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandHeader } from '../components/BrandHeader';
+import { Emblem } from '../components/Emblem';
 import { VerdictBadge } from '../components/VerdictBadge';
-import { daysBetween, lagWord } from '../lib/derive';
+import { daysBetween, derivePortfolios, lagWord, portfolioFlag } from '../lib/derive';
+import type { Portfolio } from '../lib/types';
+import type { TabParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
 import { useFollows } from '../state/follows';
-import { color, font, radius, shadow, space } from '../theme/tokens';
+import { color, font, radius, shadow, space, verdictColor } from '../theme/tokens';
 
 export function FollowingScreen() {
   const insets = useSafeAreaInsets();
+  const nav = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const { rows } = useFeed();
   const { followed } = useFollows();
 
@@ -22,6 +28,15 @@ export function FollowingScreen() {
         .sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || '')),
     [rows, followed],
   );
+  // Look up the rolled-up portfolio for a followed name (for its emblem + Sharia flag).
+  const portfolios = useMemo(() => {
+    const m = new Map<string, Portfolio>();
+    for (const p of derivePortfolios(rows)) m.set(p.name, p);
+    return m;
+  }, [rows]);
+
+  const openPortfolio = (name: string) => nav.navigate('HomeTab', { screen: 'PortfolioDetail', params: { name } });
+  const openStock = (ticker: string) => nav.navigate('StocksTab', { screen: 'StockDetail', params: { ticker } });
 
   return (
     <ScrollView
@@ -49,16 +64,37 @@ export function FollowingScreen() {
       ) : (
         <>
           <Text style={styles.sectionTitle}>Following ({followed.length})</Text>
-          {followed.map((name) => (
-            <View key={name} style={styles.followRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initials(name)}</Text>
-              </View>
-              <Text style={styles.followName} numberOfLines={1}>
-                {name}
-              </Text>
-            </View>
-          ))}
+          {followed.map((name) => {
+            const p = portfolios.get(name);
+            const flag = p ? portfolioFlag(p) : null;
+            return (
+              <TouchableOpacity
+                key={name}
+                style={styles.followRow}
+                activeOpacity={0.85}
+                onPress={() => openPortfolio(name)}
+              >
+                {p ? (
+                  <Emblem p={p} size={40} />
+                ) : (
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{initials(name)}</Text>
+                  </View>
+                )}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.followName} numberOfLines={1}>
+                    {name}
+                  </Text>
+                  {flag ? (
+                    <Text style={[styles.followFlag, { color: verdictColor[flag.tone].text }]} numberOfLines={1}>
+                      {flag.text}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            );
+          })}
 
           <Text style={styles.sectionTitle}>Latest activity</Text>
           {notifications.length === 0 ? (
@@ -67,7 +103,12 @@ export function FollowingScreen() {
             notifications.map((t) => {
               const lag = daysBetween(t.transactionDate, t.filingDate);
               return (
-                <View key={String(t.id)} style={styles.noteRow}>
+                <TouchableOpacity
+                  key={String(t.id)}
+                  style={styles.noteRow}
+                  activeOpacity={0.85}
+                  onPress={() => openStock(t.ticker)}
+                >
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.noteActor} numberOfLines={1}>
                       {t.actor}
@@ -78,7 +119,7 @@ export function FollowingScreen() {
                     </Text>
                   </View>
                   <VerdictBadge label={t.label} size="sm" />
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
@@ -147,7 +188,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { fontSize: font.small, fontWeight: font.weight.heavy, color: color.brandInk },
-  followName: { flex: 1, fontSize: font.body, fontWeight: font.weight.bold, color: color.ink },
+  followName: { fontSize: font.body, fontWeight: font.weight.bold, color: color.ink },
+  followFlag: { fontSize: font.small, fontWeight: font.weight.bold, marginTop: 2 },
+  chevron: { fontSize: 22, color: color.faint },
   noteRow: {
     flexDirection: 'row',
     alignItems: 'center',
