@@ -1,0 +1,211 @@
+@media (max-width: 74.99rem) {
+  .mz-product-header {
+    grid-template-columns: minmax(15rem, 22rem) 1fr;
+  }
+
+  .mz-product-header > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .mz-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mz-content-grid--drawer-open {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mz-drawer {
+    position: fixed;
+    inset-block: var(--mz-header-height) 0;
+    inset-inline-end: 0;
+    z-index: 60;
+    width: min(100%, var(--mz-drawer-width));
+    max-height: none;
+    border-block: 0;
+    border-inline-end: 0;
+    border-radius: 0;
+    box-shadow: var(--mz-shadow-drawer);
+  }
+}
+
+@media (max-width: 47.99rem) {
+  body {
+    padding-block-end: calc(var(--mz-mobile-nav-height) + env(safe-area-inset-bottom));
+  }
+
+  .mz-utility-rail {
+    display: none;
+  }
+
+  .mz-shell {
+    margin-inline-start: 0;
+  }
+
+  .mz-topbar {
+    min-height: 3.75rem;
+    padding-inline: var(--mz-space-4);
+  }
+
+  .mz-topbar .mz-search {
+    display: none;
+  }
+
+  .mz-main {
+    padding: var(--mz-space-4);
+  }
+
+  .mz-product-header {
+    position: sticky;
+    inset-block-start: 3.75rem;
+    z-index: 25;
+    display: block;
+    margin-inline: calc(var(--mz-space-4) * -1);
+    margin-block: calc(var(--mz-space-4) * -1) var(--mz-space-5);
+    padding: var(--mz-space-3) var(--mz-space-4);
+    border-block-end: var(--mz-border);
+    background: rgb(246 247 250 / 0.95);
+    backdrop-filter: blur(12px);
+  }
+
+  .mz-product-tabs {
+    width: 100%;
+  }
+
+  .mz-page-heading {
+    display: block;
+  }
+
+  .mz-page-heading > :last-child {
+    margin-block-start: var(--mz-space-3);
+  }
+
+  .mz-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mz-space-2);
+  }
+
+  .mz-summary {
+    padding: var(--mz-space-3);
+  }
+
+  .mz-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-block-end: var(--mz-space-1);
+    scrollbar-width: none;
+  }
+
+  .mz-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mz-toolbar__end {
+    margin-inline-start: 0;
+  }
+
+  .mz-table-wrap {
+    display: none;
+  }
+
+  .mz-card-list {
+    display: grid;
+  }
+
+  .mz-drawer {
+    inset-block: auto 0;
+    width: 100%;
+    max-height: min(86vh, 48rem);
+    border: var(--mz-border);
+    border-block-end: 0;
+    border-radius: var(--mz-radius-lg) var(--mz-radius-lg) 0 0;
+  }
+
+  .mz-mobile-nav {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: 70;
+    display: grid;
+    min-height: calc(var(--mz-mobile-nav-height) + env(safe-area-inset-bottom));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding-block: var(--mz-space-2) env(safe-area-inset-bottom);
+    border-block-start: var(--mz-border);
+    background: rgb(255 255 255 / 0.97);
+    backdrop-filter: blur(12px);
+  }
+
+  .mz-mobile-nav__item {
+    display: flex;
+    min-width: 0;
+    min-height: 3.5rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    color: var(--mz-ink-500);
+    font-size: 0.625rem;
+    font-weight: 650;
+  }
+
+  .mz-mobile-nav__item[aria-current="page"] {
+    color: var(--mz-cobalt-700);
+  }
+
+  .mz-mobile-tray {
+    position: fixed;
+    inset-inline: var(--mz-space-3);
+    inset-block-end: calc(var(--mz-mobile-nav-height) + env(safe-area-inset-bottom) + var(--mz-space-3));
+    z-index: 65;
+    display: flex;
+    align-items: center;
+    gap: var(--mz-space-3);
+    padding: var(--mz-space-3);
+    border: 1px solid var(--mz-cobalt-500);
+    border-radius: var(--mz-radius-md);
+    background: var(--mz-surface);
+    box-shadow: 0 12px 32px rgb(16 24 40 / 0.18);
+  }
+
+  .mz-mobile-tray .mz-button {
+    flex: 1;
+  }
+
+  .mz-card-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 48rem) {
+  .mz-card-list {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --mz-ink-200: #98a2b3;
+  }
+
+  .mz-badge,
+  .mz-button,
+  .mz-chip,
+  .mz-product-tabs,
+  .mz-table-wrap,
+  .mz-portfolio-card,
+  .mz-stock-card {
+    border-width: 2px;
+  }
+}
+

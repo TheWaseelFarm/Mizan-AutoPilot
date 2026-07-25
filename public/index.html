@@ -1,37 +1,139 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>Mizān</title>
-    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
-    <style id="expo-reset">
-      /* These styles make the body full-height */
-      html,
-      body {
-        height: 100%;
-      }
-      /* These styles disable body scrolling if you are using <ScrollView> */
-      body {
-        overflow: hidden;
-      }
-      /* These styles make the root element full-height */
-      #root {
-        display: flex;
-        height: 100%;
-        flex: 1;
-      }
-    </style>
-  </head>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Mizān — Sharia market intelligence</title>
+<meta name="description" content="Mizān — a Sharia-aware market-intelligence terminal. Disclosed portfolios and stocks with AAOIFI Standard No. 21 screening." />
+<meta name="theme-color" content="#2457d6" />
+<link rel="stylesheet" href="/styles/index.css" />
+<style>
+  /* App-local glue only — the design system lives entirely in /styles/*.css (the handoff). */
+  .mz-app__brandmark { color: var(--mz-cobalt-600); font-weight: 800; font-size: var(--mz-text-lg); letter-spacing: -0.02em; }
+  .mz-avatar { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border-radius: 50%;
+    background: var(--mz-cobalt-600); color: #fff; font-weight: 800; font-size: var(--mz-text-xs); }
+  .mz-subtabs { display: flex; gap: var(--mz-space-1); overflow-x: auto; scrollbar-width: none; border-block-end: var(--mz-border); }
+  .mz-subtabs::-webkit-scrollbar { display: none; }
+  .mz-subtab { padding: var(--mz-space-3) var(--mz-space-3); border: 0; border-block-end: 2px solid transparent;
+    margin-block-end: -1px; background: transparent; color: var(--mz-ink-500); font-weight: 650; font-size: var(--mz-text-sm);
+    white-space: nowrap; cursor: pointer; }
+  .mz-subtab[aria-selected="true"] { color: var(--mz-cobalt-700); border-block-end-color: var(--mz-cobalt-600); }
+  .mz-linkbtn { border: 0; background: transparent; color: var(--mz-cobalt-700); font-weight: 650; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 0.35rem; font-size: var(--mz-text-sm); }
+  .mz-star { border: 0; background: transparent; cursor: pointer; color: var(--mz-ink-400); display: inline-grid; place-items: center; }
+  .mz-star[data-on="true"] { color: var(--mz-cobalt-600); }
+  .mz-check-btn { border: 1.5px solid var(--mz-ink-300); border-radius: 0.35rem; width: 1.25rem; height: 1.25rem;
+    background: var(--mz-surface); cursor: pointer; display: inline-grid; place-items: center; color: #fff; padding: 0; }
+  .mz-check-btn[data-on="true"] { background: var(--mz-cobalt-600); border-color: var(--mz-cobalt-600); }
+  .mz-spark { width: 5rem; height: 1.75rem; display: block; }
+  .mz-fresh { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--mz-ink-500); font-size: var(--mz-text-xs); font-weight: 600; white-space: nowrap; }
+  .mz-fresh[data-fresh="true"] { color: var(--mz-cobalt-700); }
+  .mz-rank { color: var(--mz-ink-400); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .mz-legend { display: flex; flex-wrap: wrap; gap: var(--mz-space-4); margin-block-start: var(--mz-space-4);
+    color: var(--mz-ink-500); font-size: var(--mz-text-xs); font-weight: 650; }
+  .mz-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .mz-dot { width: 0.6rem; height: 0.6rem; border-radius: 3px; display: inline-block; }
+  .mz-guardrail { margin-block-start: var(--mz-space-5); color: var(--mz-ink-400); font-size: var(--mz-text-xs); line-height: 1.5; }
+  .mz-info { display: inline-grid; place-items: center; width: 1.05rem; height: 1.05rem; color: var(--mz-ink-400); vertical-align: -2px; }
+  .mz-drawer__title { display: flex; align-items: center; justify-content: space-between; gap: var(--mz-space-3); }
+  .mz-cmp-head { display: grid; grid-template-columns: 1fr 1fr; gap: var(--mz-space-3); text-align: center; }
+  .mz-cmp-metric__label { color: var(--mz-ink-500); font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .mz-cmp-vals { display: grid; grid-template-columns: 1fr 1fr; gap: var(--mz-space-3); font-weight: 750; font-variant-numeric: tabular-nums; }
+  .mz-why-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--mz-space-2); }
+  .mz-why-list li { display: flex; gap: var(--mz-space-2); align-items: flex-start; color: var(--mz-ink-700); }
+  .mz-menu { position: absolute; z-index: 80; margin-block-start: 0.35rem; min-width: 15rem; padding: var(--mz-space-2);
+    border: var(--mz-border); border-radius: var(--mz-radius-md); background: var(--mz-surface); box-shadow: var(--mz-shadow-drawer); }
+  .mz-menu button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--mz-space-3);
+    padding: var(--mz-space-2) var(--mz-space-3); border: 0; border-radius: var(--mz-radius-sm); background: transparent;
+    color: var(--mz-ink-700); font-weight: 600; cursor: pointer; text-align: start; font-size: var(--mz-text-sm); }
+  .mz-menu button:hover { background: var(--mz-ink-50); }
+  .mz-menu button[aria-selected="true"] { color: var(--mz-cobalt-700); }
+  .mz-menu small { display: block; color: var(--mz-ink-500); font-weight: 500; }
+  .mz-pos { position: relative; }
+  .mz-cell-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* Inline-icon sizing — SVGs have viewBoxes but no intrinsic size; constrain per context. */
+  .mz-button svg, .mz-chip svg, .mz-linkbtn svg, .mz-menu button svg, .mz-why-list svg { width: 1.05rem; height: 1.05rem; flex: 0 0 auto; }
+  .mz-button--primary svg, .mz-button--secondary svg, .mz-button--ghost svg { width: 1.1rem; height: 1.1rem; }
+  .mz-rail-link svg, .mz-mobile-nav__item svg { width: 1.35rem; height: 1.35rem; }
+  .mz-search__icon svg { width: 1rem; height: 1rem; }
+  .mz-fresh svg { width: 0.85rem; height: 0.85rem; }
+  .mz-star svg { width: 1.15rem; height: 1.15rem; }
+  .mz-entity__meta svg { width: 0.9rem; height: 0.9rem; }
+  .mz-check-btn svg { width: 0.85rem; height: 0.85rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="mz-app">
+  <nav class="mz-utility-rail" aria-label="Utility">
+    <span class="mz-utility-rail__brand mz-app__brandmark" title="Mizān">M</span>
+    <a href="/following" class="mz-rail-link" data-rail="following"></a>
+    <a href="/alerts" class="mz-rail-link" data-rail="alerts"></a>
+    <a href="/account" class="mz-rail-link" data-rail="account"></a>
+    <span class="mz-utility-rail__spacer"></span>
+    <button class="mz-rail-link" id="langToggle" type="button"></button>
+  </nav>
 
-  <body>
-    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
-    <noscript>
-      You need to enable JavaScript to run this app.
-    </noscript>
-    <!-- The root element for your Expo app. -->
-    <div id="root"></div>
-  <script src="/_expo/static/js/web/index-dc3091bea0037c16561fb81f6024d4ea.js" defer></script>
+  <div class="mz-shell">
+    <header class="mz-topbar">
+      <div class="mz-product-tabs" role="tablist" id="topTabs">
+        <button class="mz-product-tab" role="tab" data-tab="portfolios" type="button"></button>
+        <button class="mz-product-tab" role="tab" data-tab="stocks" type="button"></button>
+      </div>
+      <div class="mz-search">
+        <span class="mz-search__icon" id="searchIcon"></span>
+        <input id="search" type="search" autocomplete="off" />
+      </div>
+      <div class="mz-topbar__actions">
+        <span class="mz-muted" id="freshness" style="font-size:var(--mz-text-xs);font-weight:600"></span>
+        <button class="mz-button mz-button--icon" id="bellBtn" type="button" aria-label="Alerts"></button>
+        <span class="mz-avatar" aria-hidden="true">MA</span>
+      </div>
+    </header>
+
+    <main class="mz-main">
+      <div class="mz-page-heading">
+        <div>
+          <h1 id="pageTitle"></h1>
+          <p class="mz-muted" id="pageSub" style="max-width:44rem"></p>
+        </div>
+        <div id="headingEnd"></div>
+      </div>
+
+      <div class="mz-subtabs" role="tablist" id="subtabs"></div>
+
+      <div class="mz-toolbar" style="margin-block-start:var(--mz-space-4)">
+        <div class="mz-segmented" id="timebar" role="group" aria-label="Time period"></div>
+        <div class="mz-pos"><button class="mz-chip" id="sortBtn" type="button"></button><div id="sortMenu"></div></div>
+        <button class="mz-linkbtn" id="whyBtn" type="button"></button>
+        <div class="mz-toolbar__end">
+          <div class="mz-pos"><button class="mz-chip" id="filterBtn" type="button"></button><div id="filterMenu"></div></div>
+          <button class="mz-chip" id="compareBtn" type="button"></button>
+        </div>
+      </div>
+
+      <div id="chips" style="margin-block-end:var(--mz-space-3)"></div>
+      <div class="mz-muted" id="resultMeta" style="font-size:var(--mz-text-xs);margin-block-end:var(--mz-space-3)"></div>
+
+      <div class="mz-content-grid" id="contentGrid">
+        <div>
+          <div class="mz-table-wrap" id="tableWrap">
+            <div class="mz-table-scroll">
+              <table class="mz-table" id="table"><thead id="thead"></thead><tbody id="tbody"></tbody></table>
+            </div>
+          </div>
+          <div class="mz-card-list" id="cards"></div>
+          <div class="mz-legend" id="legend"></div>
+          <p class="mz-guardrail" id="guardrail"></p>
+        </div>
+        <aside class="mz-drawer" id="drawer" hidden></aside>
+      </div>
+    </main>
+
+    <nav class="mz-mobile-nav" id="mobileNav" aria-label="Primary"></nav>
+    <div class="mz-mobile-tray" id="mobileTray" hidden></div>
+  </div>
+</div>
+<script src="/app.js"></script>
 </body>
 </html>
