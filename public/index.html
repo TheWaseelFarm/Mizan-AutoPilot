@@ -60,6 +60,12 @@
   .mz-star svg { width: 1.15rem; height: 1.15rem; }
   .mz-entity__meta svg { width: 0.9rem; height: 0.9rem; }
   .mz-check-btn svg { width: 0.85rem; height: 0.85rem; }
+  /* Performance-led hierarchy: the return is the hero, in cobalt (never a Sharia hue). */
+  .mz-perf-hero { display: inline-flex; align-items: center; gap: 0.15rem; font-size: var(--mz-text-lg);
+    font-weight: 800; font-variant-numeric: tabular-nums; color: var(--mz-cobalt-700); letter-spacing: -0.01em; white-space: nowrap; }
+  .mz-perf-hero[data-up="false"] { color: var(--mz-ink-600); }
+  .mz-perf-hero svg { width: 0.72rem; height: 0.72rem; }
+  .mz-perf-cell { display: flex; align-items: center; gap: 0.65rem; }
   .mz-linkbtn { white-space: nowrap; }
   #freshness { white-space: nowrap; }
   /* Toolbar rows: the time selector sits on its own row above the controls. */

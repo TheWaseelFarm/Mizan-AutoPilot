@@ -28,6 +28,8 @@
     external: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14 0 18M12 3c-3 3.5-3 14 0 18"/></svg>',
+    caretUp: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 8l6 9H6z"/></svg>',
+    caretDown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 16l-6-9h12z"/></svg>',
   };
 
   /* ---------------------------------------------------------------- i18n */
@@ -232,6 +234,16 @@
   const entity = (avatarHtml, name, metaHtml, nameLtr) => `<div class="mz-entity"><span class="mz-entity__avatar">${avatarHtml}</span><div><div class="mz-entity__name${nameLtr ? ' mz-ltr' : ''}">${esc(name)}</div><div class="mz-entity__meta">${metaHtml}</div></div></div>`;
   const miniIcon = (svg) => `<span style="width:.9rem;height:.9rem;display:inline-flex">${svg}</span>`;
   const perfCell = (v) => v == null ? '<span class="mz-muted">—</span>' : `<span class="mz-performance">${fmtPct(v)}</span>`;
+  // Performance HERO — the primary signal (performance-led hierarchy). Cobalt up / neutral-ink
+  // down with a caret; deliberately NOT a Sharia hue, so it never reads as a verdict.
+  const perfHero = (v) => v == null
+    ? '<span class="mz-muted" style="font-size:var(--mz-text-lg)">—</span>'
+    : `<span class="mz-perf-hero" data-up="${v >= 0}">${v >= 0 ? I.caretUp : I.caretDown}${fmtPct(v)}</span>`;
+  const sparkVals = (vals) => vals && vals.length >= 2 ? `<svg class="mz-spark" viewBox="0 0 80 28" preserveAspectRatio="none"><polyline fill="none" stroke="var(--mz-cobalt-500)" stroke-width="1.5" points="${chartPath(vals, 80, 28)}"/></svg>` : '';
+  // Full-width sparkline for mobile cards (leads with the trend in performance-led mode).
+  const sparkFull = (vals) => vals && vals.length >= 2 ? `<svg viewBox="0 0 300 40" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polyline fill="none" stroke="var(--mz-cobalt-500)" stroke-width="1.4" points="${chartPath(vals, 300, 40)}"/></svg>` : '';
+  // Compact compliance tag — small pill, no longer the loud hero (performance-led).
+  const compliancePill = (tone) => { const cls = tone === 'clean' ? 'compliant' : tone === 'purify' ? 'purify' : 'noncompliant'; const short = tone === 'clean' ? t('v.compliant') : tone === 'purify' ? t('v.purify') : t('v.noncompliant'); return `<span class="mz-badge mz-badge--${cls}" style="min-height:1.4rem;font-size:.65rem">${short}</span>`; };
   const starBtn = (id) => `<button class="mz-star" data-star="${esc(id)}" data-on="${S.follows.has(id)}" aria-label="Follow">${S.follows.has(id) ? I.starOn : I.star}</button>`;
 
   /* --- real performance charts, restored from the native app (dual-anchor / index) --- */
@@ -321,19 +333,21 @@
     document.getElementById('guardrail').textContent = t(isP ? 'g.portfolios' : 'g.disclaimer');
 
     if (isP) {
-      thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.portfolio')}</th><th>${t('h.type')}</th><th>${t('h.return')}</th><th>${t('h.activity')}</th><th>${t('h.freshness')}</th><th>${t('h.allocation')}</th><th>${t('h.purify')}</th><th>${t('h.followers')}</th></tr>`;
+      // Performance-led: Return is the hero column (2nd), compliance is a compact tag near the end.
+      thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.portfolio')}</th><th>${t('h.return')}</th><th>${t('h.activity')}</th><th>${t('h.freshness')}</th><th>${LANG === 'ar' ? 'الالتزام' : 'Compliance'}</th><th>${t('h.followers')}</th></tr>`;
       tbody.innerHTML = list.map((p, i) => {
         const flag = portfolioFlag(p), sel = S.selected.includes(p.name);
         const first = S.compareMode ? `<button class="mz-check-btn" data-select="${esc(p.name)}" data-on="${sel}" aria-label="Select">${sel ? I.check : ''}</button>` : `<span class="mz-rank">${i + 1}</span>`;
         const av = `<span style="color:var(--mz-cobalt-700);font-weight:800;font-size:.8rem">${esc(p.initials)}</span>`;
-        const meta = `<span style="display:inline-flex;gap:.35rem;align-items:center">${miniIcon(groupIcon(p.group))}${esc(flag.text)}</span>`;
-        return `<tr data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(av, p.name, meta)}</td><td class="mz-muted">${typeLabel(p.kind)}</td><td>${perfCell(p.perf)}</td><td class="mz-cell-num">${p.count}</td><td>${freshEl(p.fresh)}</td><td>${allocBar(p.mix)}</td><td class="mz-cell-num" style="color:var(--mz-purify-700)">${p.purifyPct > 0 ? p.purifyPct + '%' : '—'}</td><td>${starBtn(p.name)}</td></tr>`;
-      }).join('') || emptyRow(9);
+        const meta = `<span style="display:inline-flex;gap:.35rem;align-items:center">${miniIcon(groupIcon(p.group))}${esc(typeLabel(p.kind))}</span>`;
+        return `<tr data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(av, p.name, meta)}</td><td><div class="mz-perf-cell">${perfHero(p.perf)}${sparkVals(portfolioIndexVals(p.rows))}</div></td><td class="mz-cell-num">${p.count}</td><td>${freshEl(p.fresh)}</td><td>${compliancePill(flag.tone)}</td><td>${starBtn(p.name)}</td></tr>`;
+      }).join('') || emptyRow(7);
       cards.innerHTML = list.map((p, i) => portfolioCard(p, i)).join('');
     } else {
-      thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.stock')}</th><th>${t('h.signal')}</th><th>${t('h.evidence')}</th><th>${t('h.filers')}</th><th>${t('h.value')}</th><th>${t('h.freshness')}</th><th>${t('h.since')}</th><th>${t('h.status')}</th></tr>`;
+      // Performance-led: Since-disclosed return is the hero column (3rd); status is a compact badge.
+      thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.stock')}</th><th>${t('h.since')}</th><th>${t('h.signal')}</th><th>${t('h.evidence')}</th><th>${t('h.filers')}</th><th>${t('h.value')}</th><th>${t('h.status')}</th></tr>`;
       const signal = { bought: 'Accumulation', sold: 'Reduction', new: 'New position', incr: 'Position increased', red: 'Position reduced', exit: 'Exited' }[S.sMetric];
-      tbody.innerHTML = list.map((s, i) => `<tr data-row="stock" data-id="${esc(s.ticker)}"><td><span class="mz-rank">${i + 1}</span></td><td>${entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(s.ticker.slice(0, 4))}</span>`, s.ticker, esc(s.company), true)}</td><td><div class="mz-muted">${signal}</div>${spark(s.ticker)}</td><td style="font-weight:700">${t('ev.' + evStrength(s.filerCount))}</td><td class="mz-cell-num">${s.filerCount}</td><td class="mz-cell-num" style="font-weight:750">${fmtMoney(s.dollar)}</td><td>${freshEl(s.fresh)}</td><td>${perfCell(s.perf)}</td><td>${badge(s.label)}</td></tr>`).join('') || emptyRow(9);
+      tbody.innerHTML = list.map((s, i) => `<tr data-row="stock" data-id="${esc(s.ticker)}"><td><span class="mz-rank">${i + 1}</span></td><td>${entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(s.ticker.slice(0, 4))}</span>`, s.ticker, `${esc(s.company)}${s.fresh != null ? ` · ${s.fresh}d` : ''}`, true)}</td><td><div class="mz-perf-cell">${perfHero(s.perf)}${spark(s.ticker)}</div></td><td class="mz-muted">${signal}</td><td style="font-weight:700">${t('ev.' + evStrength(s.filerCount))}</td><td class="mz-cell-num">${s.filerCount}</td><td class="mz-cell-num" style="font-weight:750">${fmtMoney(s.dollar)}</td><td>${badge(s.label)}</td></tr>`).join('') || emptyRow(8);
       cards.innerHTML = list.map((s, i) => stockCard(s, i)).join('');
     }
   }
@@ -345,27 +359,28 @@
       <div style="display:flex;gap:.75rem;align-items:center">
         ${S.compareMode ? `<button class="mz-check-btn" data-select="${esc(p.name)}" data-on="${sel}">${sel ? I.check : ''}</button>` : `<span class="mz-rank">${i + 1}</span>`}
         <span class="mz-entity__avatar"><span style="color:var(--mz-cobalt-700);font-weight:800">${esc(p.initials)}</span></span>
-        <div style="flex:1;min-width:0"><div class="mz-entity__name">${esc(p.name)}</div><div class="mz-entity__meta">${typeLabel(p.kind)}</div></div>
-        <div style="text-align:end">${perfCell(p.perf)}</div>
+        <div style="flex:1;min-width:0"><div class="mz-entity__name">${esc(p.name)}</div><div class="mz-entity__meta">${esc(typeLabel(p.kind))}${p.fresh != null ? ` · ${p.fresh}d` : ''}</div></div>
+        <div style="text-align:end">${perfHero(p.perf)}</div>
       </div>
+      <div style="margin-block-start:.65rem">${sparkVals(portfolioIndexVals(p.rows)) ? `<div style="height:2.5rem">${sparkFull(portfolioIndexVals(p.rows))}</div>` : ''}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-block-start:.6rem;gap:.5rem">
-        <span class="mz-badge mz-badge--${flag.tone === 'clean' ? 'compliant' : flag.tone === 'purify' ? 'purify' : 'noncompliant'}">${flag.text}</span>
-        ${freshEl(p.fresh)}
+        ${compliancePill(flag.tone)}
+        <span class="mz-muted" style="font-size:var(--mz-text-xs)">${p.count} ${LANG === 'ar' ? 'إفصاح' : 'disclosures'} · ${starBtn(p.name)}</span>
       </div>
-      <div style="margin-block-start:.6rem">${allocBar(p.mix)}</div>
-      <div class="mz-card-metrics"><div><div class="mz-metric__label">${t('h.activity')}</div><div class="mz-metric__value">${p.count}</div></div><div><div class="mz-metric__label">${t('h.purify')}</div><div class="mz-metric__value">${p.purifyPct}%</div></div><div><div class="mz-metric__label">${t('h.followers')}</div><div class="mz-metric__value">${starBtn(p.name)}</div></div></div>
     </article>`;
   }
   function stockCard(s, i) {
     return `<article class="mz-stock-card" data-row="stock" data-id="${esc(s.ticker)}">
       <div style="display:flex;gap:.75rem;align-items:center">
         <span class="mz-rank">${i + 1}</span>
-        <div style="flex:1;min-width:0"><div class="mz-entity__name mz-ltr">${esc(s.ticker)}</div><div class="mz-entity__meta">${esc(s.company)}</div></div>
-        ${spark(s.ticker)}
-        ${badge(s.label)}
+        <div style="flex:1;min-width:0"><div class="mz-entity__name mz-ltr">${esc(s.ticker)}</div><div class="mz-entity__meta">${esc(s.company)}${s.fresh != null ? ` · ${s.fresh}d` : ''}</div></div>
+        <div style="text-align:end">${perfHero(s.perf)}</div>
       </div>
-      <div class="mz-card-metrics"><div><div class="mz-metric__label">${t('h.evidence')}</div><div class="mz-metric__value">${t('ev.' + evStrength(s.filerCount))}</div></div><div><div class="mz-metric__label">${t('h.value')}</div><div class="mz-metric__value">${fmtMoney(s.dollar)}</div></div><div><div class="mz-metric__label">${t('h.since')}</div><div class="mz-metric__value">${fmtPct(s.perf) || '—'}</div></div></div>
-      <div style="margin-block-start:.5rem">${freshEl(s.fresh)}</div>
+      <div style="margin-block-start:.6rem">${sparkVals(histVals(s.ticker)) ? `<div style="height:2.5rem">${sparkFull(histVals(s.ticker))}</div>` : ''}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-block-start:.6rem;gap:.5rem">
+        ${badge(s.label)}
+        <span class="mz-muted" style="font-size:var(--mz-text-xs)">${t('ev.' + evStrength(s.filerCount))} · ${s.filerCount} ${LANG === 'ar' ? 'مُفصِح' : 'filers'} · ${fmtMoney(s.dollar)}</span>
+      </div>
     </article>`;
   }
 
