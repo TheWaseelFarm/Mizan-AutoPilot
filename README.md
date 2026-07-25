@@ -3,7 +3,7 @@
 **Live dashboard:** https://mizan-auto-pilot.vercel.app
 
 Sharia-aware **disclosure intelligence & alerting**. Monitors expert / institutional
-trade disclosures and attaches a Framework B (Hanbali) Sharia verdict to every security
+trade disclosures and attaches an AAOIFI Standard 21 Sharia verdict to every security
 before it reaches your feed.
 
 Built on your standard stack: single-HTML frontend + Vercel serverless + Supabase +
@@ -17,7 +17,7 @@ api/feed.js                  GET disclosure feed (shape the UI expects)
 api/watchlist.js             GET/POST tracked sources
 api/login.js                 POST hash-based login -> token
 api/poll-disclosures.js      CRON: ingest -> screen -> classify -> store (idempotent)
-api/_lib/frameworkB.js       ⭐ Framework B engine (shared by API + frontend)
+api/_lib/aaoifi.js            ⭐ AAOIFI engine (shared by API + frontend)
 api/_lib/supabase.js         Supabase service-role client
 api/_lib/auth.js             hash + token helpers
 api/_lib/sources/mock.js     mock disclosure source  (swap -> quiver.js)
@@ -26,13 +26,13 @@ api/_lib/screening/mock.js   mock Sharia-screening data (swap -> zoya.js)
 api/_lib/screening/zoya.js   real screening stub (Zoya / Halal Terminal)
 supabase/schema.sql          tables + RLS + seed data
 scripts/hash.js              generate ADMIN_PASSWORD_HASH
-test/frameworkB.test.js      engine self-test (npm test)
+test/aaoifi.test.js          engine self-test (npm test)
 ```
 
 ## The pipeline (same shape as the farm app's sensor loop)
 
 ```
-cron-job.org ──► /api/poll-disclosures ──► source ──► screening ──► Framework B ──► Supabase
+cron-job.org ──► /api/poll-disclosures ──► source ──► screening ──► AAOIFI ──► Supabase
                                                                                       │
                         public/index.html ◄──────── /api/feed ◄───────────────────────┘
 ```
@@ -86,13 +86,13 @@ npm test
   the import in `api/poll-disclosures.js` from `./sources/mock.js` to `./sources/quiver.js`.
 - **Screening:** implement `api/_lib/screening/zoya.js` (or Halal Terminal), set
   `SCREENING_API_KEY`, swap the import. **Feed it raw inputs** (business activity,
-  impure-income %, debt ratio) and let `frameworkB.js` decide — never a vendor's pass/fail.
+  impure-income %, debt ratio) and let `aaoifi.js` decide — never a vendor's pass/fail.
 - **Push notifications:** add a channel (web-push via the PWA now; FCM/OneSignal for native)
   and record sends in `alerts_sent` inside `poll-disclosures.js`.
 
 ## Guardrails (do not skip before anything real ships)
 - **Not a fatwa / not advice.** The verdict is an automated indicator; keep the disclaimer.
-  Have the Framework B rules reviewed by a qualified scholar.
+  Have the AAOIFI sector list + 30% vs 33% threshold confirmed by a qualified scholar.
 - **Secrets** live only in Vercel env vars. The `service_role` key must never reach the browser.
 - **RLS** is on; tables are reachable only via the server (service role).
 - Any security lacking screening data is treated as `watch` (manual review) — never defaulted to Clean.

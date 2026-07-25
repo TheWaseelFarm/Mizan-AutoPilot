@@ -26,11 +26,12 @@ create table if not exists disclosures (
   fallback_price   numeric,
   business         text,
   business_status  text check (business_status in ('pass','watch','fail')),
-  impure_pct       numeric default 0,
-  debt_ratio       numeric default 0,
+  impure_pct       numeric default 0,   -- impure income / total revenue (%)  — AAOIFI: >5% fails
+  debt_ratio       numeric default 0,   -- interest-bearing debt / market cap (%) — AAOIFI: >30% fails
+  cash_pct         numeric default 0,   -- cash + interest securities / market cap (%) — AAOIFI: >30% fails
   reasoning        text,
   purification     text,
-  label            text,            -- cached Framework B verdict (engine remains source of truth)
+  label            text,            -- cached AAOIFI verdict (engine remains source of truth)
   alert            text,
   confidence       text
 );
@@ -59,7 +60,7 @@ create table if not exists alerts_sent (
 -- re-screens when older than ~30 days — this is what keeps the app inside the Halal
 -- Terminal free-tier quota (spec §7). `payload` is the raw-inputs shape
 -- (business/businessStatus/impurePct/debtRatio/reasoning/screened), NEVER a verdict —
--- the verdict is always recomputed by Framework B.
+-- the verdict is always recomputed by the AAOIFI engine.
 create table if not exists screenings (
   ticker     text primary key,
   payload    jsonb not null,
@@ -91,7 +92,7 @@ create table if not exists smart_money_trends (
   net_weight  numeric,                      -- Σ trade-value-as-%-of-filer-position (rank metric)
   dollar_est  numeric,                      -- Σ disclosed midpoints (secondary $ volume)
   filer_count integer,
-  label       text,                         -- Framework B verdict for the ticker
+  label       text,                         -- AAOIFI verdict for the ticker
   updated_at  timestamptz not null default now(),
   primary key (ticker, timeframe, side)
 );

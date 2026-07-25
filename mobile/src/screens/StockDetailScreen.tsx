@@ -7,7 +7,7 @@ import { Disclaimer } from '../components/Disclaimer';
 import { PerformanceCard } from '../components/PerformanceCard';
 import { VerdictBadge } from '../components/VerdictBadge';
 import { actorDescriptor, daysBetween, lagWord } from '../lib/derive';
-import { VERDICT_PERMISSION } from '../lib/frameworkB';
+import { VERDICT_PERMISSION } from '../lib/aaoifi';
 import { resolvePrice } from '../lib/illustrative';
 import { dualAnchor, fmtPctCompact, perfTone } from '../lib/performance';
 import type { StocksStackParamList } from '../navigation/types';
@@ -112,9 +112,9 @@ function Stat({ label, value, muted, valueColor }: { label: string; value: strin
 function plainReason(t: { label: string; business?: string; screened?: boolean; impurePct?: number }): string {
   if (t.screened === false) return 'Not screened yet — reachable by search, never shown as compliant.';
   const biz = String(t.business || '').replace(/^\s*(pass|fail|watch)[^—]*—\s*/i, '').trim() || 'the disclosed business';
-  if (t.label === 'clean') return `${biz} — permissible, with no impure income.`;
-  if (t.label === 'purify') return `${biz} — permissible, but a share of profit is owed to charity at sale.`;
-  if (t.label === 'fail') return `Excluded at the business-activity level (${biz}).`;
+  if (t.label === 'clean') return `${biz} — passes the AAOIFI screens with no impure income.`;
+  if (t.label === 'purify') return `${biz} — compliant, but a small share of income is impure — purify that share of dividends.`;
+  if (t.label === 'fail') return `Non-compliant under AAOIFI (business activity or a financial ratio over the limit).`;
   return biz;
 }
 

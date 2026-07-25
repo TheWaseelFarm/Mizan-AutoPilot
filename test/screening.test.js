@@ -3,7 +3,7 @@
 // Run: npm test  (invoked by test/index.test.js) — or: node test/screening.test.js
 import assert from "node:assert";
 
-import { classifyFB } from "../api/_lib/frameworkB.js";
+import { classifyAAOIFI } from "../api/_lib/aaoifi.js";
 import { passesGate } from "../api/feed.js";
 import { screen as halalTerminalScreen } from "../api/_lib/screening/halalterminal.js";
 import { screen as mockScreen } from "../api/_lib/screening/mock.js";
@@ -32,28 +32,30 @@ const ok = (cond, msg) => {
 await (async () => {
   process.env.SCREENING_API_KEY = "test-key";
 
-  // 1) Raw-ratio mapping: activity=pass, impure 1.4%, debt 19% -> engine says "purify".
-  stubFetch(200, { business: { status: "pass", description: "Technology" }, ratios: { nonCompliantRevenuePercent: 1.4, interestBearingDebtToMarketCapPercent: 19 } });
+  // 1) Raw-ratio mapping: activity=pass, impure 1.4%, debt 19%, cash 12% -> engine says "purify".
+  stubFetch(200, { business: { status: "pass", description: "Technology" }, ratios: { nonCompliantRevenuePercent: 1.4, interestBearingDebtToMarketCapPercent: 19, cashAndInterestSecuritiesToMarketCapPercent: 12 } });
   let r = await halalTerminalScreen("AVGO");
   ok(r.screened === true, "HT: screened true");
   ok(r.businessStatus === "pass", "HT: business status from activity screen");
   ok(r.impurePct === 1.4, "HT: impure % taken raw");
   ok(r.debtRatio === 19, "HT: debt ratio taken raw");
-  ok(classifyFB(r) === "purify", "HT: engine classifies raw inputs as purify");
+  ok(r.cashPct === 12, "HT: cash ratio taken raw");
+  ok(classifyAAOIFI(r) === "purify", "HT: engine classifies raw inputs as purify");
 
   // 2) Impermissible ACTIVITY -> fail (business screen, not the vendor's overall verdict).
   stubFetch(200, { business: { status: "non-compliant" }, ratios: { nonCompliantRevenuePercent: 71 } });
   r = await halalTerminalScreen("JPM");
   ok(r.businessStatus === "fail", "HT: impermissible activity -> fail");
-  ok(classifyFB(r) === "fail", "HT: engine fails impermissible activity");
+  ok(classifyAAOIFI(r) === "fail", "HT: engine fails impermissible activity");
 
-  // 3) Debt over advisory but impure 0 -> purify, NEVER fail (debt is advisory).
+  // 3) Debt over the 30% limit, impure 0 -> AAOIFI now FAILS (the key difference; debt no longer advisory).
   stubFetch(200, { business: { status: "pass" }, ratios: { nonCompliantRevenuePercent: 0, interestBearingDebtToMarketCapPercent: 52 } });
   r = await halalTerminalScreen("XOM");
-  ok(classifyFB(r) === "purify", "HT: high debt stays purify, never fail");
+  ok(r.debtRatio === 52, "HT: high debt ratio taken raw");
+  ok(classifyAAOIFI(r) === "fail", "HT: debt > 30% -> Non-compliant under AAOIFI");
 
   // 4) NO_RAW_INPUTS guard: a response with ONLY a vendor verdict (no raw ratios/activity)
-  //    must throw — we refuse to map the vendor's conclusion to Framework B.
+  //    must throw — we refuse to map the vendor's conclusion to AAOIFI.
   stubFetch(200, { compliant: true, methodology: "AAOIFI", verdict: "COMPLIANT" });
   await assert.rejects(() => halalTerminalScreen("XYZ"), /NO_RAW_INPUTS/, "HT: refuses to map a vendor verdict");
   pass++;

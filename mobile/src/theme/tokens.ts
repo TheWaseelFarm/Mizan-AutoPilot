@@ -29,7 +29,7 @@ export const color = {
 } as const;
 
 /**
- * Verdict color language — the product's soul. Codes match `frameworkB.ts`:
+ * Verdict color language — the product's soul. Codes match `aaoifi.ts`:
  * clean | purify | fail | unscreened. `tint` = soft accessible background,
  * `text` = legible on light, `solid` = the pure hue (bars/dots only).
  */
@@ -102,4 +102,4 @@ export const shadow = {
 
 /** The subtle disclaimer required on every performance surface (spec §0). */
 export const DISCLAIMER =
-  'Informational only — past disclosed-holdings evidence, delayed by up to 45 days. Not investment advice, brokerage, or a fatwa.';
+  'Screening based on AAOIFI Standard No. 21. Informational only — past disclosed-holdings evidence, delayed by up to 45 days. Not investment advice, brokerage, or a fatwa.';

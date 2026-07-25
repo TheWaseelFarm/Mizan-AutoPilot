@@ -1,4 +1,4 @@
-import type { Label } from './frameworkB';
+import type { Label } from './aaoifi';
 
 /** A disclosure record as returned by GET /api/feed (see api/feed.js `toClient`). */
 export interface Disclosure {
@@ -23,7 +23,10 @@ export interface Disclosure {
   business?: string;
   businessStatus?: string;
   impurePct?: number;
+  /** interest-bearing debt / market cap (%) — AAOIFI: > 30% fails. */
   debtRatio?: number;
+  /** cash + interest securities / market cap (%) — AAOIFI: > 30% fails. */
+  cashPct?: number;
   reasoning?: string;
   screened?: boolean;
   /** Verdict label, filled by labelOf() on the client if the API didn't. */

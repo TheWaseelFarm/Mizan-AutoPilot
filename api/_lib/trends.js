@@ -4,7 +4,7 @@
 //   net_weight = Σ (trade value as % of the FILER's disclosed position size)  — the rank metric
 //   dollar_est = Σ trade midpoints                                            — secondary $ volume
 //   filer_count = distinct filers
-//   label      = the ticker's Framework B verdict (engine remains the source of truth)
+//   label      = the ticker's AAOIFI verdict (engine remains the source of truth)
 // Only fully-screened, verdict-carrying rows count (completeness gate — unscreened excluded).
 
 const DAY_MS = 86_400_000;

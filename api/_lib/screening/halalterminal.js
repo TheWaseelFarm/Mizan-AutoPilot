@@ -2,10 +2,9 @@
 // Halal Terminal (REST) Sharia-screening adapter — the v1 chosen provider (spec §7).
 //
 // NON-NEGOTIABLE (same rule as zoya.js): consume RAW inputs (business-activity screen +
-// raw financial ratios) and let Framework B (api/_lib/frameworkB.js) decide the verdict.
-// NEVER return, or map from, Halal Terminal's own per-methodology or overall
-// compliant/non-compliant verdict. AAOIFI/DJIM/etc. fail high-debt names; Framework B
-// treats debt as ADVISORY only. We take their numbers, not their conclusion.
+// raw financial ratios: debt %, cash %, impure %) and let the AAOIFI engine
+// (api/_lib/aaoifi.js) decide the verdict. NEVER return, or map from, Halal Terminal's own
+// overall compliant/non-compliant verdict — we take their numbers, not their conclusion.
 //
 // CONFIRMED from the public API surface (https://api.halalterminal.com/):
 //   • Endpoint:  POST /api/screen/{symbol}
@@ -45,13 +44,21 @@ const FIELD_PATHS = {
     ["financials", "nonCompliantRevenue"],
     ["nonCompliantRevenuePercent"],
   ],
-  // Interest-bearing debt ratio (advisory under Framework B — never disqualifies).
+  // Interest-bearing debt as a PERCENT of market cap (AAOIFI: > 30% => Non-compliant).
   debtRatio: [
     ["ratios", "interestBearingDebtToMarketCapPercent"],
     ["ratios", "debtToMarketCapPercent"],
     ["ratios", "debtToAssetsPercent"],
     ["financials", "debtRatio"],
     ["debtToMarketCapPercent"],
+  ],
+  // Cash + interest-bearing securities as a PERCENT of market cap (AAOIFI: > 30% => Non-compliant).
+  cashPct: [
+    ["ratios", "cashAndInterestSecuritiesToMarketCapPercent"],
+    ["ratios", "cashToMarketCapPercent"],
+    ["ratios", "liquidAssetsToMarketCapPercent"],
+    ["financials", "cashRatio"],
+    ["cashToMarketCapPercent"],
   ],
   // Vendor purification rate (informational passthrough only; sale-time math lives elsewhere).
   purificationRate: [
@@ -87,25 +94,20 @@ function mapBusinessStatus(status) {
   return "watch"; // questionable / doubtful / unknown activity -> Purify-at-sale via the engine
 }
 
-function reasoningFor(businessStatus, impurePct, debtRatio) {
+function reasoningFor(businessStatus, impurePct, debtRatio, cashPct) {
   if (businessStatus === "fail") {
-    return "Excluded at the business-activity level: the core line of business is impermissible under the screen.";
+    return "Excluded at the AAOIFI business-activity screen: the core line of business is impermissible.";
   }
-  const bits = [];
+  const bits = ["Business activity is permissible."];
+  if (debtRatio > 30) bits.push(`Interest-bearing debt is ~${debtRatio}% of market cap — over the 30% AAOIFI limit, so Non-compliant.`);
+  if (cashPct > 30) bits.push(`Cash + interest-bearing securities are ~${cashPct}% of market cap — over the 30% AAOIFI limit, so Non-compliant.`);
   bits.push(
-    businessStatus === "watch"
-      ? "Business activity is permissible but flagged for monitoring."
-      : "Business activity is permissible.",
+    impurePct > 5
+      ? `About ${impurePct}% of revenue is impure income — over the 5% limit, so Non-compliant.`
+      : impurePct > 0
+        ? `About ${impurePct}% of revenue is impure income — purify that share of dividends.`
+        : "No impure income to purify.",
   );
-  bits.push(
-    impurePct > 0
-      ? `About ${impurePct}% of revenue is non-compliant/impure, so any realised gain carries a purification amount at sale.`
-      : "No impure income to purify.",
-  );
-  if (debtRatio > 33)
-    bits.push(
-      "Debt-to-market-cap sits above the advisory reference, but under Framework B debt is advisory only and never disqualifies.",
-    );
   return bits.join(" ");
 }
 
@@ -152,27 +154,30 @@ export async function screen(ticker) {
 
   const impurePct = num(pick(root, FIELD_PATHS.impurePct));
   const debtRatio = num(pick(root, FIELD_PATHS.debtRatio));
+  const cashPctRaw = num(pick(root, FIELD_PATHS.cashPct));
   const businessRaw = pick(root, FIELD_PATHS.businessStatus);
 
   // Guard: if we found NO raw ratios AND no activity screen, we must NOT invent them or
   // fall back to the vendor's verdict. Stop loudly (per spec + zoya.js precedent).
-  if (impurePct == null && debtRatio == null && businessRaw == null) {
+  if (impurePct == null && debtRatio == null && cashPctRaw == null && businessRaw == null) {
     throw new Error(
-      "NO_RAW_INPUTS: Halal Terminal response exposed no raw revenue/debt ratios or activity screen at the configured paths — confirm FIELD_PATHS against a real response before enabling. Do NOT map a vendor verdict to Framework B.",
+      "NO_RAW_INPUTS: Halal Terminal response exposed no raw revenue/debt/cash ratios or activity screen at the configured paths — confirm FIELD_PATHS against a real response before enabling. Do NOT map a vendor verdict to AAOIFI.",
     );
   }
 
   const businessStatus = mapBusinessStatus(businessRaw);
   const impure = impurePct == null ? 0 : round2(impurePct);
   const debt = debtRatio == null ? 0 : round2(debtRatio);
+  const cash = cashPctRaw == null ? 0 : round2(cashPctRaw);
 
   return {
     screened: true,
     business: pick(root, FIELD_PATHS.businessDesc) || "Screened (Halal Terminal)",
     businessStatus, // from ACTIVITY only, never the vendor verdict
     impurePct: impure,
-    debtRatio: debt,
-    reasoning: reasoningFor(businessStatus, impure, debt),
-    purification: null, // computed at sale-time by frameworkB.purificationEstimate
+    debtRatio: debt, // interest-bearing debt / market cap (%)
+    cashPct: cash, // cash + interest securities / market cap (%)
+    reasoning: reasoningFor(businessStatus, impure, debt, cash),
+    purification: null, // computed at sale-time by aaoifi.purificationEstimate
   };
 }

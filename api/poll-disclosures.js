@@ -2,7 +2,7 @@
 // Triggered by cron-job.org (e.g. every 5 min). Ingest -> screen -> classify -> store.
 // De-dupes on a unique key so re-runs are idempotent.
 import { supabase } from "./_lib/supabase.js";
-import { classifyFB } from "./_lib/frameworkB.js";
+import { classifyAAOIFI } from "./_lib/aaoifi.js";
  import { fetchNewDisclosures } from "./_lib/sources/fmp.js";  // -> ./sources/quiver.js later
 // Cache-aware screener. Uses Zoya when SCREENING_API_KEY is set, else the mock adapter —
 // the app keeps working without a key.
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
     for (const d of incoming) {
       const s = await screenCached(db, d.ticker); // raw screening inputs (cached, 30-day)
       const rec = { ...d, ...s };
-      rec.label = classifyFB(rec);                 // Framework B verdict
+      rec.label = classifyAAOIFI(rec);              // AAOIFI verdict
 
       const { data, error } = await db
         .from("disclosures")
