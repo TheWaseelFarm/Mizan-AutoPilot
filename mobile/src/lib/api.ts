@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 
 import { labelOf } from './frameworkB';
+import type { FollowerCounts } from './followers';
 import type { PricesMap } from './performance';
 import { SAMPLE } from './sample';
 import type { Disclosure } from './types';
@@ -55,6 +56,25 @@ export async function fetchPrices(signal?: AbortSignal): Promise<PricesMap> {
     if (!res.ok) throw new Error(`prices ${res.status}`);
     const data = await res.json();
     return data && typeof data === 'object' ? (data as PricesMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Fetch the public follower-count map: { portfolio: count }. Aggregate only (no per-user
+ * data). An empty object means "no meaningful following yet", which keeps the Most-followed
+ * board hidden. Failures degrade to {} — never fabricated counts.
+ */
+export async function fetchFollowerCounts(signal?: AbortSignal): Promise<FollowerCounts> {
+  try {
+    const res = await fetch(`${API_BASE}/api/follower-counts`, {
+      headers: { accept: 'application/json' },
+      signal,
+    });
+    if (!res.ok) throw new Error(`follower-counts ${res.status}`);
+    const data = await res.json();
+    return data && typeof data === 'object' ? (data as FollowerCounts) : {};
   } catch {
     return {};
   }

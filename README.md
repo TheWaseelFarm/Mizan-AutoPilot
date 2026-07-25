@@ -65,6 +65,16 @@ https://<your-app>.vercel.app/api/poll-disclosures?secret=<CRON_SECRET>
 ```
 On the mock source this is idempotent (first run inserts, later runs insert 0).
 
+**7. Real prices (optional)** → set `FMP_API_KEY` (free tier, 250 calls/day) and add a second
+cron a few times a day hitting `refresh-prices`. It batches oldest-first and self-throttles on
+the FMP quota. Until it runs, the app shows clearly-labelled **sample** performance; once real
+closes are cached the "sample" tags clear themselves automatically — no code change.
+```
+https://<your-app>.vercel.app/api/refresh-prices?secret=<CRON_SECRET>
+```
+Note: `poll-disclosures` also uses the FMP key for real Senate/House filings — every 5 min is
+576 calls/day (over the free cap), so run it hourly or less once the key is live.
+
 ## Verify the engine
 ```bash
 npm install
