@@ -1,13 +1,13 @@
 // GET /api/rescreen?secret=CRON_SECRET
 // Backfill: force re-screens the distinct tickers in `disclosures` (e.g. after enabling the
 // Zoya key), refreshing the screenings cache AND each disclosure's stored screening fields
-// + Framework B label. Idempotent and batched (<=25/invocation) so it can be called
+// + AAOIFI label. Idempotent and batched (<=25/invocation) so it can be called
 // repeatedly; returns { done, failed, remaining, live }.
 //
 // NOTE: requires supabase/screenings.sql to have been run — the sweep uses that cache's
 // fetched_at to page through tickers across repeated calls.
 import { supabase } from "./_lib/supabase.js";
-import { classifyFB } from "./_lib/frameworkB.js";
+import { classifyAAOIFI } from "./_lib/aaoifi.js";
 import { screenOnce, usingLiveScreener } from "./_lib/screening/index.js";
 
 const BATCH = 25;
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     for (const ticker of batch) {
       try {
         const payload = await screenOnce(ticker);          // force fresh (bypass cache)
-        const label = classifyFB(payload);                 // engine decides — never the vendor
+        const label = classifyAAOIFI(payload);             // engine decides — never the vendor
         try {
           await db.from("screenings").upsert(
             { ticker, payload, fetched_at: new Date().toISOString() },

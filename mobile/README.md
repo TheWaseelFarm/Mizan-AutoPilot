@@ -2,7 +2,7 @@
 
 The native app for Mizān, the **halal investing companion**. This is the v1
 front-end build target (Expo RN, EAS cloud builds → App Store / Play). It reuses
-the repo's existing serverless backend (`/api/*`) and the **Framework B** engine —
+the repo's existing serverless backend (`/api/*`) and the **AAOIFI** engine —
 the mobile app never re-implements the verdict rule, it mirrors it.
 
 > **Status.** Navigation, the light/blue design system, the reserved verdict color
@@ -58,7 +58,7 @@ Build profiles live in `eas.json` (development / preview / production).
 | Spec | Where |
 |---|---|
 | Verdict color language (reserved) | `src/theme/tokens.ts` → `verdictColor` |
-| Framework B (mirror of backend) | `src/lib/frameworkB.ts` |
+| AAOIFI (mirror of backend) | `src/lib/aaoifi.ts` |
 | Feed contract + offline fallback | `src/lib/api.ts`, `src/lib/sample.ts` |
 | Portfolio / stock roll-ups | `src/lib/derive.ts` |
 | Tab 1 Home (perf-ranked portfolios) | `src/screens/HomeScreen.tsx` |

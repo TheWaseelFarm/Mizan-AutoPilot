@@ -1,15 +1,16 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import type { Label } from '../lib/frameworkB';
+import type { Label } from '../lib/aaoifi';
 import { color, font, radius, space, verdictColor } from '../theme/tokens';
 
 /**
  * Compliance filter (round-2 #4) — color-coded so it's obvious what each option shows. Each
  * chip carries the verdict dots it includes, and a legend maps the colors to plain meanings.
- * The key distinction is the middle "Purify at sale" bucket: "Clean only" hides it, while
- * "Clean + Purify" keeps it (hiding only non-compliant names). Uses the reserved verdict
- * colors — this control is explicitly about the Sharia verdict, so the colors belong here.
+ * The key distinction is the middle "purify" bucket (compliant, but some impure income to
+ * purify from dividends): "Clean only" hides it, while "Clean + Purify" keeps it (hiding only
+ * non-compliant names). Uses the reserved verdict colors — this control is explicitly about
+ * the Sharia verdict, so the colors belong here.
  */
 export type ComplianceKey = 'all' | 'fully' | 'exclude';
 
@@ -20,8 +21,8 @@ export const COMPLIANCE_OPTIONS: { key: ComplianceKey; label: string; tones: Lab
 ];
 
 const LEGEND: { tone: Label; word: string; desc: string }[] = [
-  { tone: 'clean', word: 'Clean', desc: 'own freely' },
-  { tone: 'purify', word: 'Purify', desc: 'charity owed at sale' },
+  { tone: 'clean', word: 'Compliant', desc: 'own freely' },
+  { tone: 'purify', word: 'Purify', desc: 'purify dividends' },
   { tone: 'fail', word: 'Non-compliant', desc: 'not permissible' },
 ];
 

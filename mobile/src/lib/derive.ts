@@ -1,4 +1,4 @@
-import type { Label } from './frameworkB';
+import type { Label } from './aaoifi';
 import type { Disclosure, Portfolio, Stock } from './types';
 
 const isFund = (kind: string) => (kind || '').toLowerCase().includes('fund');

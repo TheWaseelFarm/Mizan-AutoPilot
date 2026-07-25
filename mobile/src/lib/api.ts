@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 
-import { labelOf } from './frameworkB';
+import { labelOf } from './aaoifi';
 import type { FollowerCounts } from './followers';
 import type { PricesMap } from './performance';
 import { SAMPLE } from './sample';

@@ -3,7 +3,7 @@
 // aggregates raw trades on every request. Idempotent: recomputes all (ticker,timeframe,side)
 // rows and upserts them. Returns a summary. Tolerates the table being absent.
 import { supabase } from "./_lib/supabase.js";
-import { classifyFB } from "./_lib/frameworkB.js";
+import { classifyAAOIFI } from "./_lib/aaoifi.js";
 import { aggregateTrends } from "./_lib/trends.js";
 
 // Mirror api/feed.js: recompute the verdict from raw inputs and derive `screened`.
@@ -21,7 +21,7 @@ function toRec(row) {
   };
   rec.screened =
     typeof row.screened === "boolean" ? row.screened : !/^No screening data/i.test(row.reasoning || "");
-  rec.label = classifyFB(rec);
+  rec.label = classifyAAOIFI(rec);
   return rec;
 }
 

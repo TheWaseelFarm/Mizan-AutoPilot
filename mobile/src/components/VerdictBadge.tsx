@@ -1,8 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { Label } from '../lib/frameworkB';
-import { VERDICT_SHORT } from '../lib/frameworkB';
+import type { Label } from '../lib/aaoifi';
+import { VERDICT_SHORT } from '../lib/aaoifi';
 import { font, radius, space, verdictColor } from '../theme/tokens';
 
 /** The reserved verdict pill — soft tint + legible text + a solid dot. */

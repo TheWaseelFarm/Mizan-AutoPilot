@@ -5,9 +5,9 @@
 // Provider is chosen by SCREENING_PROVIDER ("halalterminal" (default) | "zoya"). Halal
 // Terminal is the v1 provider (spec §7); Zoya is kept as an alternative adapter.
 //
-// Every adapter returns RAW inputs (business activity, impure %, debt) — NEVER a vendor
-// pass/fail verdict. Framework B (api/_lib/frameworkB.js) is the only thing that decides
-// the verdict; it is not touched here.
+// Every adapter returns RAW inputs (business activity, impure %, debt %, cash %) — NEVER a
+// vendor pass/fail verdict. AAOIFI (api/_lib/aaoifi.js) is the only thing that decides the
+// verdict; it is not touched here.
 import { screen as halalTerminalScreen } from "./halalterminal.js";
 import { screen as mockScreen } from "./mock.js";
 import { screen as zoyaScreen } from "./zoya.js";
@@ -32,6 +32,7 @@ export function unscreened(detail) {
     businessStatus: "watch",
     impurePct: 0,
     debtRatio: 0,
+    cashPct: 0,
     reasoning: "No screening data available" + (detail ? ` (${detail})` : "") +
       " for this ticker — flagged for manual review.",
     purification: null,

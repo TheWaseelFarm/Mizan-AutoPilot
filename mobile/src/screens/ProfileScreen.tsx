@@ -79,19 +79,22 @@ export function ProfileScreen() {
 
       <Text style={styles.sectionTitle}>Methodology</Text>
       <View style={styles.infoCard}>
-        <Text style={styles.rowTitle}>Framework B · Hanbali</Text>
+        <Text style={styles.rowTitle}>AAOIFI Standard No. 21</Text>
         <Text style={styles.rowBody}>
-          Two disqualifying tests: permissible business activity, and impure income ≤ 5%. Debt is
-          advisory — it never fails a name, only moves it to Purify-at-sale.
+          Two screens, both required: permissible business activity, and financial ratios vs. market
+          cap — interest-bearing debt &lt; 30%, cash + interest securities &lt; 30%, and impure income
+          &lt; 5%. Over any limit is Non-compliant. Some impure income (0–5%) is Compliant · purify —
+          you purify that share of dividends.
         </Text>
       </View>
 
       <View style={styles.infoCard}>
         <Text style={styles.rowTitle}>Disclaimer</Text>
         <Text style={styles.rowBody}>
-          Mizān is informational only. It is not a brokerage, a trading or copy-trading service, or a
-          formal fatwa. Performance is past disclosed-holdings evidence, delayed by filing lag — never
-          a recommendation.
+          Screening is based on AAOIFI Standard No. 21. Mizān is informational only — not a brokerage,
+          a trading or copy-trading service, or a formal fatwa. Performance is past disclosed-holdings
+          evidence, delayed by filing lag — never a recommendation. Scholarly review confirms the
+          sector list and thresholds.
         </Text>
       </View>
     </ScrollView>

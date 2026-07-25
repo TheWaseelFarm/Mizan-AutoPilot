@@ -1,10 +1,10 @@
 // api/_lib/screening/zoya.js
 // Zoya (GraphQL) Sharia-screening adapter.
 //
-// NON-NEGOTIABLE: consume RAW inputs (business activity + raw financial ratios) and let
-// Framework B (api/_lib/frameworkB.js) decide the verdict. NEVER return, or map from,
-// Zoya's own AAOIFI compliant/non-compliant verdict — AAOIFI fails high-debt names, but
-// Framework B treats debt as advisory only.
+// NON-NEGOTIABLE: consume RAW inputs (business activity + raw debt/cash/impure ratios) and
+// let the AAOIFI engine (api/_lib/aaoifi.js) decide the verdict. Zoya is AAOIFI-native, so its
+// own verdict may agree with ours — but we still compute from the raw ratios, not their label,
+// so the methodology + thresholds live in exactly one place (api/_lib/aaoifi.js).
 //
 // TODO(owner): the build sandbox can't reach the Zoya developer docs (403), so the
 // endpoint, auth header, query, and field paths below are UNVERIFIED. Confirm them against
@@ -12,7 +12,7 @@
 //
 //   If Zoya only exposes a FINAL compliance verdict and does NOT expose (a) a business-
 //   activity screen separate from financials AND (b) raw revenue/debt ratios, then Zoya is
-//   NOT usable under Framework B — this adapter throws NO_RAW_INPUTS so you stop rather
+//   NOT usable under AAOIFI — this adapter throws NO_RAW_INPUTS so you stop rather
 //   than mapping their verdict to ours.
 
 const ZOYA_ENDPOINT = "https://api.zoya.finance/graphql";   // TODO confirm
@@ -27,7 +27,8 @@ const QUERY = `query MizanScreen($symbol: String!) {
     financials {
       nonCompliantRevenuePercentage                     # TODO
       questionableRevenuePercentage                     # TODO (doubtful/uncertain income)
-      interestBearingDebtToMarketCapPercentage          # TODO
+      interestBearingDebtToMarketCapPercentage          # TODO (AAOIFI: >30% fails)
+      cashAndInterestSecuritiesToMarketCapPercentage    # TODO (AAOIFI: >30% fails)
     }
   }
 }`;
@@ -48,18 +49,18 @@ function mapBusinessStatus(status) {
   return "watch"; // questionable / doubtful / unknown activity -> manual-watch (Purify-at-sale via engine)
 }
 
-function reasoningFor(businessStatus, impurePct, debtRatio) {
+function reasoningFor(businessStatus, impurePct, debtRatio, cashPct) {
   if (businessStatus === "fail") {
-    return "Excluded at the business-activity level: the core line of business is impermissible under the screen.";
+    return "Excluded at the AAOIFI business-activity screen: the core line of business is impermissible.";
   }
-  const bits = [];
-  bits.push(businessStatus === "watch"
-    ? "Business activity is permissible but flagged for monitoring."
-    : "Business activity is permissible.");
-  bits.push(impurePct > 0
-    ? `About ${impurePct}% of revenue is non-compliant/doubtful, so any realised gain carries a purification amount at sale.`
-    : "No impure income to purify.");
-  if (debtRatio > 33) bits.push("Debt-to-market-cap sits above the advisory reference, but under Framework B debt is advisory only and never disqualifies.");
+  const bits = ["Business activity is permissible."];
+  if (debtRatio > 30) bits.push(`Interest-bearing debt is ~${debtRatio}% of market cap — over the 30% AAOIFI limit, so Non-compliant.`);
+  if (cashPct > 30) bits.push(`Cash + interest-bearing securities are ~${cashPct}% of market cap — over the 30% AAOIFI limit, so Non-compliant.`);
+  bits.push(impurePct > 5
+    ? `About ${impurePct}% of revenue is impure income — over the 5% limit, so Non-compliant.`
+    : impurePct > 0
+      ? `About ${impurePct}% of revenue is impure income — purify that share of dividends.`
+      : "No impure income to purify.");
   return bits.join(" ");
 }
 
@@ -102,11 +103,12 @@ export async function screen(ticker) {
   const nonCompliant = num(fin.nonCompliantRevenuePercentage);
   const questionable = num(fin.questionableRevenuePercentage);
   const debtRatio    = num(fin.interestBearingDebtToMarketCapPercentage);
+  const cashRatio    = num(fin.cashAndInterestSecuritiesToMarketCapPercentage);
 
   // Guard: if the vendor gave us no raw ratios, we must NOT invent them or fall back to a
   // verdict. Stop loudly so the owner reconsiders the provider (per the task).
-  if (nonCompliant == null && questionable == null && debtRatio == null) {
-    throw new Error("NO_RAW_INPUTS: Zoya returned no raw revenue/debt ratios — do not map a vendor verdict to Framework B. Confirm the query/fields or choose another provider.");
+  if (nonCompliant == null && questionable == null && debtRatio == null && cashRatio == null) {
+    throw new Error("NO_RAW_INPUTS: Zoya returned no raw revenue/debt/cash ratios — do not map a vendor verdict to AAOIFI. Confirm the query/fields or choose another provider.");
   }
 
   const impurePct = round2((nonCompliant || 0) + (questionable || 0));
@@ -116,8 +118,9 @@ export async function screen(ticker) {
     business: node.businessActivity?.description || "Screened",
     businessStatus,                                   // from ACTIVITY only, never the vendor verdict
     impurePct,
-    debtRatio: debtRatio || 0,
-    reasoning: reasoningFor(businessStatus, impurePct, debtRatio || 0),
+    debtRatio: debtRatio || 0,                        // interest-bearing debt / market cap (%)
+    cashPct: cashRatio || 0,                          // cash + interest securities / market cap (%)
+    reasoning: reasoningFor(businessStatus, impurePct, debtRatio || 0, cashRatio || 0),
     purification: null,                               // computed at sale-time elsewhere
   };
 }

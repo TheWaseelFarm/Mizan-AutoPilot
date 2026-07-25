@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 import { fetchFeed, fetchFollowerCounts, fetchPrices } from '../lib/api';
 import type { FollowerCounts } from '../lib/followers';
-import { isScreened } from '../lib/frameworkB';
+import { isScreened } from '../lib/aaoifi';
 import type { PricesMap } from '../lib/performance';
 import type { Disclosure } from '../lib/types';
 

@@ -2,7 +2,7 @@
   "name": "mizan-mobile",
   "version": "1.0.0",
   "private": true,
-  "description": "Mizān — halal investing companion (Expo React Native). Reuses the repo's /api/* backend + Framework B engine.",
+  "description": "Mizān — halal investing companion (Expo React Native). Reuses the repo's /api/* backend + AAOIFI screening engine.",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",

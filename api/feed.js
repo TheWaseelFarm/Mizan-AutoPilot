@@ -4,7 +4,7 @@
 //   ?all=1          include unscreened rows too (internal/admin/debug only).
 //   ?performance=1  join the cached prices and attach dual-anchor performance per row.
 import { supabase } from "./_lib/supabase.js";
-import { classifyFB } from "./_lib/frameworkB.js";
+import { classifyAAOIFI } from "./_lib/aaoifi.js";
 import { dualAnchor } from "./_lib/performance.js";
 // import { requireAuth } from "./_lib/auth.js"; // uncomment to require login
 
@@ -21,7 +21,9 @@ function toClient(row) {
     transactionDate: row.transaction_date, filingDate: row.filing_date,
     purchasePrice: Number(row.purchase_price), fallbackPrice: Number(row.fallback_price),
     business: row.business, businessStatus: row.business_status,
+    // AAOIFI ratio inputs (all vs. market cap). debtRatio kept as the debt alias; cashPct new.
     impurePct: Number(row.impure_pct), debtRatio: Number(row.debt_ratio),
+    cashPct: row.cash_pct == null ? 0 : Number(row.cash_pct),
     reasoning: row.reasoning, purification: row.purification,
     alert: row.alert, confidence: row.confidence
   };
@@ -31,7 +33,7 @@ function toClient(row) {
   rec.screened = typeof row.screened === "boolean"
     ? row.screened
     : !/^No screening data/i.test(row.reasoning || "");
-  rec.label = classifyFB(rec); // engine is the single source of truth for the verdict
+  rec.label = classifyAAOIFI(rec); // engine is the single source of truth for the verdict
   return rec;
 }
 
