@@ -8,7 +8,16 @@ import { color, font, radius, space, verdictColor } from '../theme/tokens';
  * Mini Clean/Purify/Fail mix bar for a portfolio (spec §2). The Sharia flag is
  * visually louder than performance; this bar accompanies it everywhere.
  */
-export function MixBar({ mix, showLegend = false }: { mix: Portfolio['mix']; showLegend?: boolean }) {
+export function MixBar({
+  mix,
+  showLegend = false,
+  inlineLabels = false,
+}: {
+  mix: Portfolio['mix'];
+  showLegend?: boolean;
+  /** Compact colored % numbers to the right of the bar (matches the ranking-row reference). */
+  inlineLabels?: boolean;
+}) {
   const total = mix.clean + mix.purify + mix.fail + mix.unscreened || 1;
   const seg = [
     ['clean', mix.clean],
@@ -16,18 +25,34 @@ export function MixBar({ mix, showLegend = false }: { mix: Portfolio['mix']; sho
     ['fail', mix.fail],
     ['unscreened', mix.unscreened],
   ] as const;
+  const bar = (
+    <View style={styles.bar}>
+      {seg.map(([k, n]) =>
+        n > 0 ? (
+          <View key={k} style={{ flex: n, backgroundColor: verdictColor[k].solid, height: '100%' }} />
+        ) : null,
+      )}
+    </View>
+  );
+  if (inlineLabels) {
+    return (
+      <View style={styles.inlineRow}>
+        <View style={{ flex: 1 }}>{bar}</View>
+        <View style={styles.inlinePcts}>
+          {seg.map(([k, n]) =>
+            n > 0 ? (
+              <Text key={k} style={[styles.inlinePct, { color: verdictColor[k].text }]}>
+                {Math.round((n / total) * 100)}%
+              </Text>
+            ) : null,
+          )}
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={styles.wrap}>
-      <View style={styles.bar}>
-        {seg.map(([k, n]) =>
-          n > 0 ? (
-            <View
-              key={k}
-              style={{ flex: n, backgroundColor: verdictColor[k].solid, height: '100%' }}
-            />
-          ) : null,
-        )}
-      </View>
+      {bar}
       {showLegend ? (
         <View style={styles.legend}>
           {seg.map(([k, n]) => (
@@ -57,4 +82,7 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: font.small, fontWeight: font.weight.medium, color: color.muted },
+  inlineRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  inlinePcts: { flexDirection: 'row', gap: 8 },
+  inlinePct: { fontSize: font.small, fontWeight: font.weight.heavy, fontVariant: ['tabular-nums'] },
 });

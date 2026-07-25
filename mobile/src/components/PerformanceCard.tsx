@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { resolvePrice } from '../lib/illustrative';
 import { dualAnchor, fmtPctCompact, perfTone, type PricesMap } from '../lib/performance';
 import { color, font, perfColor, radius, space } from '../theme/tokens';
+import { Icon } from './Icon';
 import { PerformanceChart } from './PerformanceChart';
 
 /**
@@ -58,7 +59,8 @@ export function PerformanceCard({
 
       {perf.freshness ? (
         <View style={styles.fresh}>
-          <Text style={styles.freshText}>⚑ {perf.freshness}</Text>
+          <Icon name="clock" size={13} color={color.muted} />
+          <Text style={styles.freshText}>{perf.freshness}</Text>
         </View>
       ) : null}
 
@@ -125,7 +127,7 @@ const styles = StyleSheet.create({
   // Muted — evidence, never a verdict color.
   anchorValue: { fontSize: font.h2, fontWeight: font.weight.heavy, color: color.muted, marginTop: 4, fontVariant: ['tabular-nums'] },
   anchorSub: { fontSize: font.tiny, color: color.faint, marginTop: 2 },
-  fresh: { marginTop: space.md, padding: space.md, borderRadius: radius.sm, backgroundColor: color.surfaceAlt },
+  fresh: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: space.md, padding: space.md, borderRadius: radius.sm, backgroundColor: color.surfaceAlt },
   freshText: { fontSize: font.small, color: color.muted, fontWeight: font.weight.medium, lineHeight: 18 },
   prow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.md },
   price: { fontSize: font.small, color: color.faint, fontWeight: font.weight.medium, fontVariant: ['tabular-nums'] },
