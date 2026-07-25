@@ -1,7 +1,7 @@
 import type { RouteProp } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/native';
-import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Disclaimer } from '../components/Disclaimer';
 import { FollowButton } from '../components/FollowButton';
@@ -10,6 +10,7 @@ import { PerformanceChart } from '../components/PerformanceChart';
 import { PieChart } from '../components/PieChart';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
+  type Holding,
   actorDescriptor,
   daysBetween,
   derivePortfolios,
@@ -53,7 +54,9 @@ export function PortfolioDetailScreen() {
   const followers = followerCounts[name] || 0;
   const composition = useMemo(() => portfolioComposition(activity), [activity]);
   const held = composition.filter((h) => h.held);
+  const sold = composition.filter((h) => !h.held);
   const maxWeight = held[0]?.weightPct || 1;
+  const [showSold, setShowSold] = useState(false);
   const pp = useMemo(() => portfolioIndex(composition, activity, prices), [composition, activity, prices]);
   const ppSince = pp?.sinceDisclosed != null ? fmtPctCompact(pp.sinceDisclosed) : null;
   // Per-holding "since disclosed" so each name shows whether it's up ▲ or down ▼.
@@ -142,42 +145,29 @@ export function PortfolioDetailScreen() {
       ) : (
         <Text style={styles.noHoldings}>No current disclosed holdings — every position here was net sold.</Text>
       )}
-      {composition.map((h) => {
-        const perf = holdingPerf[h.ticker];
-        return (
-          <View key={h.ticker} style={styles.compRow}>
-            <View style={[styles.compDot, { backgroundColor: verdictColor[h.label].solid }]} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.compTicker, !h.held && styles.compTickerMuted]} numberOfLines={1}>
-                {h.ticker} <Text style={styles.compCompany}>· {h.company}</Text>
-              </Text>
-              {h.held ? (
-                <View style={styles.compTrack}>
-                  <View style={[styles.compFill, { width: `${(h.weightPct / maxWeight) * 100}%` }]} />
-                </View>
-              ) : null}
-            </View>
-            <View style={styles.compRight}>
-              {h.held ? (
-                <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
-              ) : (
-                <View style={styles.soldTag}>
-                  <Text style={styles.soldTagText}>Sold</Text>
-                </View>
-              )}
-              {/* Per-name performance — up=blue / down=slate (a non-verdict tone). */}
-              {perf?.since ? (
-                <Text style={[styles.compPerf, { color: perfColor[perf.tone] }]}>{perf.since} since</Text>
-              ) : (
-                <Text style={styles.compPerfPending}>perf pending</Text>
-              )}
-            </View>
-          </View>
-        );
-      })}
+      {/* Current holdings first. */}
+      {held.map((h) => (
+        <CompRow key={h.ticker} h={h} maxWeight={maxWeight} perf={holdingPerf[h.ticker]} />
+      ))}
+
+      {/* Net-sold / exited names collapse under a toggle so current holdings stay on top. */}
+      {sold.length ? (
+        <>
+          <TouchableOpacity
+            style={styles.soldHead}
+            activeOpacity={0.7}
+            onPress={() => setShowSold((s) => !s)}
+          >
+            <Text style={styles.soldHeadChevron}>{showSold ? '▾' : '▸'}</Text>
+            <Text style={styles.soldHeadText}>Sold / exited · {sold.length}</Text>
+          </TouchableOpacity>
+          {showSold ? sold.map((h) => <CompRow key={h.ticker} h={h} maxWeight={maxWeight} perf={holdingPerf[h.ticker]} />) : null}
+        </>
+      ) : null}
+
       <Text style={styles.compNote}>
         Share of current disclosed holdings by value; names net sold in these filings are kept
-        and marked “Sold.” Each name shows its move since disclosed (▲ up / ▼ down) —
+        under “Sold / exited.” Each name shows its move since disclosed (▲ up / ▼ down) —
         informational, not a recommendation to buy.
       </Text>
 
@@ -206,6 +196,47 @@ export function PortfolioDetailScreen() {
 
       <Disclaimer />
     </ScrollView>
+  );
+}
+
+function CompRow({
+  h,
+  maxWeight,
+  perf,
+}: {
+  h: Holding;
+  maxWeight: number;
+  perf?: { since: string | null; tone: 'up' | 'down' | 'flat' };
+}) {
+  return (
+    <View style={styles.compRow}>
+      <View style={[styles.compDot, { backgroundColor: verdictColor[h.label].solid }]} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[styles.compTicker, !h.held && styles.compTickerMuted]} numberOfLines={1}>
+          {h.ticker} <Text style={styles.compCompany}>· {h.company}</Text>
+        </Text>
+        {h.held ? (
+          <View style={styles.compTrack}>
+            <View style={[styles.compFill, { width: `${(h.weightPct / maxWeight) * 100}%` }]} />
+          </View>
+        ) : null}
+      </View>
+      <View style={styles.compRight}>
+        {h.held ? (
+          <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
+        ) : (
+          <View style={styles.soldTag}>
+            <Text style={styles.soldTagText}>Sold</Text>
+          </View>
+        )}
+        {/* Per-name performance — up=blue / down=slate (a non-verdict tone). */}
+        {perf?.since ? (
+          <Text style={[styles.compPerf, { color: perfColor[perf.tone] }]}>{perf.since} since</Text>
+        ) : (
+          <Text style={styles.compPerfPending}>perf pending</Text>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -325,6 +356,17 @@ const styles = StyleSheet.create({
   compCompany: { fontSize: font.small, fontWeight: font.weight.regular, color: color.faint },
   soldTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.sm, backgroundColor: color.surfaceAlt },
   soldTagText: { fontSize: font.tiny, fontWeight: font.weight.heavy, color: color.muted, letterSpacing: 0.4 },
+  soldHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginHorizontal: space.lg,
+    marginTop: 2,
+    marginBottom: space.sm,
+    paddingVertical: 4,
+  },
+  soldHeadChevron: { fontSize: font.small, color: color.faint, width: 12 },
+  soldHeadText: { fontSize: font.label, fontWeight: font.weight.heavy, color: color.muted },
   noHoldings: {
     marginHorizontal: space.lg,
     marginBottom: space.md,
