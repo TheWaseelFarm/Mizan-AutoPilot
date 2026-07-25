@@ -100,3 +100,32 @@ export function fmtPctCompact(v: number | null): string | null {
   if (v == null || !isFinite(v)) return null;
   return (v >= 0 ? '▲' : '▼') + Math.abs(v).toFixed(1) + '%';
 }
+
+/**
+ * Trailing-window return: the % change over the last `days` of a price/index series (so the
+ * 1W / 1M / 3M … selector actually re-scopes the number). `days = Infinity` → full range.
+ * The window base is the first point on/after the cutoff; if the series is shorter than the
+ * window it falls back to the earliest point (honest "as far back as we have").
+ */
+export function windowReturn(history: PricePoint[], days: number): number | null {
+  if (!Array.isArray(history) || history.length < 2) return null;
+  const last = history[history.length - 1];
+  const lastC = Number(last.c);
+  if (!isFinite(lastC) || lastC === 0) return null;
+  let baseC: number;
+  if (!isFinite(days)) {
+    baseC = Number(history[0].c);
+  } else {
+    const cutoff = Date.parse(last.d) - days * DAY_MS;
+    let base = history[0];
+    for (const p of history) {
+      if (Date.parse(p.d) >= cutoff) {
+        base = p;
+        break;
+      }
+    }
+    baseC = Number(base.c);
+  }
+  if (!isFinite(baseC) || baseC === 0) return null;
+  return (lastC / baseC - 1) * 100;
+}

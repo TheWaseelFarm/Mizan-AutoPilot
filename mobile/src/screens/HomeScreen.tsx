@@ -21,7 +21,7 @@ import { MixBar } from '../components/MixBar';
 import { SearchBar } from '../components/SearchBar';
 import { derivePortfolios, portfolioComposition, portfolioFlag, typeLabel } from '../lib/derive';
 import { hasMeaningfulFollowers } from '../lib/followers';
-import { fmtPctCompact } from '../lib/performance';
+import { fmtPctCompact, windowReturn } from '../lib/performance';
 import { portfolioIndex } from '../lib/portfolioPerf';
 import type { Disclosure, Portfolio } from '../lib/types';
 import type { HomeStackParamList } from '../navigation/types';
@@ -38,6 +38,18 @@ const TIMEFRAMES = [
   { key: '5Y', label: '5Y' },
   { key: 'ALL', label: 'All' },
 ] as const;
+
+// Trailing window (days) each timeframe scopes the performance to.
+const TF_DAYS: Record<string, number> = {
+  '1W': 7,
+  '1M': 30,
+  '3M': 90,
+  '6M': 180,
+  '1Y': 365,
+  '3Y': 1095,
+  '5Y': 1825,
+  ALL: Infinity,
+};
 
 const SORTS = [
   { key: 'performance', label: 'Performance' },
@@ -106,7 +118,8 @@ export function HomeScreen() {
       return {
         p,
         who: whoLine(p, source),
-        perf: idx?.sinceDisclosed ?? null,
+        // Trailing-window return for the selected timeframe (so 1W/1M/3M… actually re-scope it).
+        perf: idx ? windowReturn(idx.history, TF_DAYS[tf]) : null,
         illustrative: idx?.illustrative ?? true,
         followers: followerCounts[p.name] || 0,
       };
@@ -135,7 +148,7 @@ export function HomeScreen() {
       list = list.sort((a, b) => b.followers - a.followers || b.p.count - a.p.count);
     }
     return list;
-  }, [rows, byActor, prices, followerCounts, query, sort, compliance]);
+  }, [rows, byActor, prices, followerCounts, query, sort, compliance, tf]);
 
   const shown = showAll ? ranked : ranked.slice(0, INITIAL_SHOWN);
   const activeFilters = (sort !== 'performance' ? 1 : 0) + (compliance !== 'all' ? 1 : 0);

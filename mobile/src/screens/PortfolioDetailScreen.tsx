@@ -7,6 +7,7 @@ import { Disclaimer } from '../components/Disclaimer';
 import { FollowButton } from '../components/FollowButton';
 import { MixBar } from '../components/MixBar';
 import { PerformanceChart } from '../components/PerformanceChart';
+import { PieChart } from '../components/PieChart';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
   actorDescriptor,
@@ -121,16 +122,11 @@ export function PortfolioDetailScreen() {
       {/* Composition — how much of the portfolio each stock makes up (informational). */}
       <View style={styles.compHead}>
         <Text style={styles.sectionTitle}>Composition</Text>
-        <Text style={styles.compSub}>Share of the disclosed portfolio, by amount</Text>
+        <Text style={styles.compSub}>Share of the disclosed portfolio, by value invested</Text>
       </View>
-      {/* Stacked allocation bar (neutral blue tints — verdict colors stay reserved). */}
-      <View style={styles.allocBar}>
-        {composition.map((h, i) => (
-          <View
-            key={h.ticker}
-            style={{ flex: h.weightPct, backgroundColor: allocTint(i, composition.length), height: '100%' }}
-          />
-        ))}
+      {/* Donut: value split by stock (neutral categorical colors — verdict colors stay reserved). */}
+      <View style={styles.pieCard}>
+        <PieChart slices={composition.map((h) => ({ key: h.ticker, label: h.ticker, sub: h.company, pct: h.weightPct }))} />
       </View>
       {composition.map((h) => {
         const perf = holdingPerf[h.ticker];
@@ -197,13 +193,6 @@ function Stat({ label, value, muted }: { label: string; value: string; muted?: b
       <Text style={[styles.statValue, muted && styles.statValueMuted]}>{value}</Text>
     </View>
   );
-}
-
-// Neutral blue tint for an allocation segment (index-based) — kept distinct from the
-// reserved verdict color language.
-function allocTint(i: number, n: number): string {
-  const opacity = Math.max(0.28, 0.9 - (i / Math.max(1, n - 1)) * 0.62);
-  return `rgba(37, 99, 235, ${opacity.toFixed(2)})`;
 }
 
 function sideWord(side: string): string {
@@ -285,14 +274,14 @@ const styles = StyleSheet.create({
   illText: { fontSize: 9.5, fontWeight: font.weight.bold, color: color.faint, letterSpacing: 0.2 },
   compHead: { paddingHorizontal: space.lg, marginTop: space.md, marginBottom: space.sm },
   compSub: { fontSize: font.small, color: color.faint, marginTop: 2 },
-  allocBar: {
-    flexDirection: 'row',
-    height: 12,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
+  pieCard: {
     marginHorizontal: space.lg,
     marginBottom: space.md,
-    backgroundColor: color.surfaceAlt,
+    padding: space.lg,
+    borderRadius: radius.md,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.line,
   },
   compRow: {
     flexDirection: 'row',
