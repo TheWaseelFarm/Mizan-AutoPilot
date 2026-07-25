@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandHeader } from '../components/BrandHeader';
 import { ChipRow } from '../components/Chips';
+import { ComplianceFilter, type ComplianceKey } from '../components/ComplianceFilter';
 import { Disclaimer } from '../components/Disclaimer';
 import { SearchBar } from '../components/SearchBar';
 import { VerdictBadge } from '../components/VerdictBadge';
@@ -39,15 +40,10 @@ const TIMEFRAMES = [
 const TF_DAYS: Record<string, number> = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '3Y': 1095, '5Y': 1825, ALL: Infinity };
 
 const SORTS = [
-  { key: 'weight', label: 'Weight' },
   { key: 'volume', label: '$ Volume' },
+  { key: 'weight', label: 'Weight' },
 ] as const;
 
-const COMPLIANCE = [
-  { key: 'all', label: 'All' },
-  { key: 'fully', label: 'Fully compliant' },
-  { key: 'exclude', label: 'Exclude non-compliant' },
-] as const;
 
 export function StocksScreen() {
   const nav = useNavigation<Nav>();
@@ -55,11 +51,12 @@ export function StocksScreen() {
   const { rows, loading, live, refresh } = useFeed();
   const [side, setSide] = useState<Side>('bought');
   const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('ALL');
-  const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('weight');
-  const [compliance, setCompliance] = useState<(typeof COMPLIANCE)[number]['key']>('all');
+  const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('volume');
+  const [compliance, setCompliance] = useState<ComplianceKey>('all');
   const [query, setQuery] = useState('');
 
   const stocks = useMemo(() => {
+    // deriveSmartMoney returns rows already ranked by $ volume (the default, logical order).
     let list = deriveSmartMoney(rows, side === 'bought' ? 'BUY' : 'SELL', TF_DAYS[tf]);
     if (query.trim()) {
       const q = query.trim().toLowerCase();
@@ -68,8 +65,11 @@ export function StocksScreen() {
     if (compliance !== 'all') {
       list = list.filter((s) => (compliance === 'fully' ? s.label === 'clean' : s.label !== 'fail'));
     }
-    if (sort === 'volume') list = [...list].sort((a, b) => b.dollarVol - a.dollarVol);
-    return list; // default already sorted by net weight
+    if (sort === 'weight') {
+      // Rank by the gaugeable weight; names with no sizeable position (null) fall to the bottom.
+      list = [...list].sort((a, b) => (b.netWeightPct ?? -1) - (a.netWeightPct ?? -1) || b.dollarVol - a.dollarVol);
+    }
+    return list;
   }, [rows, side, tf, sort, compliance, query]);
 
   return (
@@ -102,7 +102,7 @@ export function StocksScreen() {
           <View>
             <ChipRow label="Time" options={TIMEFRAMES} value={tf} onChange={setTf} />
             <ChipRow label="Sort by" options={SORTS} value={sort} onChange={setSort} />
-            <ChipRow label="Compliance" options={COMPLIANCE} value={compliance} onChange={setCompliance} />
+            <ComplianceFilter value={compliance} onChange={setCompliance} />
             <View style={styles.listHead}>
               <Text style={styles.listHeadTitle}>{side === 'bought' ? 'Most bought' : 'Most sold'}</Text>
               <Text style={styles.listHeadMeta}>
@@ -138,11 +138,12 @@ function StockRow({ s, rank, onPress }: { s: SmartRow; rank: number; onPress: ()
       </View>
       <View style={styles.right}>
         <VerdictBadge label={s.label} size="sm" />
-        {/* Primary rank metric: trade value as % of filer position, summed across filers. */}
-        <Text style={styles.weight}>{s.netWeightPct.toFixed(1)}% wt</Text>
-        {/* Secondary: $ volume · filer count (muted). */}
+        {/* Primary rank metric: real disclosed $ volume. */}
+        <Text style={styles.weight}>{fmtMoney(s.dollarVol)}</Text>
+        {/* Secondary: filer count + "% of position" ONLY when a position could be sized. */}
         <Text style={styles.metric}>
-          {fmtMoney(s.dollarVol)} · {s.filers} filer{s.filers === 1 ? '' : 's'}
+          {s.filers} filer{s.filers === 1 ? '' : 's'}
+          {s.netWeightPct != null ? ` · ${s.netWeightPct}% of position` : ''}
         </Text>
       </View>
     </TouchableOpacity>

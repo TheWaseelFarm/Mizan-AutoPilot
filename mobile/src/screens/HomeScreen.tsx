@@ -16,16 +16,17 @@ import { BrandHeader } from '../components/BrandHeader';
 import { Disclaimer } from '../components/Disclaimer';
 import { Emblem } from '../components/Emblem';
 import { FilterSheet } from '../components/FilterSheet';
+import type { ComplianceKey } from '../components/ComplianceFilter';
 import { MixBar } from '../components/MixBar';
 import { SearchBar } from '../components/SearchBar';
 import { derivePortfolios, portfolioComposition, portfolioFlag, typeLabel } from '../lib/derive';
 import { hasMeaningfulFollowers } from '../lib/followers';
-import { fmtPctCompact } from '../lib/performance';
+import { fmtPctCompact, perfTone, windowReturn } from '../lib/performance';
 import { portfolioIndex } from '../lib/portfolioPerf';
 import type { Disclosure, Portfolio } from '../lib/types';
 import type { HomeStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
-import { color, font, radius, shadow, space, verdictColor } from '../theme/tokens';
+import { color, font, perfColor, radius, shadow, space, verdictColor } from '../theme/tokens';
 
 const TIMEFRAMES = [
   { key: '1W', label: '1W' },
@@ -38,17 +39,23 @@ const TIMEFRAMES = [
   { key: 'ALL', label: 'All' },
 ] as const;
 
+// Trailing window (days) each timeframe scopes the performance to.
+const TF_DAYS: Record<string, number> = {
+  '1W': 7,
+  '1M': 30,
+  '3M': 90,
+  '6M': 180,
+  '1Y': 365,
+  '3Y': 1095,
+  '5Y': 1825,
+  ALL: Infinity,
+};
+
 const SORTS = [
   { key: 'performance', label: 'Performance' },
   { key: 'followers', label: 'Followers' },
 ] as const;
 
-// Compliance FILTERS the list (it is not a sort) — v1-extend task #2.
-const COMPLIANCE = [
-  { key: 'all', label: 'All' },
-  { key: 'fully', label: 'Fully compliant' },
-  { key: 'exclude', label: 'Exclude non-compliant' },
-] as const;
 
 const INITIAL_SHOWN = 6;
 
@@ -86,7 +93,7 @@ export function HomeScreen() {
   const { rows, prices, followerCounts, loading, live, refresh } = useFeed();
   const [tf, setTf] = useState<(typeof TIMEFRAMES)[number]['key']>('1M');
   const [sort, setSort] = useState<(typeof SORTS)[number]['key']>('performance');
-  const [compliance, setCompliance] = useState<(typeof COMPLIANCE)[number]['key']>('all');
+  const [compliance, setCompliance] = useState<ComplianceKey>('all');
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -111,7 +118,8 @@ export function HomeScreen() {
       return {
         p,
         who: whoLine(p, source),
-        perf: idx?.sinceDisclosed ?? null,
+        // Trailing-window return for the selected timeframe (so 1W/1M/3M… actually re-scope it).
+        perf: idx ? windowReturn(idx.history, TF_DAYS[tf]) : null,
         illustrative: idx?.illustrative ?? true,
         followers: followerCounts[p.name] || 0,
       };
@@ -140,7 +148,7 @@ export function HomeScreen() {
       list = list.sort((a, b) => b.followers - a.followers || b.p.count - a.p.count);
     }
     return list;
-  }, [rows, byActor, prices, followerCounts, query, sort, compliance]);
+  }, [rows, byActor, prices, followerCounts, query, sort, compliance, tf]);
 
   const shown = showAll ? ranked : ranked.slice(0, INITIAL_SHOWN);
   const activeFilters = (sort !== 'performance' ? 1 : 0) + (compliance !== 'all' ? 1 : 0);
@@ -150,22 +158,14 @@ export function HomeScreen() {
   // Most-followed board appears only when the counts describe a real leaderboard (decision #8).
   const showMostFollowed = hasMeaningfulFollowers(followerCounts);
 
-  const goStocks = () => nav.getParent()?.navigate('StocksTab' as never);
-
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <BrandHeader />
 
-      {/* Portfolios | Stocks segmented toggle + a search affordance. */}
+      {/* Screen title + a search affordance. (Stocks lives in the bottom tab — a single door;
+          the old top "Portfolios | Stocks" switcher was a confusing second one — round-2 #3.) */}
       <View style={styles.topBar}>
-        <View style={styles.segment}>
-          <View style={[styles.segItem, styles.segItemOn]}>
-            <Text style={[styles.segText, styles.segTextOn]}>Portfolios</Text>
-          </View>
-          <TouchableOpacity style={styles.segItem} onPress={goStocks} activeOpacity={0.7}>
-            <Text style={styles.segText}>Stocks</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.screenTitle}>Portfolios</Text>
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={() => setSearchOpen((s) => !s)}
@@ -260,7 +260,7 @@ export function HomeScreen() {
         onClose={() => setFilterOpen(false)}
         time={{ label: 'Time', options: TIMEFRAMES, value: tf, onChange: setTf }}
         sort={{ label: 'Sort by', options: SORTS, value: sort, onChange: setSort }}
-        compliance={{ label: 'Compliance', options: COMPLIANCE, value: compliance, onChange: setCompliance }}
+        compliance={{ value: compliance, onChange: setCompliance }}
       />
     </View>
   );
@@ -296,6 +296,7 @@ function TimeBar({
 function PerformerRow({ r, rank, onPress }: { r: Ranked; rank: number; onPress: () => void }) {
   const flag = portfolioFlag(r.p);
   const perf = fmtPctCompact(r.perf);
+  const tone = perfTone(r.perf); // up = blue, down = slate — never a verdict color
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.row}>
       <Text style={styles.rank}>{rank}</Text>
@@ -321,9 +322,9 @@ function PerformerRow({ r, rank, onPress }: { r: Ranked; rank: number; onPress: 
       </View>
 
       <View style={styles.rowRight}>
-        {/* Neutral performance chip — grey ▲/▼, never a verdict color. */}
-        <View style={styles.perfChip}>
-          <Text style={styles.perfText}>{perf ?? 'perf pending'}</Text>
+        {/* Performance chip — up=blue / down=slate (a non-verdict tone, so a gain reads clearly). */}
+        <View style={[styles.perfChip, { backgroundColor: perfColor[`${tone}Soft`] }]}>
+          <Text style={[styles.perfText, { color: perfColor[tone] }]}>{perf ?? 'perf pending'}</Text>
         </View>
         {r.illustrative && perf ? <Text style={styles.perfNote}>sample</Text> : null}
         <Text style={styles.chevron}>›</Text>
@@ -376,22 +377,13 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: space.sm,
     paddingHorizontal: space.lg,
     paddingTop: space.xs,
     paddingBottom: space.sm,
   },
-  segment: {
-    flexDirection: 'row',
-    flex: 1,
-    backgroundColor: color.surfaceAlt,
-    borderRadius: radius.pill,
-    padding: 3,
-  },
-  segItem: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: radius.pill },
-  segItemOn: { backgroundColor: color.surface, ...shadow.card },
-  segText: { fontSize: font.label, fontWeight: font.weight.bold, color: color.muted },
-  segTextOn: { color: color.ink },
+  screenTitle: { fontSize: font.h2, fontWeight: font.weight.heavy, color: color.ink, letterSpacing: -0.3 },
   iconBtn: {
     width: 46,
     height: 46,

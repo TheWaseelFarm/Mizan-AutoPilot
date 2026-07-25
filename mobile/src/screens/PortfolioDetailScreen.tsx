@@ -7,6 +7,7 @@ import { Disclaimer } from '../components/Disclaimer';
 import { FollowButton } from '../components/FollowButton';
 import { MixBar } from '../components/MixBar';
 import { PerformanceChart } from '../components/PerformanceChart';
+import { PieChart } from '../components/PieChart';
 import { VerdictBadge } from '../components/VerdictBadge';
 import {
   actorDescriptor,
@@ -17,11 +18,11 @@ import {
   portfolioFlag,
 } from '../lib/derive';
 import { resolvePrice } from '../lib/illustrative';
-import { dualAnchor, fmtPctCompact } from '../lib/performance';
+import { dualAnchor, fmtPctCompact, perfTone } from '../lib/performance';
 import { portfolioIndex } from '../lib/portfolioPerf';
 import type { HomeStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
-import { color, font, radius, shadow, space, verdictColor } from '../theme/tokens';
+import { color, font, perfColor, radius, shadow, space, verdictColor } from '../theme/tokens';
 
 export function PortfolioDetailScreen() {
   const route = useRoute<RouteProp<HomeStackParamList, 'PortfolioDetail'>>();
@@ -49,18 +50,19 @@ export function PortfolioDetailScreen() {
   const descriptor = actorDescriptor(activity[0] ?? { kind: portfolio.kind });
   const avgLag = averageLag(activity);
   const composition = useMemo(() => portfolioComposition(activity), [activity]);
-  const maxWeight = composition[0]?.weightPct || 1;
+  const held = composition.filter((h) => h.held);
+  const maxWeight = held[0]?.weightPct || 1;
   const pp = useMemo(() => portfolioIndex(composition, activity, prices), [composition, activity, prices]);
   const ppSince = pp?.sinceDisclosed != null ? fmtPctCompact(pp.sinceDisclosed) : null;
   // Per-holding "since disclosed" so each name shows whether it's up ▲ or down ▼.
   const holdingPerf = useMemo(() => {
-    const m: Record<string, { since: string | null; down: boolean }> = {};
+    const m: Record<string, { since: string | null; tone: 'up' | 'down' | 'flat' }> = {};
     for (const h of composition) {
       const disc = activity
         .filter((r) => r.ticker === h.ticker)
         .sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || ''))[0];
       const v = disc ? dualAnchor(resolvePrice(prices, { ticker: h.ticker }).price, disc)?.sinceDisclosed ?? null : null;
-      m[h.ticker] = { since: fmtPctCompact(v), down: v != null && v < 0 };
+      m[h.ticker] = { since: fmtPctCompact(v), tone: perfTone(v) };
     }
     return m;
   }, [composition, activity, prices]);
@@ -96,7 +98,12 @@ export function PortfolioDetailScreen() {
       </View>
       <View style={styles.stats}>
         <Stat label="Risk appetite" value="Pending" muted />
-        <Stat label="Performance" value={ppSince || 'Pending'} muted />
+        <Stat
+          label="Performance"
+          value={ppSince || 'Pending'}
+          muted
+          valueColor={ppSince ? perfColor[perfTone(pp?.sinceDisclosed ?? null)] : undefined}
+        />
         <Stat label="Followers" value="—" muted />
       </View>
 
@@ -121,35 +128,43 @@ export function PortfolioDetailScreen() {
       {/* Composition — how much of the portfolio each stock makes up (informational). */}
       <View style={styles.compHead}>
         <Text style={styles.sectionTitle}>Composition</Text>
-        <Text style={styles.compSub}>Share of the disclosed portfolio, by amount</Text>
+        <Text style={styles.compSub}>Share of the disclosed portfolio, by value invested</Text>
       </View>
-      {/* Stacked allocation bar (neutral blue tints — verdict colors stay reserved). */}
-      <View style={styles.allocBar}>
-        {composition.map((h, i) => (
-          <View
-            key={h.ticker}
-            style={{ flex: h.weightPct, backgroundColor: allocTint(i, composition.length), height: '100%' }}
-          />
-        ))}
-      </View>
+      {/* Donut: value split by CURRENT holdings (net-sold names carry 0% and drop out of the
+          pie, but still appear below tagged "Sold"). Neutral colors — verdict colors reserved. */}
+      {held.length ? (
+        <View style={styles.pieCard}>
+          <PieChart slices={held.map((h) => ({ key: h.ticker, label: h.ticker, sub: h.company, pct: h.weightPct }))} />
+        </View>
+      ) : (
+        <Text style={styles.noHoldings}>No current disclosed holdings — every position here was net sold.</Text>
+      )}
       {composition.map((h) => {
         const perf = holdingPerf[h.ticker];
         return (
           <View key={h.ticker} style={styles.compRow}>
             <View style={[styles.compDot, { backgroundColor: verdictColor[h.label].solid }]} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.compTicker} numberOfLines={1}>
+              <Text style={[styles.compTicker, !h.held && styles.compTickerMuted]} numberOfLines={1}>
                 {h.ticker} <Text style={styles.compCompany}>· {h.company}</Text>
               </Text>
-              <View style={styles.compTrack}>
-                <View style={[styles.compFill, { width: `${(h.weightPct / maxWeight) * 100}%` }]} />
-              </View>
+              {h.held ? (
+                <View style={styles.compTrack}>
+                  <View style={[styles.compFill, { width: `${(h.weightPct / maxWeight) * 100}%` }]} />
+                </View>
+              ) : null}
             </View>
             <View style={styles.compRight}>
-              <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
-              {/* Per-name performance — muted (▲ up / ▼ down); never a verdict color. */}
+              {h.held ? (
+                <Text style={styles.compPct}>{h.weightPct >= 9.5 ? Math.round(h.weightPct) : h.weightPct.toFixed(1)}%</Text>
+              ) : (
+                <View style={styles.soldTag}>
+                  <Text style={styles.soldTagText}>Sold</Text>
+                </View>
+              )}
+              {/* Per-name performance — up=blue / down=slate (a non-verdict tone). */}
               {perf?.since ? (
-                <Text style={[styles.compPerf, perf.down && styles.compPerfDown]}>{perf.since} since</Text>
+                <Text style={[styles.compPerf, { color: perfColor[perf.tone] }]}>{perf.since} since</Text>
               ) : (
                 <Text style={styles.compPerfPending}>perf pending</Text>
               )}
@@ -158,7 +173,8 @@ export function PortfolioDetailScreen() {
         );
       })}
       <Text style={styles.compNote}>
-        Share of the portfolio, with each name's move since it was disclosed (▲ up / ▼ down) —
+        Share of current disclosed holdings by value; names net sold in these filings are kept
+        and marked “Sold.” Each name shows its move since disclosed (▲ up / ▼ down) —
         informational, not a recommendation to buy.
       </Text>
 
@@ -190,20 +206,13 @@ export function PortfolioDetailScreen() {
   );
 }
 
-function Stat({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+function Stat({ label, value, muted, valueColor }: { label: string; value: string; muted?: boolean; valueColor?: string }) {
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[styles.statValue, muted && styles.statValueMuted]}>{value}</Text>
+      <Text style={[styles.statValue, muted && styles.statValueMuted, valueColor ? { color: valueColor } : null]}>{value}</Text>
     </View>
   );
-}
-
-// Neutral blue tint for an allocation segment (index-based) — kept distinct from the
-// reserved verdict color language.
-function allocTint(i: number, n: number): string {
-  const opacity = Math.max(0.28, 0.9 - (i / Math.max(1, n - 1)) * 0.62);
-  return `rgba(37, 99, 235, ${opacity.toFixed(2)})`;
 }
 
 function sideWord(side: string): string {
@@ -285,14 +294,14 @@ const styles = StyleSheet.create({
   illText: { fontSize: 9.5, fontWeight: font.weight.bold, color: color.faint, letterSpacing: 0.2 },
   compHead: { paddingHorizontal: space.lg, marginTop: space.md, marginBottom: space.sm },
   compSub: { fontSize: font.small, color: color.faint, marginTop: 2 },
-  allocBar: {
-    flexDirection: 'row',
-    height: 12,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
+  pieCard: {
     marginHorizontal: space.lg,
     marginBottom: space.md,
-    backgroundColor: color.surfaceAlt,
+    padding: space.lg,
+    borderRadius: radius.md,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.line,
   },
   compRow: {
     flexDirection: 'row',
@@ -304,7 +313,20 @@ const styles = StyleSheet.create({
   },
   compDot: { width: 9, height: 9, borderRadius: 5, flex: 0 },
   compTicker: { fontSize: font.body, fontWeight: font.weight.bold, color: color.ink },
+  compTickerMuted: { color: color.muted },
   compCompany: { fontSize: font.small, fontWeight: font.weight.regular, color: color.faint },
+  soldTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.sm, backgroundColor: color.surfaceAlt },
+  soldTagText: { fontSize: font.tiny, fontWeight: font.weight.heavy, color: color.muted, letterSpacing: 0.4 },
+  noHoldings: {
+    marginHorizontal: space.lg,
+    marginBottom: space.md,
+    padding: space.md,
+    borderRadius: radius.md,
+    backgroundColor: color.surfaceAlt,
+    fontSize: font.small,
+    color: color.muted,
+    lineHeight: 18,
+  },
   compTrack: { height: 6, borderRadius: 3, backgroundColor: color.surfaceAlt, marginTop: 5, overflow: 'hidden' },
   compFill: { height: '100%', borderRadius: 3, backgroundColor: color.brand },
   compRight: { alignItems: 'flex-end', minWidth: 74 },

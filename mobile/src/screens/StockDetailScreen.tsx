@@ -9,10 +9,10 @@ import { VerdictBadge } from '../components/VerdictBadge';
 import { actorDescriptor, daysBetween, lagWord } from '../lib/derive';
 import { VERDICT_PERMISSION } from '../lib/frameworkB';
 import { resolvePrice } from '../lib/illustrative';
-import { dualAnchor, fmtPctCompact } from '../lib/performance';
+import { dualAnchor, fmtPctCompact, perfTone } from '../lib/performance';
 import type { StocksStackParamList } from '../navigation/types';
 import { useFeed } from '../state/feed';
-import { color, font, radius, shadow, space } from '../theme/tokens';
+import { color, font, perfColor, radius, shadow, space } from '../theme/tokens';
 
 export function StockDetailScreen() {
   const route = useRoute<RouteProp<StocksStackParamList, 'StockDetail'>>();
@@ -59,7 +59,12 @@ export function StockDetailScreen() {
       <View style={styles.stats}>
         <Stat label="Filers buying" value={String(buys)} />
         <Stat label="Filers selling" value={String(sells)} />
-        <Stat label="Since disclosed" value={sinceDisclosed || 'Pending'} muted />
+        <Stat
+          label="Since disclosed"
+          value={sinceDisclosed || 'Pending'}
+          muted
+          valueColor={sinceDisclosed ? perfColor[perfTone(headPerf?.sinceDisclosed ?? null)] : undefined}
+        />
       </View>
 
       {/* Dual-anchor performance (since disclosed / since public + freshness). */}
@@ -95,11 +100,11 @@ export function StockDetailScreen() {
   );
 }
 
-function Stat({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+function Stat({ label, value, muted, valueColor }: { label: string; value: string; muted?: boolean; valueColor?: string }) {
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[styles.statValue, muted && styles.statValueMuted]}>{value}</Text>
+      <Text style={[styles.statValue, muted && styles.statValueMuted, valueColor ? { color: valueColor } : null]}>{value}</Text>
     </View>
   );
 }

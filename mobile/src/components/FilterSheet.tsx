@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { ChipRow } from './Chips';
+import { ComplianceFilter, type ComplianceKey } from './ComplianceFilter';
 import { color, font, radius, space } from '../theme/tokens';
 
 /**
@@ -16,7 +17,7 @@ export interface FilterOption<T extends string> {
   label: string;
 }
 
-export function FilterSheet<A extends string, B extends string, C extends string>({
+export function FilterSheet<A extends string, B extends string>({
   visible,
   onClose,
   time,
@@ -27,7 +28,7 @@ export function FilterSheet<A extends string, B extends string, C extends string
   onClose: () => void;
   time: FilterOption<A>;
   sort: FilterOption<B>;
-  compliance: FilterOption<C>;
+  compliance: { value: ComplianceKey; onChange: (k: ComplianceKey) => void };
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -43,12 +44,7 @@ export function FilterSheet<A extends string, B extends string, C extends string
 
           <ChipRow label={time.label} options={time.options} value={time.value} onChange={time.onChange} />
           <ChipRow label={sort.label} options={sort.options} value={sort.value} onChange={sort.onChange} />
-          <ChipRow
-            label={compliance.label}
-            options={compliance.options}
-            value={compliance.value}
-            onChange={compliance.onChange}
-          />
+          <ComplianceFilter value={compliance.value} onChange={compliance.onChange} />
 
           <Text style={styles.note}>
             Sorting on disclosed-holdings evidence only. It ranks past filings — never a

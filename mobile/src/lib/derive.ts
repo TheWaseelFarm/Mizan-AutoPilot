@@ -109,18 +109,21 @@ export interface Holding {
   ticker: string;
   company: string;
   label: Label;
-  /** net disclosed dollars in this name (buys − sells, floored at 0). */
+  /** net disclosed dollars in this name (buys − sells). */
   net: number;
-  /** share of the whole portfolio, 0–100. */
+  /** share of the disclosed portfolio, 0–100 (0 for net-sold names). */
   weightPct: number;
+  /** true = a current disclosed position (net > 0); false = net-sold/exited in these filings. */
+  held: boolean;
 }
 
 /**
- * Portfolio composition — how much of a filer's disclosed portfolio each stock makes up,
- * so a user can see the allocation (informational, never a buy instruction). Weight is the
- * name's net disclosed amount (buys − sells) as a share of the total; if net positions sum to
- * zero (e.g. only sells on record) it falls back to gross disclosed amount so nothing vanishes.
- * `rows` should already be filtered to a single actor.
+ * Portfolio composition — how much of a filer's disclosed portfolio each stock makes up, so a
+ * user can see the allocation (informational, never a buy instruction). Held names (net buys >
+ * sells) are weighted by their net disclosed amount as a share of the total. Names that netted
+ * to a SALE are NOT dropped — they're kept with 0% and `held: false` (tagged "Sold" in the UI)
+ * so nothing silently vanishes. If a filer only ever sold (no net position at all), weights
+ * fall back to gross disclosed amount so the split is still visible. `rows` = one actor.
  */
 export function portfolioComposition(rows: Disclosure[]): Holding[] {
   const map = new Map<string, { ticker: string; company: string; label: Label; net: number; gross: number }>();
@@ -133,15 +136,21 @@ export function portfolioComposition(rows: Disclosure[]): Holding[] {
     m.label = t.label; // same per ticker; keep the latest
     map.set(t.ticker, m);
   }
-  const items = [...map.values()];
+  const items = [...map.values()].filter((i) => i.gross > 0);
   const totalPos = items.reduce((s, i) => s + Math.max(0, i.net), 0);
-  const usePos = totalPos > 0;
-  const basis = (i: { net: number; gross: number }) => (usePos ? Math.max(0, i.net) : i.gross);
-  const total = items.reduce((s, i) => s + basis(i), 0) || 1;
+  const denom = totalPos > 0 ? totalPos : 1;
+  // Held names (net > 0) weighted by net; net-sold names kept at 0% and held: false (tagged
+  // "Sold" in the UI) so nothing silently vanishes. Held first, then sold.
   return items
-    .map((i) => ({ ticker: i.ticker, company: i.company, label: i.label, net: i.net, weightPct: (basis(i) / total) * 100 }))
-    .filter((h) => h.weightPct > 0)
-    .sort((a, b) => b.weightPct - a.weightPct);
+    .map((i) => ({
+      ticker: i.ticker,
+      company: i.company,
+      label: i.label,
+      net: i.net,
+      held: i.net > 0,
+      weightPct: i.net > 0 ? (i.net / denom) * 100 : 0,
+    }))
+    .sort((a, b) => Number(b.held) - Number(a.held) || b.weightPct - a.weightPct || b.net - a.net);
 }
 
 /** A smart-money ranked stock row (Tab 2). Mirrors api/_lib/trends.js. */
@@ -149,17 +158,24 @@ export interface SmartRow {
   ticker: string;
   company: string;
   label: Label;
-  /** Σ trade-value-as-%-of-filer-position across filers — the rank metric. */
-  netWeightPct: number;
-  /** Σ disclosed midpoints — secondary $ volume. */
+  /**
+   * Σ trade-value-as-%-of-filer-position across the filers whose position we can size.
+   * `null` when NO contributing filer disclosed enough to gauge a position (never a
+   * fabricated identical number — the UI shows "—").
+   */
+  netWeightPct: number | null;
+  /** Σ disclosed midpoints — the primary $ volume rank metric. */
   dollarVol: number;
   filers: number;
 }
 
 /**
- * Client-side smart-money aggregation (fallback for /api/smart-money): ranks stocks on a side
- * by trade value as a % of each filer's position size, summed across filers. `rows` should be
- * the already-gated feed (unscreened excluded). `withinDays` filters by filing recency.
+ * Client-side smart-money aggregation (fallback for /api/smart-money). Ranks stocks on a side
+ * by disclosed **$ volume** (real and comparable across names). It also computes a secondary
+ * "% of position" weight — but ONLY from filers whose position we can actually gauge (they
+ * disclosed ≥2 holdings). A single-holding filer's trade is always 100% of what we can see,
+ * which is a fabricated-looking figure, so those are excluded from the weight; a stock with no
+ * gaugeable filer gets `netWeightPct: null` → "—" in the UI. `rows` is the already-gated feed.
  */
 export function deriveSmartMoney(
   rows: Disclosure[],
@@ -167,9 +183,17 @@ export function deriveSmartMoney(
   withinDays = Infinity,
   nowMs = Date.now(),
 ): SmartRow[] {
-  const totals = new Map<string, number>();
-  for (const r of rows) totals.set(r.actor, (totals.get(r.actor) || 0) + Math.abs(Number(r.amountMid || 0)));
-  const map = new Map<string, { ticker: string; company: string; label: Label; net: number; dollar: number; filers: Set<string> }>();
+  const filerTotal = new Map<string, number>();
+  const filerTickers = new Map<string, Set<string>>();
+  for (const r of rows) {
+    filerTotal.set(r.actor, (filerTotal.get(r.actor) || 0) + Math.abs(Number(r.amountMid || 0)));
+    (filerTickers.get(r.actor) || filerTickers.set(r.actor, new Set()).get(r.actor)!).add(r.ticker);
+  }
+
+  const map = new Map<
+    string,
+    { ticker: string; company: string; label: Label; weight: number; hasWeight: boolean; dollar: number; filers: Set<string> }
+  >();
   for (const r of rows) {
     if ((String(r.side).toUpperCase() === 'SELL' ? 'SELL' : 'BUY') !== side) continue;
     if (withinDays !== Infinity) {
@@ -177,19 +201,31 @@ export function deriveSmartMoney(
       if (Number.isNaN(f) || nowMs - f > withinDays * 86_400_000) continue;
     }
     const amt = Math.abs(Number(r.amountMid || 0));
-    const ft = totals.get(r.actor) || amt || 1;
-    const w = ft > 0 ? amt / ft : 0;
     const m =
-      map.get(r.ticker) || { ticker: r.ticker, company: r.company || r.ticker, label: r.label, net: 0, dollar: 0, filers: new Set<string>() };
-    m.net += w;
+      map.get(r.ticker) ||
+      { ticker: r.ticker, company: r.company || r.ticker, label: r.label, weight: 0, hasWeight: false, dollar: 0, filers: new Set<string>() };
     m.dollar += amt;
     m.filers.add(r.actor);
     m.label = r.label;
+    // Weight only from filers whose position we can size (≥2 disclosed holdings) — the guard.
+    const total = filerTotal.get(r.actor) || 0;
+    if ((filerTickers.get(r.actor)?.size || 1) >= 2 && total > 0) {
+      m.weight += amt / total;
+      m.hasWeight = true;
+    }
     map.set(r.ticker, m);
   }
   return [...map.values()]
-    .map((m) => ({ ticker: m.ticker, company: m.company, label: m.label, netWeightPct: +(m.net * 100).toFixed(1), dollarVol: m.dollar, filers: m.filers.size }))
-    .sort((a, b) => b.netWeightPct - a.netWeightPct);
+    .map((m) => ({
+      ticker: m.ticker,
+      company: m.company,
+      label: m.label,
+      netWeightPct: m.hasWeight ? +(m.weight * 100).toFixed(1) : null,
+      dollarVol: m.dollar,
+      filers: m.filers.size,
+    }))
+    // Default ranking = disclosed $ volume (real + logical: a $22M name outranks a $41K one).
+    .sort((a, b) => b.dollarVol - a.dollarVol);
 }
 
 /** Compact $ money label (e.g. $1.2M, $340K). */
