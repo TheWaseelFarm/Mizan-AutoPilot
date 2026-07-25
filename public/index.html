@@ -60,6 +60,19 @@
   .mz-star svg { width: 1.15rem; height: 1.15rem; }
   .mz-entity__meta svg { width: 0.9rem; height: 0.9rem; }
   .mz-check-btn svg { width: 0.85rem; height: 0.85rem; }
+  .mz-linkbtn { white-space: nowrap; }
+  #freshness { white-space: nowrap; }
+  /* Toolbar rows: the time selector sits on its own row above the controls. */
+  #controlRow { margin-block-start: var(--mz-space-2); }
+  /* Mobile drawer scrim (bottom sheet / side sheet on < desktop). */
+  .mz-scrim { position: fixed; inset: 0; z-index: 50; background: rgb(16 24 40 / 0.42); }
+  @media (min-width: 75rem) { .mz-scrim { display: none !important; } }
+  @media (max-width: 47.99rem) {
+    #freshness { display: none; }
+    .mz-topbar .mz-product-tabs { grid-template-columns: repeat(2, minmax(4.5rem, 1fr)); }
+    .mz-topbar { gap: var(--mz-space-2); }
+    #controlRow { margin-block-start: var(--mz-space-1); }
+  }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -102,8 +115,10 @@
 
       <div class="mz-subtabs" role="tablist" id="subtabs"></div>
 
-      <div class="mz-toolbar" style="margin-block-start:var(--mz-space-4)">
+      <div class="mz-toolbar" id="timeRow" style="margin-block-start:var(--mz-space-4)">
         <div class="mz-segmented" id="timebar" role="group" aria-label="Time period"></div>
+      </div>
+      <div class="mz-toolbar" id="controlRow">
         <div class="mz-pos"><button class="mz-chip" id="sortBtn" type="button"></button><div id="sortMenu"></div></div>
         <button class="mz-linkbtn" id="whyBtn" type="button"></button>
         <div class="mz-toolbar__end">
@@ -133,6 +148,7 @@
     <nav class="mz-mobile-nav" id="mobileNav" aria-label="Primary"></nav>
     <div class="mz-mobile-tray" id="mobileTray" hidden></div>
   </div>
+  <div class="mz-scrim" id="scrim" hidden></div>
 </div>
 <script src="/app.js"></script>
 </body>
