@@ -122,6 +122,18 @@
   .mz-hold { display: flex; align-items: center; gap: 0.6rem; padding-block: 0.55rem; border-block-end: var(--mz-border); }
   .mz-hold:last-child { border-block-end: 0; }
   .mz-hold__n { flex: 1; min-width: 0; }
+  /* Context suffix on a return number ("· 1M" / "· indic.") — muted, never competes with the value. */
+  .mz-perf-ctx { font-size: 0.62em; font-weight: 700; color: var(--mz-ink-400); letter-spacing: 0; }
+  .mz-dtl-ctx { font-size: 0.5em; font-weight: 750; color: var(--mz-ink-400); vertical-align: middle; }
+  /* Trade direction — NEUTRAL cobalt(buy)/ink(sell). Verdict hues stay reserved for compliance. */
+  .mz-side { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: var(--mz-radius-pill);
+    font-size: 0.68rem; font-weight: 750; border: 1px solid; white-space: nowrap; min-height: 1.3rem; }
+  .mz-side[data-side="buy"] { color: var(--mz-cobalt-700); background: var(--mz-cobalt-50); border-color: var(--mz-cobalt-100); }
+  .mz-side[data-side="sell"] { color: var(--mz-ink-600); background: var(--mz-ink-50); border-color: var(--mz-ink-200); }
+  /* Make the top Portfolios|Stocks control read unmistakably as a segmented toggle (a pill track
+     with an elevated selected chip) — distinct from the icon-based bottom tab bar. */
+  .mz-product-tabs { border-radius: var(--mz-radius-pill); }
+  .mz-product-tab { border-radius: var(--mz-radius-pill); }
   .mz-linkbtn { white-space: nowrap; }
   #freshness { white-space: nowrap; }
   /* Toolbar rows: the time selector sits on its own row above the controls. */
