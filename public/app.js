@@ -479,6 +479,18 @@
   const sliceTf = (hist) => { const n = TF_DAYS_ALL[S.tf] ?? Infinity; return (n === Infinity || hist.length <= n) ? hist : hist.slice(-Math.max(2, Math.round(n))); };
   const shortDate = (d) => { const ms = Date.parse(d); if (!isFinite(ms)) return d || ''; return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
   const seriesReturn = (v) => v && v.length >= 2 ? (v[v.length - 1] / v[0] - 1) * 100 : null;
+  const fmtPrice = (v) => (v == null || !isFinite(+v)) ? '—' : '$' + (+v).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  // "Bought-at → now": the disclosure's disclosed-close vs today's price + gain, from the
+  // dual-anchor performance each row carries (feed ?performance=1). The core evidence signal:
+  // "would following this filer have worked?" Neutral cobalt/ink only — never a verdict hue.
+  function entryVsNow(r) {
+    const p = r && r.performance;
+    if (!p || p.disclosedClose == null || p.now == null) return '';
+    const pct = p.sinceDisclosed;
+    const pctHtml = (pct == null || !isFinite(pct)) ? '' : ` · <span class="mz-ret" data-up="${pct >= 0}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}%</span>`;
+    const since = LANG === 'ar' ? 'منذ الإفصاح' : 'since disclosed';
+    return `<span class="mz-entry">${fmtPrice(p.disclosedClose)} → <b>${fmtPrice(p.now)}</b>${pctHtml} <span class="mz-muted">${since}</span></span>`;
+  }
   const tfLabelNow = () => (TFS.find(([k]) => k === S.tf) || [, 'All'])[1];
   // Timeframe-aware return that carries its context. Prefers the price return over the active
   // timeframe (recomputes with the selector); if prices are pending, falls back to the disclosed
@@ -829,6 +841,8 @@
     // amount + date + filing lag. (Was sorted by dollar size, which jumbled the dates.)
     const dOf = (r) => Date.parse(fDisclosed(r) || r[FIELD.filedDate] || '') || 0;
     const log = [...rows].sort((a, b) => dOf(b) - dOf(a) || fAmt(b) - fAmt(a)).slice(0, 8);
+    // Trust note: when a material share of a move happened during the filing lag (before public).
+    const freshNote = log.map((r) => r.performance && r.performance.freshness).find(Boolean);
     const following = S.follows.has(ticker);
     const who = { avatar: `<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(ticker.slice(0, 4))}</span>`, name: ticker, sub: rows[0].company || ticker, ltr: true };
     // Chart: pin each disclosed trade on the line (cobalt buy / ink sell) + a "today" price label.
@@ -839,7 +853,7 @@
     return drawerHead(t('dtl.stock'), { back: true, tag: badge(label) }) +
       detailHero(who, headline, returnOf(histOf(ticker), perf), stats) +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(shist, { markers: marks, today: todayLab, empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ● بيع مُفصَح عنه — اسحب لأي تاريخ.' : '● disclosed buy · ● sell — scrub the line for the value on any date.'}</p></div>` +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.who')}</div>${log.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); return `<div class="mz-hold"><div class="mz-hold__n"><div style="font-weight:700">${esc(r.actor)}</div><div class="mz-entity__meta">${esc(r.source || r.kind || '')} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div></div>${sideTag(r.side)}<span class="mz-cell-num" style="font-weight:750;margin-inline-start:.5rem">${fmtMoney(fAmt(r))}</span></div>`; }).join('')}</div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.who')}</div>${log.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); const evn = entryVsNow(r); return `<div class="mz-hold"><div class="mz-hold__n"><div style="font-weight:700">${esc(r.actor)}</div><div class="mz-entity__meta">${esc(r.source || r.kind || '')} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div>${evn ? `<div class="mz-entity__meta">${evn}</div>` : ''}</div>${sideTag(r.side)}<span class="mz-cell-num" style="font-weight:750;margin-inline-start:.5rem">${fmtMoney(fAmt(r))}</span></div>`; }).join('')}${freshNote ? `<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0;line-height:1.4">${I.info} ${esc(freshNote)}</p>` : ''}</div>` +
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
       `<div class="mz-drawer__footer" style="display:grid;grid-template-columns:1fr auto;gap:.5rem"><button class="mz-button mz-button--primary" data-follow="${esc(ticker)}">${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button><button class="mz-button mz-button--ghost" data-nav="alerts">${I.bell}${t('common.watch')}</button></div>`;
   }
@@ -872,7 +886,7 @@
       detailHero(who, headline, p.ret, stats) +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(idxH, { markers: p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker })), empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ● بيع مُفصَح عنه على مؤشّر متساوي الأوزان للحيازات. أدلة، ليست نصيحة.' : '● disclosed buy · ● sell, on an equal-weight index of the holdings. Evidence, not advice.'}</p></div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.holdings')}</div>${hs.map((h) => { const w = Math.round(h.v / totalV * 100); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || '')} · ${w}% ${t('dtl.weight')}${h.d ? ` · ${t('dtl.disclosed')} ${esc(shortDate(h.d))}` : ''}</div></div>${badge(h.label)}<span style="margin-inline-start:.5rem;min-width:3.4rem;text-align:end">${retNode(priceReturn(h.ticker))}</span></div>`; }).join('')}</div>` +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.activity')}</div>${acts.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${fmtMoney(fAmt(r))} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div></div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.activity')}</div>${acts.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); const evn = entryVsNow(r); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${fmtMoney(fAmt(r))} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div>${evn ? `<div class="mz-entity__meta">${evn}</div>` : ''}</div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
       `<div class="mz-drawer__footer"><button class="mz-button mz-button--secondary" style="width:100%" data-follow="${esc(name)}">${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button></div>`;
   }
