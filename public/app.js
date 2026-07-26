@@ -479,6 +479,17 @@
   const histOf = (ticker) => ((S.prices[ticker] && S.prices[ticker].history) || []).filter((p) => p && isFinite(+p.c));
   const TF_DAYS_ALL = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '3Y': 1095, '5Y': 1825, ALL: Infinity };
   const sliceTf = (hist) => { const n = TF_DAYS_ALL[S.tf] ?? Infinity; return (n === Infinity || hist.length <= n) ? hist : hist.slice(-Math.max(2, Math.round(n))); };
+  // Detail performance charts frame to the disclosed-trade window when the timeframe is "All",
+  // so recent buy/sell markers spread across the width instead of bunching against years of
+  // history. Specific timeframes (1W…5Y) still slice normally via sliceTf.
+  function frameToTrades(hist, rows) {
+    if (S.tf !== 'ALL' || !Array.isArray(hist) || hist.length < 2) return sliceTf(hist);
+    const ds = (rows || []).map((r) => Date.parse(fDisclosed(r))).filter((x) => isFinite(x));
+    if (!ds.length) return sliceTf(hist);
+    const start = Math.min(...ds) - 30 * 864e5; // ~1 month of lead-in before the first trade
+    const framed = hist.filter((p) => Date.parse(p.d) >= start);
+    return framed.length >= 2 ? framed : sliceTf(hist);
+  }
   const shortDate = (d) => { const ms = Date.parse(d); if (!isFinite(ms)) return d || ''; return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
   const seriesReturn = (v) => v && v.length >= 2 ? (v[v.length - 1] / v[0] - 1) * 100 : null;
   const fmtPrice = (v) => (v == null || !isFinite(+v)) ? '—' : '$' + (+v).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -863,7 +874,8 @@
     const following = S.follows.has(ticker);
     const who = { avatar: `<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(ticker.slice(0, 4))}</span>`, name: ticker, sub: rows[0].company || ticker, ltr: true };
     // Chart: pin each disclosed trade on the line (cobalt buy / ink sell) + a "today" price label.
-    const shist = sliceTf(histOf(ticker));
+    // On "All", frame to the trade window so the (recent) markers spread across the chart.
+    const shist = frameToTrades(histOf(ticker), rows);
     const quote = (S.prices[ticker] && S.prices[ticker].quote != null) ? +S.prices[ticker].quote : (shist.length ? +shist[shist.length - 1].c : null);
     const todayLab = quote != null ? `$${quote.toLocaleString('en-US', { maximumFractionDigits: 2 })} · ${LANG === 'ar' ? 'اليوم' : 'today'}` : '';
     const marks = rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.actor }));
@@ -888,9 +900,8 @@
     const compTag = compliancePill(flag.tone); // compact quiet label (full wording lives in the holdings chips)
     // Evidence: the disclosed-holdings performance — a single neutral line (compliance never
     // changes the performance shown). Timeframe-aware via sliceTf(), like every chart.
-    const idxH = sliceTf(portfolioIndexHist(p.rows));
-    const idxRet = seriesReturn(idxH.map((x) => +x.c)); // index's own return over the shown window
-    const idxToday = idxRet == null ? '' : `${idxRet >= 0 ? '▲' : '▼'} ${Math.abs(idxRet).toFixed(1)}% · ${LANG === 'ar' ? 'حتى اليوم' : 'to date'}`;
+    // On "All", frame to the trade window so the (recent) markers spread across the chart.
+    const idxH = frameToTrades(portfolioIndexHist(p.rows), p.rows);
     // Top holdings, value-weighted, each carrying its weight (% of portfolio) + disclosure date,
     // its own compliance chip, and a neutral price return.
     const holdings = {};
@@ -901,10 +912,28 @@
     const acts = [...p.rows].sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || '')).slice(0, 4);
     const following = S.follows.has(name);
     const who = { avatar: `<span style="color:var(--mz-cobalt-700);font-weight:800;font-size:.8rem">${esc(p.initials)}</span>`, name, sub: `${typeLabel(p.kind)} · ${p.count} ${disclosuresLbl}` };
+    // Performance chart: the FUND (equal-weight index of holdings) by default; drilling into a
+    // holding (tap it below) swaps the chart to THAT stock with its own disclosed buy/sell points.
+    const pick = (S.drawer && S.drawer.chartTicker && histOf(S.drawer.chartTicker).length >= 2) ? S.drawer.chartTicker : null;
+    let perfChart, perfLabel, perfCaption;
+    if (pick) {
+      const trows = p.rows.filter((r) => r.ticker === pick);
+      const th = frameToTrades(histOf(pick), trows);
+      const q = (S.prices[pick] && S.prices[pick].quote != null) ? +S.prices[pick].quote : (th.length ? +th[th.length - 1].c : null);
+      const tl = q != null ? `${fmtPrice(q)} · ${LANG === 'ar' ? 'اليوم' : 'today'}` : '';
+      perfChart = chart(th, { markers: trows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker })), today: tl, axis: true, empty: t('dtl.pending') });
+      perfLabel = `<span class="mz-ltr">${esc(pick)}</span> <button class="mz-linkbtn" data-holding="${esc(pick)}" style="font-size:var(--mz-text-xs)">${LANG === 'ar' ? 'الصندوق ↩' : '↩ Fund'}</button>`;
+      perfCaption = LANG === 'ar' ? `● شراء · ● بيع مُفصَح عنه لسهم ${esc(pick)} — اسحب لأي نقطة.` : `● disclosed buy · ● sell for ${esc(pick)} — scrub any point.`;
+    } else {
+      perfChart = chart(idxH, { markers: p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker })), axis: true, empty: t('dtl.pending') });
+      perfLabel = LANG === 'ar' ? 'الصندوق' : 'Fund';
+      perfCaption = (LANG === 'ar' ? '● شراء · ● بيع على مؤشّر متساوي الأوزان للحيازات. اضغط سهمًا أدناه لعرض أدائه.' : '● disclosed buy · ● sell, on an equal-weight index of the holdings. Tap a holding below to chart it.');
+    }
+    const perfSection = `<div class="mz-drawer__section"><div style="display:flex;align-items:center;gap:.4rem;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${t('dtl.perf')}</span><span class="mz-muted" style="font-size:var(--mz-text-xs)">· ${perfLabel}</span></div>${perfChart}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${perfCaption}</p></div>`;
     return drawerHead(t('dtl.portfolio'), { back: true, tag: compTag }) +
       detailHero(who, headline, p.ret, stats) +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(idxH, { markers: p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker })), today: idxToday, axis: true, empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ● بيع مُفصَح عنه على مؤشّر متساوي الأوزان للحيازات. اسحب لأي نقطة لرؤية التاريخ.' : '● disclosed buy · ● sell, on an equal-weight index of the holdings. Scrub any point for its date.'}</p></div>` +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.holdings')}</div>${hs.map((h) => { const w = Math.round(h.v / totalV * 100); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || '')} · ${w}% ${t('dtl.weight')}${h.d ? ` · ${t('dtl.disclosed')} ${esc(shortDate(h.d))}` : ''}</div></div>${badge(h.label)}<span style="margin-inline-start:.5rem;min-width:3.4rem;text-align:end">${retNode(priceReturn(h.ticker))}</span></div>`; }).join('')}</div>` +
+      perfSection +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.holdings')} <span class="mz-muted" style="font-weight:500;text-transform:none;letter-spacing:0">· ${LANG === 'ar' ? 'اضغط لعرضه في الرسم' : 'tap to chart'}</span></div>${hs.map((h) => { const w = Math.round(h.v / totalV * 100); const on = pick === h.ticker; return `<div class="mz-hold mz-hold--pick" data-holding="${esc(h.ticker)}" data-active="${on}"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || '')} · ${w}% ${t('dtl.weight')}${h.d ? ` · ${t('dtl.disclosed')} ${esc(shortDate(h.d))}` : ''}</div></div>${badge(h.label)}<span style="margin-inline-start:.5rem;min-width:3.4rem;text-align:end">${retNode(priceReturn(h.ticker))}</span></div>`; }).join('')}</div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.activity')}</div>${acts.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); const evn = entryVsNow(r); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${fmtMoney(fAmt(r))} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div>${evn ? `<div class="mz-entity__meta">${evn}</div>` : ''}</div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
       `<div class="mz-drawer__footer"><button class="mz-button mz-button--secondary" style="width:100%" data-follow="${esc(name)}">${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button></div>`;
@@ -924,7 +953,7 @@
 
   /* ---------------------------------------------------------------- events (delegated) */
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-star],[data-select],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#drawerBack,#clearChips,#trayOpen,#bellBtn');
+    const el = e.target.closest('[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-star],[data-select],[data-holding],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#drawerBack,#clearChips,#trayOpen,#bellBtn');
     if (!el) { if (S.openMenu) { S.openMenu = null; closeMenus(); } return; }
     const has = (a) => el.hasAttribute(a) || el.id === a;
 
@@ -943,6 +972,7 @@
     if (el.id === 'sortBtn') { toggleMenu('sort'); return; }
     if (el.id === 'filterBtn') { toggleMenu('filter'); return; }
     if (el.id === 'whyBtn') { toggleMenu('why'); return; }
+    if (el.dataset.holding != null) { e.stopPropagation(); if (S.drawer) { S.drawer.chartTicker = S.drawer.chartTicker === el.dataset.holding ? null : el.dataset.holding; renderDrawer(); } return; }
     if (el.id === 'drawerClose' || el.id === 'drawerBack') { closeDrawer(); return; }
     if (el.id === 'clearChips') { S.compliance = 'all'; S.evFilter = 'all'; S.followedOnly = false; render(); return; }
     if (el.dataset.chip != null) { const chips = document.getElementById('chips')._chips; chips && chips[+el.dataset.chip] && chips[+el.dataset.chip][1](); return; }

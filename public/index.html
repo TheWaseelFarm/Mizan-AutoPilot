@@ -137,6 +137,10 @@
   .mz-hold { display: flex; align-items: center; gap: 0.6rem; padding-block: 0.55rem; border-block-end: var(--mz-border); }
   .mz-hold:last-child { border-block-end: 0; }
   .mz-hold__n { flex: 1; min-width: 0; }
+  /* Tappable holding that drills the portfolio chart into that stock. */
+  .mz-hold--pick { cursor: pointer; margin-inline: calc(var(--mz-space-2) * -1); padding-inline: var(--mz-space-2); border-radius: var(--mz-radius-sm); }
+  .mz-hold--pick:hover { background: var(--mz-ink-50); }
+  .mz-hold--pick[data-active="true"] { background: var(--mz-cobalt-50); box-shadow: inset 2px 0 0 var(--mz-cobalt-600); }
   /* "Bought-at → now" evidence line — tabular, neutral; the ▲/▼ % uses .mz-ret (cobalt/ink). */
   .mz-entry { display: inline-flex; align-items: baseline; gap: 0.25rem; flex-wrap: wrap; font-size: var(--mz-text-xs); font-variant-numeric: tabular-nums; }
   .mz-entry b { font-weight: 750; color: var(--mz-ink-800); }
