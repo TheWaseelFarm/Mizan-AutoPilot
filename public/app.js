@@ -12,6 +12,7 @@
     sort: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M6 12h12M9 17h6"/></svg>',
     chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
     chevronRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>',
+    chevronLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
     star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.6 1-5.8L3.5 9.7l5.9-.9z"/></svg>',
@@ -57,6 +58,13 @@
       'meta.count': '{n} shown', 'live': 'Live data', 'sample': 'Sample data', 'freshUpdated': 'Updated',
       'empty.title': 'Nothing matches these filters', 'empty.body': 'Try clearing a filter or widening the time period.',
       'acct.title': 'Account', 'acct.lang': 'Language', 'follow.title': 'Following', 'alerts.title': 'Alerts',
+      'common.follow': 'Follow', 'common.following': 'Following', 'common.watch': 'Watch',
+      'dtl.portfolio': 'Portfolio', 'dtl.stock': 'Stock', 'dtl.return': 'Disclosed return', 'dtl.returnSub': 'Disclosed-holdings performance',
+      'dtl.pending': 'Pending', 'dtl.pendingSub': 'Not enough price history yet', 'dtl.attention': 'Attention',
+      'dtl.followers': 'followers', 'dtl.disclosures': 'disclosures', 'dtl.buyers': 'filers buying', 'dtl.filers': 'total filers',
+      'dtl.perf': 'Performance', 'dtl.holdings': 'Top holdings', 'dtl.who': 'Who bought & sold', 'dtl.activity': 'Activity log',
+      'dtl.nojudge': 'Not enough data yet to judge.', 'dtl.evNote': 'Disclosed-holdings evidence, delayed by filing lag (up to 45 days). Informational only — not advice or a recommendation to follow.',
+      'dtl.compNote': 'Compliance is shown as a label (AAOIFI Standard No. 21). Screening is a filter you apply elsewhere — it does not change the performance shown.',
       'sec.methodology': 'Methodology', 'sec.mtext': 'Screening follows AAOIFI Shariah Standard No. 21 — the current "30/30/5" rule. Two screens, both required: (1) permissible business activity, and (2) financial ratios vs. market capitalization — interest-bearing debt < 30%, cash + interest-bearing securities < 30%, and non-permissible income < 5% of revenue. Over any limit is Non-compliant. Some impure income (0–5%) is Compliant · purify — you purify that share of dividends. (The 33% figure used by some index providers is not AAOIFI.)',
     },
     ar: {
@@ -82,6 +90,13 @@
       'meta.count': '{n} معروض', 'live': 'بيانات حية', 'sample': 'بيانات تجريبية', 'freshUpdated': 'حُدِّث',
       'empty.title': 'لا شيء يطابق هذه المرشحات', 'empty.body': 'جرّب مسح مرشح أو توسيع الفترة الزمنية.',
       'acct.title': 'الحساب', 'acct.lang': 'اللغة', 'follow.title': 'المتابَعون', 'alerts.title': 'التنبيهات',
+      'common.follow': 'متابعة', 'common.following': 'تتابعه', 'common.watch': 'مراقبة',
+      'dtl.portfolio': 'المحفظة', 'dtl.stock': 'السهم', 'dtl.return': 'العائد المُفصَح', 'dtl.returnSub': 'أداء الحيازات المُفصَح عنها',
+      'dtl.pending': 'قيد الانتظار', 'dtl.pendingSub': 'لا يوجد سجل أسعار كافٍ بعد', 'dtl.attention': 'الاهتمام',
+      'dtl.followers': 'متابِع', 'dtl.disclosures': 'إفصاح', 'dtl.buyers': 'جهة تشتري', 'dtl.filers': 'إجمالي المُفصِحين',
+      'dtl.perf': 'الأداء', 'dtl.holdings': 'أهم الحيازات', 'dtl.who': 'مَن اشترى وباع', 'dtl.activity': 'سجل النشاط',
+      'dtl.nojudge': 'لا توجد بيانات كافية للحكم بعد.', 'dtl.evNote': 'أدلة الحيازات المُفصَح عنها، متأخرة بزمن الإفصاح (حتى 45 يومًا). لأغراض معلوماتية فقط — ليست نصيحة أو توصية بالمتابعة.',
+      'dtl.compNote': 'يُعرض الالتزام كوسم (معيار AAOIFI رقم 21). الفحص مرشِّح تطبّقه في مكان آخر — ولا يغيّر الأداء المعروض.',
       'sec.methodology': 'المنهجية', 'sec.mtext': 'يتبع الفحص معيار AAOIFI الشرعي رقم 21 — قاعدة «30/30/5» الحالية. فحصان، كلاهما مطلوب: (1) نشاط تجاري مباح، و(2) نسب مالية إلى القيمة السوقية — الدين بفائدة < 30%، والنقد والأوراق ذات الفائدة < 30%، والدخل غير المباح < 5% من الإيراد. تجاوز أي حد = غير متوافق. دخل غير نقي يسير (0–5%) = متوافق · تطهير. (نسبة 33% لدى بعض مزوّدي المؤشرات ليست من AAOIFI.)',
     },
   };
@@ -205,6 +220,61 @@
     return { sentence: s, tags, hhi };
   }
 
+  /* ===== Conclusion-first detail screens: the app STATES the judgment, leads with return +
+     attraction, keeps compliance a quiet label. Nothing here fabricates a number. ===== */
+  // Public follower counts only become visible once a real leaderboard exists (mirrors
+  // api/_lib/followers.js) — so one keen early follow never fabricates an "attention" figure.
+  const followersAreMeaningful = () => Object.values(S.followerCounts || {}).filter((n) => n >= 3).length >= 3;
+  const followerCountOf = (name) => (followersAreMeaningful() && isFinite(+S.followerCounts[name])) ? +S.followerCounts[name] : null;
+  // Real, deterministic rank of a portfolio by disclosed return (nulls excluded — never invented).
+  function returnRank(name) {
+    const ranked = derivePortfolios(S.rows).filter((p) => p.perf != null && isFinite(p.perf)).sort((a, b) => b.perf - a.perf);
+    const i = ranked.findIndex((p) => p.name === name);
+    return i < 0 ? null : { rank: i + 1, total: ranked.length };
+  }
+  // Neutral (cobalt/ink ▲▼) return — NEVER a verdict hue. Missing -> "—" (no fabrication).
+  const retNode = (v) => v == null || !isFinite(v)
+    ? '<span class="mz-muted">—</span>'
+    : `<span class="mz-ret" data-up="${v >= 0}">${v >= 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(1)}%</span>`;
+  const priceReturn = (ticker) => seriesReturn(sliceTf(histOf(ticker)).map((p) => +p.c));
+
+  // THE rules function: (disclosed return, attraction signals) -> one plain headline. Bilingual.
+  // When the return is unknown AND there's no activity, it says so — it never invents a verdict.
+  function composeHeadline(perf, attr) {
+    attr = attr || {}; const ar = LANG === 'ar'; const known = perf != null && isFinite(perf);
+    if (!known && !attr.hasActivity) return t('dtl.nojudge');
+    let r;
+    if (!known) r = ar ? 'الأداء قيد الانتظار' : 'Performance pending';
+    else if (perf >= 15) r = ar ? 'أداء قوي مؤخرًا' : 'Strong recent performance';
+    else if (perf >= 3) r = ar ? 'أداء جيد مؤخرًا' : 'Solid recent performance';
+    else if (perf >= 0) r = ar ? 'أداء ثابت تقريبًا' : 'Roughly flat lately';
+    else if (perf > -10) r = ar ? 'أداء ضعيف مؤخرًا' : 'Soft recent performance';
+    else r = ar ? 'أداء متراجع' : 'Weak recent performance';
+    let a = '';
+    if (attr.wellFollowed) a = ar ? 'ويحظى بمتابعة واسعة' : 'and widely followed';
+    else if (attr.buyers >= 2) a = ar ? `و${attr.buyers} جهات تشتريه` : `and ${attr.buyers} filers buying`;
+    else if (attr.active) a = ar ? 'ونشِط في الإفصاح' : 'and actively disclosing';
+    else if (attr.quiet) a = ar ? 'لكن الإفصاحات قليلة' : 'though disclosures are sparse';
+    return `${r}${a ? (ar ? '، ' : ', ') : ''}${a}.`;
+  }
+
+  // Shared conclusion-first hero: WHO this is -> composed headline -> return (hero) + attraction.
+  // `who` = { avatar, name, sub, ltr }; `stats` are the localized attraction rows.
+  function detailHero(who, headline, perf, statsHtml) {
+    const ret = (perf == null || !isFinite(perf))
+      ? `<div class="mz-dtl-big mz-dtl-neutral">${t('dtl.pending')}</div><div class="mz-dtl-sub">${t('dtl.pendingSub')}</div>`
+      : `<div class="mz-dtl-big" data-up="${perf >= 0}">${perf >= 0 ? '▲' : '▼'} ${Math.abs(perf).toFixed(1)}%</div><div class="mz-dtl-sub">${t('dtl.returnSub')}</div>`;
+    return `<div class="mz-drawer__section">
+      <div class="mz-dtl-who"><span class="mz-entity__avatar">${who.avatar}</span><div style="min-width:0"><div class="mz-dtl-name${who.ltr ? ' mz-ltr' : ''}">${esc(who.name)}</div><div class="mz-dtl-whosub">${esc(who.sub)}</div></div></div>
+      <p class="mz-dtl-headline">${esc(headline)}</p>
+      <div class="mz-dtl-heros">
+        <div class="mz-dtl-card"><div class="mz-dtl-lab">${t('dtl.return')}</div>${ret}</div>
+        <div class="mz-dtl-card"><div class="mz-dtl-lab">${t('dtl.attention')}</div>${statsHtml}</div>
+      </div>
+    </div>`;
+  }
+  const dtlStat = (val, label) => `<div class="mz-dtl-stat"><b>${val}</b> ${label}</div>`;
+
   function deriveStocks(rows, side) {
     const m = new Map();
     for (const r of rows) {
@@ -244,7 +314,7 @@
     tab: 'portfolios', pMetric: 'top', sMetric: 'bought', tf: 'ALL', query: '',
     compliance: 'all', evFilter: 'all', followedOnly: false, compareMode: false,
     selected: [], follows: new Set(), drawer: null, // {type:'compare'|'evidence'|'detail', ...}
-    openMenu: null, rows: SAMPLE, live: false, prices: {},
+    openMenu: null, rows: SAMPLE, live: false, prices: {}, followerCounts: {},
   };
   const P_SUB = [['top', 'sv.top'], ['active', 'sv.active'], ['followed', 'sv.followed'], ['alloc', 'sv.alloc'], ['conc', 'sv.conc'], ['lag', 'sv.lag']];
   const S_SUB = [['bought', 'sv.bought', 'BUY', 'value'], ['sold', 'sv.sold', 'SELL', 'value'], ['flow', 'sv.flow', '', 'net'], ['new', 'sv.new', 'BUY', 'filers'], ['incr', 'sv.incr', 'BUY', 'weight'], ['red', 'sv.red', 'SELL', 'weight'], ['exit', 'sv.exit', 'SELL', 'filers']];
@@ -271,12 +341,13 @@
   /* ---------------------------------------------------------------- data load */
   async function load() {
     const j = (u) => fetch(u, { headers: { accept: 'application/json' } }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    const [feed, prices] = await Promise.allSettled([j('/api/feed?performance=1'), j('/api/prices')]);
+    const [feed, prices, followers] = await Promise.allSettled([j('/api/feed?performance=1'), j('/api/prices'), j('/api/follower-counts')]);
     if (feed.status === 'fulfilled' && Array.isArray(feed.value) && feed.value.length) {
       S.rows = feed.value.map((r) => ({ ...r, label: r.label || labelOf(r) }));
       S.live = true;
     }
     if (prices.status === 'fulfilled' && prices.value && typeof prices.value === 'object') S.prices = prices.value;
+    if (followers.status === 'fulfilled' && followers.value && typeof followers.value === 'object') S.followerCounts = followers.value;
     render();
   }
 
@@ -404,6 +475,24 @@
   window.addEventListener('scroll', chartHideTip, true);
   document.addEventListener('touchmove', (e) => { if (e.touches && e.touches[0]) chartScrub(e.touches[0].clientX, e.target); }, { passive: true });
   document.addEventListener('touchend', chartHideTip);
+
+  // Swipe-back on detail drawers — a horizontal drag toward the back edge closes the sheet.
+  // (Direction flips in RTL.) Ignores swipes that start on a chart, so scrubbing isn't hijacked.
+  let swX0 = null, swY0 = null;
+  document.addEventListener('touchstart', (e) => {
+    const inDrawer = e.target.closest && e.target.closest('.mz-drawer');
+    if (!inDrawer || !S.drawer || S.drawer.type === 'compare' || (e.target.closest && e.target.closest('.mz-chart'))) { swX0 = null; return; }
+    const tt = e.touches && e.touches[0]; if (!tt) { swX0 = null; return; } swX0 = tt.clientX; swY0 = tt.clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    if (swX0 == null) return;
+    const tt = e.changedTouches && e.changedTouches[0]; if (tt) {
+      const dx = tt.clientX - swX0, dy = tt.clientY - swY0;
+      const back = document.documentElement.dir === 'rtl' ? dx < -70 : dx > 70;
+      if (back && Math.abs(dx) > Math.abs(dy) * 1.6) closeDrawer();
+    }
+    swX0 = null;
+  }, { passive: true });
 
   /* ---------------------------------------------------------------- chrome */
   function renderChrome() {
@@ -609,7 +698,12 @@
     else if (S.drawer.type === 'evidence') d.innerHTML = evidenceDrawer(S.drawer.ticker);
     else if (S.drawer.type === 'detail') d.innerHTML = portfolioDrawer(S.drawer.name);
   }
-  function drawerHead(title) { return `<div class="mz-drawer__header"><div class="mz-drawer__title"><h3 style="margin:0">${esc(title)}</h3><button class="mz-button mz-button--icon" id="drawerClose" aria-label="Close" style="min-height:2.25rem;width:2.25rem">${I.close}</button></div></div>`; }
+  function drawerHead(title, opts) {
+    opts = opts || {};
+    const backIcon = LANG === 'ar' ? I.chevronRight : I.chevronLeft;
+    const back = opts.back ? `<button class="mz-button mz-button--icon" id="drawerBack" aria-label="${LANG === 'ar' ? 'رجوع' : 'Back'}" style="min-height:2.25rem;width:2.25rem">${backIcon}</button>` : '';
+    return `<div class="mz-drawer__header"><div class="mz-drawer__title" style="gap:.4rem">${back}<h3 style="margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(title)}</h3>${opts.tag ? `<span style="flex:0 0 auto">${opts.tag}</span>` : ''}<button class="mz-button mz-button--icon" id="drawerClose" aria-label="Close" style="min-height:2.25rem;width:2.25rem">${I.close}</button></div></div>`;
+  }
 
   function compareDrawer() {
     const items = currentList().filter((p) => S.selected.includes(p.name)).slice(0, 2);
@@ -625,46 +719,55 @@
   }
   function evidenceDrawer(ticker) {
     const rows = S.rows.filter((r) => r.ticker === ticker);
-    const filers = new Set(rows.map((r) => r.actor)).size, str = evStrength(filers), fresh = Math.min(...rows.map((r) => daysSince(r.filingDate) ?? 999));
-    const label = rows[0] ? rows[0].label : 'unscreened', dollar = rows.reduce((a, r) => a + Math.abs(+r.amountMid || 0), 0);
-    const reasons = [`${filers} independent disclosing filer${filers === 1 ? '' : 's'}`, 'Consistent direction across filings', fresh <= 30 ? 'Recent, fresh disclosures' : `Most recent filing ${fresh}d ago`];
-    const top = [...rows].sort((a, b) => (+b.amountMid || 0) - (+a.amountMid || 0)).slice(0, 5);
-    const perf = rows.map((r) => r.performance && r.performance.sinceDisclosed).find((x) => x != null && isFinite(x));
-    const read = stockRead(ticker);
-    return drawerHead(t('ev.title', { t: ticker })) +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${LANG === 'ar' ? 'ما تُظهره الأدلة' : 'What the evidence shows'}</div><p class="mz-read" style="margin:0">${esc(read.sentence)}</p>${read.tags.length ? `<div style="margin-block-start:.6rem">${signalRow(read.tags)}</div>` : ''}</div>` +
-      `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${LANG === 'ar' ? 'الأداء' : 'Performance'}</span>${perf != null ? `<span class="mz-performance">${fmtPct(perf)} ${t('h.since').toLowerCase()}</span>` : ''}</div>${chart(sliceTf(histOf(ticker)), { empty: LANG === 'ar' ? 'قيد الانتظار' : 'Pending' })}</div>` +
-      `<div class="mz-drawer__section"><h3 style="font-size:var(--mz-text-md)">${t('ev.why', { s: t('ev.' + str) })}</h3><ul class="mz-why-list">${reasons.map((r) => `<li><span style="width:1.1rem;color:var(--mz-cobalt-600)">${I.check}</span>${esc(r)}</li>`).join('')}</ul></div>` +
-      `<div class="mz-drawer__section"><div class="mz-summary-grid" style="grid-template-columns:1fr 1fr 1fr;margin:0"><div class="mz-summary"><div class="mz-summary__label">${t('h.value')}</div><div class="mz-summary__value">${fmtMoney(dollar)}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('h.filers')}</div><div class="mz-summary__value">${filers}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('h.status')}</div><div style="margin-block-start:.35rem">${badge(label)}</div></div></div></div>` +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('ev.recent')}</div>${top.map((r) => `<div style="display:flex;justify-content:space-between;gap:.5rem;padding-block:.4rem;border-block-end:var(--mz-border)"><div><div style="font-weight:650">${esc(r.actor)}</div><div class="mz-entity__meta">${String(r.side).toUpperCase() === 'SELL' ? 'Sold' : 'Bought'} · ${esc(r.source || r.kind || '')}</div></div><div class="mz-cell-num" style="font-weight:700">${fmtMoney(+r.amountMid || 0)}</div></div>`).join('')}</div>` +
-      `<div class="mz-drawer__footer" style="display:grid;gap:.5rem"><button class="mz-button mz-button--primary" data-open-stock="${esc(ticker)}">${t('ev.review')} ${I.external}</button><button class="mz-button mz-button--ghost">${I.bell}${t('ev.setalert')}</button></div>`;
+    if (!rows.length) return drawerHead(ticker, { back: true });
+    const filers = new Set(rows.map((r) => r.actor)).size;
+    const buyers = new Set(rows.filter((r) => sideUp(r.side)).map((r) => r.actor)).size;
+    const fresh = Math.min(...rows.map((r) => daysSince(r.filingDate) ?? 999));
+    const label = rows[0].label;
+    const perfs = rows.map((r) => r.performance && r.performance.sinceDisclosed).filter((x) => x != null && isFinite(x));
+    const perf = perfs.length ? +(perfs.reduce((a, b) => a + b, 0) / perfs.length).toFixed(1) : null;
+    const headline = composeHeadline(perf, { hasActivity: true, buyers, active: filers >= 3 });
+    // Attraction: filers buying is the real signal; a public follower count only shows when meaningful.
+    const stats = dtlStat(buyers, t('dtl.buyers')) + dtlStat(filers, t('dtl.filers')) + dtlStat(fresh <= 900 ? fresh + 'd' : '—', LANG === 'ar' ? 'منذ آخر إفصاح' : 'since last filing');
+    // Who bought & sold — the disclosure log, newest-value first.
+    const log = [...rows].sort((a, b) => (+b.amountMid || 0) - (+a.amountMid || 0)).slice(0, 6);
+    const following = S.follows.has(ticker);
+    const who = { avatar: `<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(ticker.slice(0, 4))}</span>`, name: ticker, sub: rows[0].company || ticker, ltr: true };
+    return drawerHead(t('dtl.stock'), { back: true, tag: badge(label) }) +
+      detailHero(who, headline, perf, stats) +
+      `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${t('dtl.perf')}</span>${perf != null ? `<span class="mz-performance">${fmtPct(perf)} ${t('h.since').toLowerCase()}</span>` : ''}</div>${chart(sliceTf(histOf(ticker)), { empty: t('dtl.pending') })}</div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.who')}</div>${log.map((r) => { const sell = String(r.side).toUpperCase() === 'SELL'; return `<div class="mz-hold"><div class="mz-hold__n"><div style="font-weight:700">${esc(r.actor)}</div><div class="mz-entity__meta">${sell ? (LANG === 'ar' ? 'باع' : 'Sold') : (LANG === 'ar' ? 'اشترى' : 'Bought')} · ${esc(r.source || r.kind || '')}</div></div><span class="mz-badge mz-badge--${sell ? 'noncompliant' : 'compliant'}" style="min-height:1.3rem">${sell ? (LANG === 'ar' ? 'باع' : 'Sold') : (LANG === 'ar' ? 'اشترى' : 'Bought')}</span><span class="mz-cell-num" style="font-weight:750;margin-inline-start:.5rem">${fmtMoney(+r.amountMid || 0)}</span></div>`; }).join('')}</div>` +
+      `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
+      `<div class="mz-drawer__footer" style="display:grid;grid-template-columns:1fr auto;gap:.5rem"><button class="mz-button mz-button--primary" data-follow="${esc(ticker)}">${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button><button class="mz-button mz-button--ghost" data-nav="alerts">${I.bell}${t('common.watch')}</button></div>`;
   }
   function portfolioDrawer(name) {
-    const p = derivePortfolios(S.rows).find((x) => x.name === name); if (!p) return drawerHead(name);
+    const p = derivePortfolios(S.rows).find((x) => x.name === name); if (!p) return drawerHead(esc(name), { back: true });
     const flag = portfolioFlag(p);
-    // Composition: value-weight the ownable (non-fail) held names.
+    const fc = followerCountOf(name), rk = returnRank(name);
+    const headline = composeHeadline(p.perf, { hasActivity: p.count > 0, active: p.count >= 5, quiet: p.count > 0 && p.count < 3, wellFollowed: fc != null && fc >= 100 });
+    // Attraction: rank + disclosures are real; a public follower count only shows once meaningful.
+    const stats = dtlStat(fc != null ? fc.toLocaleString() : '—', t('dtl.followers')) +
+      dtlStat(rk ? '#' + rk.rank : '—', rk ? (LANG === 'ar' ? `من ${rk.total} بالعائد` : `of ${rk.total} by return`) : (LANG === 'ar' ? 'الترتيب' : 'rank')) +
+      dtlStat(p.count, t('dtl.disclosures'));
+    const compTag = compliancePill(flag.tone); // compact quiet label (full wording lives in the holdings chips)
+    // Evidence: the disclosed-holdings performance — a single neutral line (compliance never
+    // changes the performance shown). Timeframe-aware via sliceTf(), like every chart.
+    const idxH = sliceTf(portfolioIndexHist(p.rows));
+    // Top holdings, value-weighted, each with its own compliance chip + neutral price return.
     const holdings = {};
     for (const r of p.rows) { holdings[r.ticker] = holdings[r.ticker] || { ticker: r.ticker, company: r.company, label: r.label, v: 0 }; holdings[r.ticker].v += Math.abs(+r.amountMid || 0); }
-    const hs = Object.values(holdings).sort((a, b) => b.v - a.v);
-    const ownTotal = hs.filter((h) => h.label !== 'fail').reduce((a, h) => a + h.v, 0) || 1;
-    const idxH = sliceTf(portfolioIndexHist(p.rows));
-    const origH = sliceTf(portfolioIndexHist(p.rows, true));
-    const scrRet = seriesReturn(idxH.map((x) => +x.c)), origRet = seriesReturn(origH.map((x) => +x.c));
-    const effect = (scrRet != null && origRet != null) ? scrRet - origRet : null;
-    const hasOrig = origH.length >= 2 && p.mix.fail > 0;
-    // Activity log — recent disclosed trades, newest first.
-    const acts = [...p.rows].sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || '')).slice(0, 6);
-    const sideTag = (s) => String(s).toUpperCase() === 'SELL'
-      ? `<span class="mz-badge mz-badge--noncompliant" style="min-height:1.3rem">Sold</span>`
-      : `<span class="mz-badge mz-badge--compliant" style="min-height:1.3rem">Bought</span>`;
-    const read = portfolioRead(p);
-    return drawerHead(name) +
-      `<div class="mz-drawer__section"><p class="mz-read" style="margin:0 0 .6rem">${esc(read.sentence)}</p>${read.tags.length ? `<div style="margin-block-end:.7rem">${signalRow(read.tags)}</div>` : ''}<span class="mz-badge mz-badge--${flag.tone === 'clean' ? 'compliant' : flag.tone === 'purify' ? 'purify' : 'noncompliant'}">${flag.text}</span><div style="margin-block-start:.6rem">${allocBar(p.mix)}</div></div>` +
-      `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${hasOrig ? (LANG === 'ar' ? 'الأصلي مقابل المُصفّى شرعيًا' : 'Original vs Halal-screened') : (LANG === 'ar' ? 'الأداء' : 'Performance')}</span>${effect != null && hasOrig ? `<span style="font-size:var(--mz-text-xs);font-weight:700;color:${effect >= 0 ? 'var(--mz-cobalt-700)' : 'var(--mz-ink-600)'}">${LANG === 'ar' ? 'أثر الفحص' : 'Screening effect'} ${effect >= 0 ? '+' : '−'}${Math.abs(effect).toFixed(1)} pts</span>` : ''}</div>${chart(idxH, { compare: hasOrig ? origH : null, empty: LANG === 'ar' ? 'قيد الانتظار' : 'Pending' })}${hasOrig ? `<div style="display:flex;gap:1rem;margin-block-start:.4rem;font-size:var(--mz-text-xs)"><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:2px;background:var(--mz-cobalt-600);display:inline-block"></span>${LANG === 'ar' ? 'مُصفّى' : 'Halal-screened'} ${scrRet != null ? fmtPct(scrRet) : ''}</span><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:0;border-top:2px dashed var(--mz-ink-400);display:inline-block"></span>${LANG === 'ar' ? 'الأصلي' : 'Original'} ${origRet != null ? fmtPct(origRet) : ''}</span></div>` : ''}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? 'توضيحي — يطبّق الفحص الحالي على المجموعة المُفصَح عنها. أدلة، ليس نصيحة.' : 'Illustrative — applies today’s screen to the disclosed set. Evidence, not advice.'}</p></div>` +
-      `<div class="mz-drawer__section"><div class="mz-summary-grid" style="grid-template-columns:1fr 1fr;margin:0"><div class="mz-summary"><div class="mz-summary__label">${t('h.return')}</div><div class="mz-summary__value">${fmtPct(p.perf) || '—'}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('cmp.disclosures')}</div><div class="mz-summary__value">${p.count}</div></div></div></div>` +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('h.allocation')}</div>${hs.map((h) => { const w = h.label === 'fail' ? 0 : Math.round(h.v / ownTotal * 100); return `<div style="padding-block:.45rem;border-block-end:var(--mz-border)"><div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center"><div class="mz-ltr" style="font-weight:700;min-width:0"><span>${esc(h.ticker)}</span> <span class="mz-muted" style="font-weight:400">${esc(h.company || '')}</span></div><div style="display:flex;gap:.5rem;align-items:center;flex:0 0 auto">${h.label === 'fail' ? '' : `<span class="mz-cell-num" style="font-weight:700">${w}%</span>`}${badge(h.label)}</div></div>${h.label === 'fail' ? '' : `<div class="mz-allocation__bar" style="margin-block-start:.35rem"><span class="mz-allocation__segment--compliant" style="flex:${w}"></span><span style="flex:${100 - w};background:var(--mz-ink-100)"></span></div>`}</div>`; }).join('')}</div>` +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${LANG === 'ar' ? 'سجل النشاط' : 'Activity log'}</div>${acts.map((r) => { const lag = daysBetween(r.transactionDate, r.filingDate); return `<div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;padding-block:.4rem;border-block-end:var(--mz-border)"><div style="min-width:0"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${esc(r.amount || (r.amountMid ? fmtMoney(+r.amountMid) : ''))}${lag != null ? ` · filed ${lag}d later` : ''}</div></div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
-      `<div class="mz-drawer__footer"><button class="mz-button mz-button--secondary" style="width:100%" data-follow="${esc(name)}">${S.follows.has(name) ? I.starOn : I.star}${S.follows.has(name) ? t('common.following') : t('common.follow')}</button></div>`;
+    const hs = Object.values(holdings).sort((a, b) => b.v - a.v).slice(0, 6);
+    // Disclosure facts — recent trades, newest first (quiet, below the conclusion).
+    const acts = [...p.rows].sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || '')).slice(0, 4);
+    const following = S.follows.has(name);
+    const who = { avatar: `<span style="color:var(--mz-cobalt-700);font-weight:800;font-size:.8rem">${esc(p.initials)}</span>`, name, sub: `${typeLabel(p.kind)} · ${p.count} ${LANG === 'ar' ? 'إفصاح' : 'disclosures'}` };
+    return drawerHead(t('dtl.portfolio'), { back: true, tag: compTag }) +
+      detailHero(who, headline, p.perf, stats) +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(idxH, { empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? 'مؤشّر متساوي الأوزان للحيازات المُفصَح عنها. أدلة، ليست نصيحة.' : 'Equal-weight index of the disclosed holdings. Evidence, not advice.'}</p></div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.holdings')}</div>${hs.map((h) => `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || '')}</div></div>${badge(h.label)}<span style="margin-inline-start:.5rem;min-width:3.4rem;text-align:end">${retNode(priceReturn(h.ticker))}</span></div>`).join('')}</div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.activity')}</div>${acts.map((r) => { const lag = daysBetween(r.transactionDate, r.filingDate); const sell = String(r.side).toUpperCase() === 'SELL'; return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${esc(r.amount || (r.amountMid ? fmtMoney(+r.amountMid) : ''))}${lag != null ? (LANG === 'ar' ? ` · أُفصح بعد ${lag}ي` : ` · filed ${lag}d later`) : ''}</div></div><span class="mz-badge mz-badge--${sell ? 'noncompliant' : 'compliant'}" style="min-height:1.3rem">${sell ? (LANG === 'ar' ? 'باع' : 'Sold') : (LANG === 'ar' ? 'اشترى' : 'Bought')}</span></div>`; }).join('')}</div>` +
+      `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
+      `<div class="mz-drawer__footer"><button class="mz-button mz-button--secondary" style="width:100%" data-follow="${esc(name)}">${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button></div>`;
   }
 
   /* ---------------------------------------------------------------- main render */
@@ -681,7 +784,7 @@
 
   /* ---------------------------------------------------------------- events (delegated) */
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-star],[data-select],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#clearChips,#trayOpen,#bellBtn');
+    const el = e.target.closest('[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-star],[data-select],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#drawerBack,#clearChips,#trayOpen,#bellBtn');
     if (!el) { if (S.openMenu) { S.openMenu = null; closeMenus(); } return; }
     const has = (a) => el.hasAttribute(a) || el.id === a;
 
@@ -700,7 +803,7 @@
     if (el.id === 'sortBtn') { toggleMenu('sort'); return; }
     if (el.id === 'filterBtn') { toggleMenu('filter'); return; }
     if (el.id === 'whyBtn') { toggleMenu('why'); return; }
-    if (el.id === 'drawerClose') { closeDrawer(); return; }
+    if (el.id === 'drawerClose' || el.id === 'drawerBack') { closeDrawer(); return; }
     if (el.id === 'clearChips') { S.compliance = 'all'; S.evFilter = 'all'; S.followedOnly = false; render(); return; }
     if (el.dataset.chip != null) { const chips = document.getElementById('chips')._chips; chips && chips[+el.dataset.chip] && chips[+el.dataset.chip][1](); return; }
     if (el.dataset.openStock) { S.drawer = { type: 'evidence', ticker: el.dataset.openStock }; go('/stock/' + encodeURIComponent(el.dataset.openStock)); return; }
