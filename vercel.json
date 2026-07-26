@@ -4,6 +4,7 @@
     { "source": "/app/:path*", "destination": "/", "permanent": true }
   ],
   "rewrites": [
+    { "source": "/api/follower-counts", "destination": "/api/follows?counts=1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
