@@ -127,8 +127,12 @@
   /* Toolbar rows: the time selector sits on its own row above the controls. */
   #controlRow { margin-block-start: var(--mz-space-2); }
   /* Mobile drawer scrim (bottom sheet / side sheet on < desktop). */
-  .mz-scrim { position: fixed; inset: 0; z-index: 50; background: rgb(16 24 40 / 0.42); }
+  .mz-scrim { position: fixed; inset: 0; z-index: 50; background: rgb(16 24 40 / 0.42); overscroll-behavior: contain; touch-action: none; }
   @media (min-width: 75rem) { .mz-scrim { display: none !important; } }
+  /* Keep a scroll gesture inside the open sheet — never chain it to the page behind. */
+  .mz-drawer { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  /* Background scroll-lock while a sheet/side-panel is open (iOS-safe: freeze the body in place). */
+  body.mz-locked { position: fixed; inset-inline: 0; width: 100%; overflow: hidden; }
   @media (max-width: 47.99rem) {
     #freshness { display: none; }
     .mz-topbar .mz-product-tabs { grid-template-columns: repeat(2, minmax(4.5rem, 1fr)); }

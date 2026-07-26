@@ -690,14 +690,26 @@
       S.drawer = null;
     }
     const scrim = document.getElementById('scrim');
-    if (!S.drawer) { grid.classList.remove('mz-content-grid--drawer-open'); d.hidden = true; d.innerHTML = ''; scrim.hidden = true; return; }
+    if (!S.drawer) { grid.classList.remove('mz-content-grid--drawer-open'); d.hidden = true; d.innerHTML = ''; scrim.hidden = true; lockBodyScroll(false); return; }
     grid.classList.add('mz-content-grid--drawer-open'); d.hidden = false;
     // Scrim only under the sheet/side-panel on tablet & mobile (desktop drawer is in-grid).
     scrim.hidden = window.matchMedia('(min-width: 75rem)').matches;
+    // Freeze the page behind the sheet/side-panel so scrolling it never leaks to the list below.
+    lockBodyScroll(!scrim.hidden);
     if (S.drawer.type === 'compare') d.innerHTML = compareDrawer();
     else if (S.drawer.type === 'evidence') d.innerHTML = evidenceDrawer(S.drawer.ticker);
     else if (S.drawer.type === 'detail') d.innerHTML = portfolioDrawer(S.drawer.name);
   }
+  // iOS-safe background scroll lock: pin the body at its current offset while a sheet is open,
+  // then restore the exact scroll position on close. (overflow:hidden alone leaks on iOS Safari.)
+  let _lockedY = 0;
+  function lockBodyScroll(on) {
+    const b = document.body, locked = b.classList.contains('mz-locked');
+    if (on && !locked) { _lockedY = window.scrollY || window.pageYOffset || 0; b.style.top = `-${_lockedY}px`; b.classList.add('mz-locked'); }
+    else if (!on && locked) { b.classList.remove('mz-locked'); b.style.top = ''; window.scrollTo(0, _lockedY); }
+  }
+  // Rotating / resizing across the desktop breakpoint must re-evaluate the lock (in-grid vs sheet).
+  window.addEventListener('resize', () => { if (S.drawer) renderDrawer(); else lockBodyScroll(false); });
   function drawerHead(title, opts) {
     opts = opts || {};
     const backIcon = LANG === 'ar' ? I.chevronRight : I.chevronLeft;
