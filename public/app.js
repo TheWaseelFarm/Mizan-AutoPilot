@@ -250,7 +250,7 @@
   const S_SUB = [['bought', 'sv.bought', 'BUY', 'value'], ['sold', 'sv.sold', 'SELL', 'value'], ['flow', 'sv.flow', '', 'net'], ['new', 'sv.new', 'BUY', 'filers'], ['incr', 'sv.incr', 'BUY', 'weight'], ['red', 'sv.red', 'SELL', 'weight'], ['exit', 'sv.exit', 'SELL', 'filers']];
   const P_SORT = { top: 'so.return', active: 'so.activity', followed: 'so.followers', alloc: 'so.alloc', conc: 'so.conc', lag: 'so.lag' };
   const S_SORT = { value: 'so.value', weight: 'so.weight', filers: 'so.filers', net: 'so.net' };
-  const TFS = [['1M', '1M'], ['3M', '3M'], ['6M', '6M'], ['1Y', '1Y'], ['3Y', '3Y'], ['5Y', '5Y'], ['ALL', 'All']];
+  const TFS = [['1W', '1W'], ['1M', '1M'], ['3M', '3M'], ['6M', '6M'], ['1Y', '1Y'], ['3Y', '3Y'], ['5Y', '5Y'], ['ALL', 'All']];
 
   /* ---------------------------------------------------------------- routing */
   function parsePath() {
@@ -335,45 +335,75 @@
   const perfHero = (v) => v == null
     ? '<span class="mz-muted" style="font-size:var(--mz-text-lg)">—</span>'
     : `<span class="mz-perf-hero" data-up="${v >= 0}">${v >= 0 ? I.caretUp : I.caretDown}${fmtPct(v)}</span>`;
-  const sparkVals = (vals) => vals && vals.length >= 2 ? `<svg class="mz-spark" viewBox="0 0 80 28" preserveAspectRatio="none"><polyline fill="none" stroke="var(--mz-cobalt-500)" stroke-width="1.5" points="${chartPath(vals, 80, 28)}"/></svg>` : '';
-  // Full-width sparkline for mobile cards (leads with the trend in performance-led mode).
-  const sparkFull = (vals) => vals && vals.length >= 2 ? `<svg viewBox="0 0 300 40" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polyline fill="none" stroke="var(--mz-cobalt-500)" stroke-width="1.4" points="${chartPath(vals, 300, 40)}"/></svg>` : '';
   // Compact compliance tag — small pill, no longer the loud hero (performance-led).
   const compliancePill = (tone) => { const cls = tone === 'clean' ? 'compliant' : tone === 'purify' ? 'purify' : 'noncompliant'; const short = tone === 'clean' ? t('v.compliant') : tone === 'purify' ? t('v.purify') : t('v.noncompliant'); return `<span class="mz-badge mz-badge--${cls}" style="min-height:1.4rem;font-size:.65rem">${short}</span>`; };
   const starBtn = (id) => `<button class="mz-star" data-star="${esc(id)}" data-on="${S.follows.has(id)}" aria-label="Follow">${S.follows.has(id) ? I.starOn : I.star}</button>`;
 
-  /* --- real performance charts, restored from the native app (dual-anchor / index) --- */
-  const chartPath = (v, W, H) => { const mn = Math.min(...v), mx = Math.max(...v), r = (mx - mn) || 1; return v.map((y, i) => `${(i / (v.length - 1) * W).toFixed(2)},${(H - (y - mn) / r * H).toFixed(2)}`).join(' '); };
-  const histVals = (ticker) => ((S.prices[ticker] && S.prices[ticker].history) || []).map((p) => +p.c).filter((x) => isFinite(x));
-  // Real sparkline from the ticker's cached price history (empty string when no data).
-  const spark = (ticker) => { const v = histVals(ticker); return v.length < 2 ? '' : `<svg class="mz-spark" viewBox="0 0 80 28" preserveAspectRatio="none"><polyline fill="none" stroke="var(--mz-cobalt-500)" stroke-width="1.5" points="${chartPath(v, 80, 28)}"/></svg>`; };
-  // A bigger line chart for detail drawers; `vals` is a numeric close series.
-  function lineChart(vals) {
-    if (!vals || vals.length < 2) return `<div class="mz-muted" style="padding:1.25rem 0;text-align:center;font-size:var(--mz-text-xs)">Price data pending — will populate once the cache fills.</div>`;
-    const H = 120, W = 320, ret = vals[vals.length - 1] / vals[0] - 1;
-    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block;overflow:visible"><polyline points="${chartPath(vals, W, H)}" fill="none" stroke="var(--mz-cobalt-600)" stroke-width="1.6" stroke-linejoin="round"/></svg>
-      <div style="display:flex;justify-content:space-between;margin-block-start:.4rem;font-size:var(--mz-text-xs)"><span class="mz-muted mz-ltr">$${Math.min(...vals).toFixed(0)}</span><span class="mz-performance">${fmtPct(ret * 100)} over range</span><span class="mz-muted mz-ltr">$${Math.max(...vals).toFixed(0)}</span></div>`;
-  }
-  // Equal-weight normalized index across a portfolio's held tickers. `includeAll` keeps the
-  // non-compliant names (the "original" portfolio) so we can show the screening effect.
-  function portfolioIndexVals(rows, includeAll) {
+  /* ============ ONE shared, interactive chart component — used by EVERY chart ============
+     Global consistency rule (CLAUDE.md): every chart in the app is this component. Same
+     behavior everywhere — scrub (touch/pointer) reveals value + date, respects the active
+     timeframe (1W…All), neutral cobalt/ink only (never a verdict hue), graceful empty state. */
+  const chartPath = (v, W, H, mn, mx) => { const r = (mx - mn) || 1; return v.map((y, i) => `${(i / (v.length - 1) * W).toFixed(2)},${(H - (y - mn) / r * H).toFixed(2)}`).join(' '); };
+  const histOf = (ticker) => ((S.prices[ticker] && S.prices[ticker].history) || []).filter((p) => p && isFinite(+p.c));
+  const TF_DAYS_ALL = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '3Y': 1095, '5Y': 1825, ALL: Infinity };
+  const sliceTf = (hist) => { const n = TF_DAYS_ALL[S.tf] ?? Infinity; return (n === Infinity || hist.length <= n) ? hist : hist.slice(-Math.max(2, Math.round(n))); };
+  const shortDate = (d) => { const ms = Date.parse(d); if (!isFinite(ms)) return d || ''; return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+  const seriesReturn = (v) => v && v.length >= 2 ? (v[v.length - 1] / v[0] - 1) * 100 : null;
+
+  // Equal-weight normalized portfolio index, WITH dates (for the scrub tooltip). `includeAll`
+  // keeps the non-compliant names (the "original" portfolio) for the screening-effect overlay.
+  function portfolioIndexHist(rows, includeAll) {
     const tickers = [...new Set(rows.filter((r) => includeAll || r.label !== 'fail').map((r) => r.ticker))];
-    const series = tickers.map(histVals).filter((a) => a.length >= 2);
+    const series = tickers.map(histOf).filter((a) => a.length >= 2);
     if (!series.length) return [];
-    const len = Math.min(...series.map((a) => a.length)), out = [];
-    for (let i = 0; i < len; i++) { let s = 0; for (const a of series) s += a[a.length - len + i] / a[a.length - len]; out.push(s / series.length * 100); }
+    const len = Math.min(...series.map((a) => a.length)), ref = series[0].slice(-len), out = [];
+    for (let i = 0; i < len; i++) { let s = 0; for (const a of series) { const tl = a.slice(-len); s += (+tl[i].c) / (+tl[0].c); } out.push({ d: ref[i].d, c: s / series.length * 100 }); }
     return out;
   }
-  const seriesReturn = (v) => v && v.length >= 2 ? (v[v.length - 1] / v[0] - 1) * 100 : null;
-  // Original (all holdings) vs Halal-screened (ownable only) — the "screening effect" (handoff /
-  // Mussaed PRD). Illustrative: applies today's screen to the disclosed set, not point-in-time.
-  function dualChart(screened, original) {
-    const all = [...screened, ...original];
-    if (all.length < 2) return '<div class="mz-muted" style="padding:1.25rem 0;text-align:center;font-size:var(--mz-text-xs)">Price data pending.</div>';
-    const H = 120, W = 320, mn = Math.min(...all), mx = Math.max(...all), r = (mx - mn) || 1;
-    const path = (v) => v.map((y, i) => `${(i / (v.length - 1) * W).toFixed(2)},${(H - (y - mn) / r * H).toFixed(2)}`).join(' ');
-    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block">${original.length >= 2 ? `<polyline points="${path(original)}" fill="none" stroke="var(--mz-ink-400)" stroke-width="1.2" stroke-dasharray="3 3"/>` : ''}${screened.length >= 2 ? `<polyline points="${path(screened)}" fill="none" stroke="var(--mz-cobalt-600)" stroke-width="1.8"/>` : ''}</svg>`;
+
+  // THE shared chart. `hist` = [{d,c}]. opts: { cls: 'mz-chart--full|--card|--spark', compare:[{d,c}], empty }.
+  function chart(hist, opts) {
+    opts = opts || {};
+    const cls = opts.cls || 'mz-chart--full';
+    const h = cls === 'mz-chart--spark' ? 28 : cls === 'mz-chart--card' ? 40 : 120;
+    const data = (hist || []).filter((p) => p && isFinite(+p.c));
+    if (data.length < 2) return `<div class="mz-chart ${cls} mz-chart__empty" style="height:${h}px">${opts.empty || '—'}</div>`;
+    const closes = data.map((p) => +p.c), mn = Math.min(...closes), mx = Math.max(...closes);
+    const W = 320, H = 100, sw = cls === 'mz-chart--full' ? 1.7 : 1.4;
+    const line = `<polyline points="${chartPath(closes, W, H, mn, mx)}" fill="none" stroke="var(--mz-cobalt-600)" stroke-width="${sw}" stroke-linejoin="round"/>`;
+    let cmp = '';
+    if (opts.compare) { const c2 = (opts.compare || []).filter((p) => p && isFinite(+p.c)).map((p) => +p.c); if (c2.length >= 2) cmp = `<polyline points="${chartPath(c2, W, H, mn, mx)}" fill="none" stroke="var(--mz-ink-400)" stroke-width="1.2" stroke-dasharray="3 3"/>`; }
+    const series = esc(JSON.stringify(data.map((p) => [p.d, +p.c])));
+    return `<div class="mz-chart ${cls}" data-series="${series}" data-min="${mn}" data-max="${mx}" style="height:${h}px"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${cmp}${line}</svg><span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
   }
+
+  // Interactive scrub — ONE handler drives every chart (touch + pointer). Registered once.
+  const chartTip = (() => { const el = document.createElement('div'); el.className = 'mz-chart-tip'; document.body.appendChild(el); return el; })();
+  function chartHideTip() { if (!chartTip.classList.contains('is-on')) return; chartTip.classList.remove('is-on'); document.querySelectorAll('.mz-chart.is-active').forEach((c) => c.classList.remove('is-active')); }
+  function chartScrub(clientX, target) {
+    const el = target && target.closest && target.closest('.mz-chart[data-series]');
+    if (!el) { chartHideTip(); return; }
+    const rect = el.getBoundingClientRect();
+    let data; try { data = JSON.parse(el.dataset.series); } catch (e) { return; }
+    const n = data.length; if (n < 2) return;
+    let i = Math.round((clientX - rect.left) / rect.width * (n - 1)); i = Math.max(0, Math.min(n - 1, i));
+    const d = data[i][0], c = +data[i][1], mn = +el.dataset.min, mx = +el.dataset.max, r = (mx - mn) || 1;
+    const px = i / (n - 1) * rect.width, py = (1 - (c - mn) / r) * rect.height;
+    el.classList.add('is-active');
+    const cx = el.querySelector('.mz-chart__cx'), dot = el.querySelector('.mz-chart__dot');
+    if (cx) cx.style.left = px + 'px';
+    if (dot) { dot.style.left = px + 'px'; dot.style.top = py + 'px'; }
+    chartTip.textContent = `$${c.toFixed(2)} · ${shortDate(d)}`;
+    chartTip.style.left = (rect.left + px) + 'px'; chartTip.style.top = (rect.top + py) + 'px';
+    chartTip.classList.add('is-on');
+  }
+  document.addEventListener('pointermove', (e) => chartScrub(e.clientX, e.target));
+  document.addEventListener('pointerdown', (e) => chartScrub(e.clientX, e.target));
+  document.addEventListener('pointerup', chartHideTip);
+  document.addEventListener('pointercancel', chartHideTip);
+  window.addEventListener('scroll', chartHideTip, true);
+  document.addEventListener('touchmove', (e) => { if (e.touches && e.touches[0]) chartScrub(e.touches[0].clientX, e.target); }, { passive: true });
+  document.addEventListener('touchend', chartHideTip);
 
   /* ---------------------------------------------------------------- chrome */
   function renderChrome() {
@@ -448,7 +478,7 @@
         const av = `<span style="color:var(--mz-cobalt-700);font-weight:800;font-size:.8rem">${esc(p.initials)}</span>`;
         const tags = portfolioRead(p).tags.slice(0, 2);
         const meta = `<span style="display:inline-flex;gap:.4rem;align-items:center;flex-wrap:wrap">${miniIcon(groupIcon(p.group))}${esc(typeLabel(p.kind))}${signalRow(tags)}</span>`;
-        return `<tr data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(av, p.name, meta)}</td><td><div class="mz-perf-cell">${perfHero(p.perf)}${sparkVals(portfolioIndexVals(p.rows))}</div></td><td class="mz-cell-num">${p.count}</td><td>${freshEl(p.fresh)}</td><td>${compliancePill(flag.tone)}</td><td>${starBtn(p.name)}</td></tr>`;
+        return `<tr data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(av, p.name, meta)}</td><td><div class="mz-perf-cell">${perfHero(p.perf)}${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--spark' })}</div></td><td class="mz-cell-num">${p.count}</td><td>${freshEl(p.fresh)}</td><td>${compliancePill(flag.tone)}</td><td>${starBtn(p.name)}</td></tr>`;
       }).join('') || emptyRow(7);
       cards.innerHTML = list.map((p, i) => portfolioCard(p, i)).join('');
     } else if (S.sMetric === 'flow') {
@@ -457,7 +487,7 @@
       // Performance-led: Since-disclosed return is the hero column (3rd); status is a compact badge.
       thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.stock')}</th><th>${t('h.since')}</th><th>${t('h.signal')}</th><th>${t('h.evidence')}</th><th>${t('h.filers')}</th><th>${t('h.value')}</th><th>${t('h.status')}</th></tr>`;
       const signal = { bought: 'Accumulation', sold: 'Reduction', new: 'New position', incr: 'Position increased', red: 'Position reduced', exit: 'Exited' }[S.sMetric];
-      tbody.innerHTML = list.map((s, i) => `<tr data-row="stock" data-id="${esc(s.ticker)}"><td><span class="mz-rank">${i + 1}</span></td><td>${entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(s.ticker.slice(0, 4))}</span>`, s.ticker, `${esc(s.company)}${s.fresh != null ? ` · ${s.fresh}d` : ''}`, true)}</td><td><div class="mz-perf-cell">${perfHero(s.perf)}${spark(s.ticker)}</div></td><td><div class="mz-muted" style="margin-block-end:.2rem">${signal}</div>${signalRow(stockRead(s.ticker).tags.slice(0, 1))}</td><td style="font-weight:700">${t('ev.' + evStrength(s.filerCount))}</td><td class="mz-cell-num">${s.filerCount}</td><td class="mz-cell-num" style="font-weight:750">${fmtMoney(s.dollar)}</td><td>${badge(s.label)}</td></tr>`).join('') || emptyRow(8);
+      tbody.innerHTML = list.map((s, i) => `<tr data-row="stock" data-id="${esc(s.ticker)}"><td><span class="mz-rank">${i + 1}</span></td><td>${entity(`<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(s.ticker.slice(0, 4))}</span>`, s.ticker, `${esc(s.company)}${s.fresh != null ? ` · ${s.fresh}d` : ''}`, true)}</td><td><div class="mz-perf-cell">${perfHero(s.perf)}${chart(sliceTf(histOf(s.ticker)), { cls: 'mz-chart--spark' })}</div></td><td><div class="mz-muted" style="margin-block-end:.2rem">${signal}</div>${signalRow(stockRead(s.ticker).tags.slice(0, 1))}</td><td style="font-weight:700">${t('ev.' + evStrength(s.filerCount))}</td><td class="mz-cell-num">${s.filerCount}</td><td class="mz-cell-num" style="font-weight:750">${fmtMoney(s.dollar)}</td><td>${badge(s.label)}</td></tr>`).join('') || emptyRow(8);
       cards.innerHTML = list.map((s, i) => stockCard(s, i)).join('');
     }
   }
@@ -490,7 +520,7 @@
         <div style="flex:1;min-width:0"><div class="mz-entity__name">${esc(p.name)}</div><div class="mz-entity__meta">${esc(typeLabel(p.kind))}${p.fresh != null ? ` · ${p.fresh}d` : ''}</div></div>
         <div style="text-align:end">${perfHero(p.perf)}</div>
       </div>
-      <div style="margin-block-start:.65rem">${sparkVals(portfolioIndexVals(p.rows)) ? `<div style="height:2.5rem">${sparkFull(portfolioIndexVals(p.rows))}</div>` : ''}</div>
+      <div style="margin-block-start:.65rem">${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--card' })}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-block-start:.6rem;gap:.5rem">
         ${compliancePill(flag.tone)}
         <span class="mz-muted" style="font-size:var(--mz-text-xs)">${p.count} ${LANG === 'ar' ? 'إفصاح' : 'disclosures'} · ${starBtn(p.name)}</span>
@@ -504,7 +534,7 @@
         <div style="flex:1;min-width:0"><div class="mz-entity__name mz-ltr">${esc(s.ticker)}</div><div class="mz-entity__meta">${esc(s.company)}${s.fresh != null ? ` · ${s.fresh}d` : ''}</div></div>
         <div style="text-align:end">${perfHero(s.perf)}</div>
       </div>
-      <div style="margin-block-start:.6rem">${sparkVals(histVals(s.ticker)) ? `<div style="height:2.5rem">${sparkFull(histVals(s.ticker))}</div>` : ''}</div>
+      <div style="margin-block-start:.6rem">${chart(sliceTf(histOf(s.ticker)), { cls: 'mz-chart--card' })}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-block-start:.6rem;gap:.5rem">
         ${badge(s.label)}
         <span class="mz-muted" style="font-size:var(--mz-text-xs)">${t('ev.' + evStrength(s.filerCount))} · ${s.filerCount} ${LANG === 'ar' ? 'مُفصِح' : 'filers'} · ${fmtMoney(s.dollar)}</span>
@@ -603,7 +633,7 @@
     const read = stockRead(ticker);
     return drawerHead(t('ev.title', { t: ticker })) +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${LANG === 'ar' ? 'ما تُظهره الأدلة' : 'What the evidence shows'}</div><p class="mz-read" style="margin:0">${esc(read.sentence)}</p>${read.tags.length ? `<div style="margin-block-start:.6rem">${signalRow(read.tags)}</div>` : ''}</div>` +
-      `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${LANG === 'ar' ? 'الأداء' : 'Performance'}</span>${perf != null ? `<span class="mz-performance">${fmtPct(perf)} ${t('h.since').toLowerCase()}</span>` : ''}</div>${lineChart(histVals(ticker))}</div>` +
+      `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${LANG === 'ar' ? 'الأداء' : 'Performance'}</span>${perf != null ? `<span class="mz-performance">${fmtPct(perf)} ${t('h.since').toLowerCase()}</span>` : ''}</div>${chart(sliceTf(histOf(ticker)), { empty: LANG === 'ar' ? 'قيد الانتظار' : 'Pending' })}</div>` +
       `<div class="mz-drawer__section"><h3 style="font-size:var(--mz-text-md)">${t('ev.why', { s: t('ev.' + str) })}</h3><ul class="mz-why-list">${reasons.map((r) => `<li><span style="width:1.1rem;color:var(--mz-cobalt-600)">${I.check}</span>${esc(r)}</li>`).join('')}</ul></div>` +
       `<div class="mz-drawer__section"><div class="mz-summary-grid" style="grid-template-columns:1fr 1fr 1fr;margin:0"><div class="mz-summary"><div class="mz-summary__label">${t('h.value')}</div><div class="mz-summary__value">${fmtMoney(dollar)}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('h.filers')}</div><div class="mz-summary__value">${filers}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('h.status')}</div><div style="margin-block-start:.35rem">${badge(label)}</div></div></div></div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('ev.recent')}</div>${top.map((r) => `<div style="display:flex;justify-content:space-between;gap:.5rem;padding-block:.4rem;border-block-end:var(--mz-border)"><div><div style="font-weight:650">${esc(r.actor)}</div><div class="mz-entity__meta">${String(r.side).toUpperCase() === 'SELL' ? 'Sold' : 'Bought'} · ${esc(r.source || r.kind || '')}</div></div><div class="mz-cell-num" style="font-weight:700">${fmtMoney(+r.amountMid || 0)}</div></div>`).join('')}</div>` +
@@ -617,11 +647,11 @@
     for (const r of p.rows) { holdings[r.ticker] = holdings[r.ticker] || { ticker: r.ticker, company: r.company, label: r.label, v: 0 }; holdings[r.ticker].v += Math.abs(+r.amountMid || 0); }
     const hs = Object.values(holdings).sort((a, b) => b.v - a.v);
     const ownTotal = hs.filter((h) => h.label !== 'fail').reduce((a, h) => a + h.v, 0) || 1;
-    const idx = portfolioIndexVals(p.rows);
-    const origIdx = portfolioIndexVals(p.rows, true);
-    const scrRet = seriesReturn(idx), origRet = seriesReturn(origIdx);
+    const idxH = sliceTf(portfolioIndexHist(p.rows));
+    const origH = sliceTf(portfolioIndexHist(p.rows, true));
+    const scrRet = seriesReturn(idxH.map((x) => +x.c)), origRet = seriesReturn(origH.map((x) => +x.c));
     const effect = (scrRet != null && origRet != null) ? scrRet - origRet : null;
-    const hasOrig = origIdx.length >= 2 && p.mix.fail > 0;
+    const hasOrig = origH.length >= 2 && p.mix.fail > 0;
     // Activity log — recent disclosed trades, newest first.
     const acts = [...p.rows].sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || '')).slice(0, 6);
     const sideTag = (s) => String(s).toUpperCase() === 'SELL'
@@ -630,7 +660,7 @@
     const read = portfolioRead(p);
     return drawerHead(name) +
       `<div class="mz-drawer__section"><p class="mz-read" style="margin:0 0 .6rem">${esc(read.sentence)}</p>${read.tags.length ? `<div style="margin-block-end:.7rem">${signalRow(read.tags)}</div>` : ''}<span class="mz-badge mz-badge--${flag.tone === 'clean' ? 'compliant' : flag.tone === 'purify' ? 'purify' : 'noncompliant'}">${flag.text}</span><div style="margin-block-start:.6rem">${allocBar(p.mix)}</div></div>` +
-      `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${hasOrig ? (LANG === 'ar' ? 'الأصلي مقابل المُصفّى شرعيًا' : 'Original vs Halal-screened') : (LANG === 'ar' ? 'الأداء' : 'Performance')}</span>${effect != null && hasOrig ? `<span style="font-size:var(--mz-text-xs);font-weight:700;color:${effect >= 0 ? 'var(--mz-cobalt-700)' : 'var(--mz-ink-600)'}">${LANG === 'ar' ? 'أثر الفحص' : 'Screening effect'} ${effect >= 0 ? '+' : '−'}${Math.abs(effect).toFixed(1)} pts</span>` : ''}</div>${hasOrig ? dualChart(idx, origIdx) : lineChart(idx)}${hasOrig ? `<div style="display:flex;gap:1rem;margin-block-start:.4rem;font-size:var(--mz-text-xs)"><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:2px;background:var(--mz-cobalt-600);display:inline-block"></span>${LANG === 'ar' ? 'مُصفّى' : 'Halal-screened'} ${scrRet != null ? fmtPct(scrRet) : ''}</span><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:0;border-top:2px dashed var(--mz-ink-400);display:inline-block"></span>${LANG === 'ar' ? 'الأصلي' : 'Original'} ${origRet != null ? fmtPct(origRet) : ''}</span></div>` : ''}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? 'توضيحي — يطبّق الفحص الحالي على المجموعة المُفصَح عنها. أدلة، ليس نصيحة.' : 'Illustrative — applies today’s screen to the disclosed set. Evidence, not advice.'}</p></div>` +
+      `<div class="mz-drawer__section"><div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${hasOrig ? (LANG === 'ar' ? 'الأصلي مقابل المُصفّى شرعيًا' : 'Original vs Halal-screened') : (LANG === 'ar' ? 'الأداء' : 'Performance')}</span>${effect != null && hasOrig ? `<span style="font-size:var(--mz-text-xs);font-weight:700;color:${effect >= 0 ? 'var(--mz-cobalt-700)' : 'var(--mz-ink-600)'}">${LANG === 'ar' ? 'أثر الفحص' : 'Screening effect'} ${effect >= 0 ? '+' : '−'}${Math.abs(effect).toFixed(1)} pts</span>` : ''}</div>${chart(idxH, { compare: hasOrig ? origH : null, empty: LANG === 'ar' ? 'قيد الانتظار' : 'Pending' })}${hasOrig ? `<div style="display:flex;gap:1rem;margin-block-start:.4rem;font-size:var(--mz-text-xs)"><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:2px;background:var(--mz-cobalt-600);display:inline-block"></span>${LANG === 'ar' ? 'مُصفّى' : 'Halal-screened'} ${scrRet != null ? fmtPct(scrRet) : ''}</span><span style="display:inline-flex;align-items:center;gap:.35rem"><span style="width:.9rem;height:0;border-top:2px dashed var(--mz-ink-400);display:inline-block"></span>${LANG === 'ar' ? 'الأصلي' : 'Original'} ${origRet != null ? fmtPct(origRet) : ''}</span></div>` : ''}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? 'توضيحي — يطبّق الفحص الحالي على المجموعة المُفصَح عنها. أدلة، ليس نصيحة.' : 'Illustrative — applies today’s screen to the disclosed set. Evidence, not advice.'}</p></div>` +
       `<div class="mz-drawer__section"><div class="mz-summary-grid" style="grid-template-columns:1fr 1fr;margin:0"><div class="mz-summary"><div class="mz-summary__label">${t('h.return')}</div><div class="mz-summary__value">${fmtPct(p.perf) || '—'}</div></div><div class="mz-summary"><div class="mz-summary__label">${t('cmp.disclosures')}</div><div class="mz-summary__value">${p.count}</div></div></div></div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('h.allocation')}</div>${hs.map((h) => { const w = h.label === 'fail' ? 0 : Math.round(h.v / ownTotal * 100); return `<div style="padding-block:.45rem;border-block-end:var(--mz-border)"><div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center"><div class="mz-ltr" style="font-weight:700;min-width:0"><span>${esc(h.ticker)}</span> <span class="mz-muted" style="font-weight:400">${esc(h.company || '')}</span></div><div style="display:flex;gap:.5rem;align-items:center;flex:0 0 auto">${h.label === 'fail' ? '' : `<span class="mz-cell-num" style="font-weight:700">${w}%</span>`}${badge(h.label)}</div></div>${h.label === 'fail' ? '' : `<div class="mz-allocation__bar" style="margin-block-start:.35rem"><span class="mz-allocation__segment--compliant" style="flex:${w}"></span><span style="flex:${100 - w};background:var(--mz-ink-100)"></span></div>`}</div>`; }).join('')}</div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${LANG === 'ar' ? 'سجل النشاط' : 'Activity log'}</div>${acts.map((r) => { const lag = daysBetween(r.transactionDate, r.filingDate); return `<div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;padding-block:.4rem;border-block-end:var(--mz-border)"><div style="min-width:0"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${esc(r.amount || (r.amountMid ? fmtMoney(+r.amountMid) : ''))}${lag != null ? ` · filed ${lag}d later` : ''}</div></div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
