@@ -75,6 +75,30 @@ https://<your-app>.vercel.app/api/refresh-prices?secret=<CRON_SECRET>
 Note: `poll-disclosures` also uses the FMP key for real Senate/House filings — every 5 min is
 576 calls/day (over the free cap), so run it hourly or less once the key is live.
 
+## Are we getting real data? (`/api/status`)
+Open **`https://<your-app>.vercel.app/api/status`** — a read-only probe (counts + config
+booleans only, never secret values). It tells you at a glance whether the app is serving
+**real** data or the embedded **sample** fallback, and what's missing:
+
+- `config` — which integrations are configured: `supabase`, `fmp` (disclosures **and** prices),
+  `screening`, `cronSecret`.
+- `data` — row counts + freshness for `disclosures` (with verdict breakdown), `prices`,
+  `screenings`, `follows`.
+- `ready` / `servingSample` + `notes` — e.g. *"No disclosures cached — run
+  `/api/poll-disclosures` (needs `FMP_API_KEY`)"*, or *"No prices cached — returns show
+  'indicative' and charts read 'Pending' until `/api/refresh-prices` runs"*.
+
+To go from sample → real: (1) set `SUPABASE_*` and apply `supabase/schema.sql`; (2) set
+`FMP_API_KEY` and schedule the crons below; (3) optionally set `SCREENING_API_KEY` for real
+AAOIFI ratios (else the mock screener runs). The app **never fabricates** — until a table is
+populated it shows a clearly-labelled *Sample* / *Pending* state.
+
+| Cron (cron-job.org → `?secret=CRON_SECRET`) | Fills | Needs |
+| --- | --- | --- |
+| `/api/poll-disclosures` | `disclosures` (+ screening cache) | `FMP_API_KEY` |
+| `/api/refresh-prices`   | `prices` (charts + returns)      | `FMP_API_KEY` |
+| `/api/rescreen`         | `screenings` (AAOIFI verdicts)   | `SCREENING_API_KEY` (else mock) |
+
 ## Verify the engine
 ```bash
 npm install

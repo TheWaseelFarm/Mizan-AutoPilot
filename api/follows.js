@@ -6,8 +6,23 @@
 // the app degrades to local follow state before the migration is run.
 import { supabase } from "./_lib/supabase.js";
 import { requireAuth } from "./_lib/auth.js";
+import { aggregateFollowerCounts } from "./_lib/followers.js";
 
 export default async function handler(req, res) {
+  // PUBLIC follower-count aggregate (no auth, no per-user data). Served here to stay within
+  // the serverless-function budget; `/api/follower-counts` rewrites to `/api/follows?counts=1`
+  // (see vercel.json). Tolerates the `follows` table being absent -> {} (board stays hidden).
+  if (req.method === "GET" && (req.query.counts === "1" || req.query.counts === "true")) {
+    try {
+      const { data, error } = await supabase().from("follows").select("portfolio");
+      if (error) throw error;
+      res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=1800");
+      return res.status(200).json(aggregateFollowerCounts(data || []));
+    } catch {
+      return res.status(200).json({});
+    }
+  }
+
   const user = requireAuth(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
   const db = supabase();
