@@ -56,8 +56,24 @@ export default async function handler(_req, res) {
       latest("screenings", "fetched_at"),
     ]);
 
+    // Portfolio depth — the app groups disclosures by actor and only RANKS actors with >= 3
+    // distinct holdings (the thin-data gate). This shows how many actually qualify, so "only one
+    // portfolio shows" can be read as data-reality vs a bug. Counts raw rows (before the
+    // screened-completeness gate), so it's an upper bound on what the app surfaces.
+    let portfolios = null;
+    try {
+      const { data, error } = await db.from("disclosures").select("actor,ticker").limit(5000);
+      if (!error && data) {
+        const m = new Map();
+        for (const r of data) { if (!r.actor || !r.ticker) continue; let s = m.get(r.actor); if (!s) m.set(r.actor, (s = new Set())); s.add(r.ticker); }
+        const sizes = [...m.values()].map((s) => s.size);
+        portfolios = { distinctActors: m.size, rankable: sizes.filter((n) => n >= 3).length, oneOrTwoHoldings: sizes.filter((n) => n < 3).length };
+      }
+    } catch { /* leave null */ }
+
     out.data = {
       disclosures: { total: disclosures, screened, byVerdict: { clean, purify, fail }, latest: latestDisclosure },
+      portfolios, // { distinctActors, rankable (>=3 holdings), oneOrTwoHoldings }
       prices: { tickers: prices, latest: latestPrice },
       screenings: { cached: screenings, latest: latestScreen },
       follows,

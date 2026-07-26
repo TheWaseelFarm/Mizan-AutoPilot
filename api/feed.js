@@ -70,11 +70,15 @@ export default async function handler(req, res) {
   try {
     const includeAll = /^(1|true|yes)$/i.test(String(req.query.all || ""));
     const withPerf = /^(1|true|yes)$/i.test(String(req.query.performance || ""));
+    // Pull a wide recent window (not just 100): the app groups disclosures into portfolios and
+    // only ranks those with >= 3 distinct holdings, so too small a window starves every filer
+    // and leaves just the single most-active one visible. Overridable via ?limit (50–1000).
+    const limit = Math.min(1000, Math.max(50, parseInt(req.query.limit, 10) || 400));
     const db = supabase();
     const { data, error } = await db
       .from("disclosures").select("*")
       .order("filing_date", { ascending: false })
-      .limit(100);
+      .limit(limit);
     if (error) throw error;
     let rows = (data || []).map(toClient);
     if (!includeAll) rows = rows.filter(passesGate); // gate ON by default

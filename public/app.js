@@ -120,8 +120,14 @@
   };
   const MIN_HOLDINGS = 3;           // a ranked / followable portfolio needs ≥ this many distinct holdings
   const fAmt = (r) => Math.abs(+r[FIELD.amount] || 0);
+  // Weight basis: prefer the filer's exact disclosed POSITION size (13F) for a true portfolio
+  // weight; fall back to trade value (amountMid) for congressional/insider filings, which only
+  // report dollar RANGES — there the weight is a rough share of disclosed trades, not a holding %.
+  const fWeightBasis = (r) => { const pv = r[FIELD.positionValue]; return Math.abs(+(pv == null ? r[FIELD.amount] : pv) || 0); };
   const fDisclosed = (r) => r[FIELD.disclosedDate];
   const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + 's')}`;
+  // Strip source artifacts from a company name, e.g. "Exxon Mobil Corp (1)" -> "Exxon Mobil Corp".
+  const coName = (c) => String(c || '').replace(/\s*\(\d+\)\s*$/, '').trim();
 
   /* ---------------------------------------------------------------- AAOIFI verdict (mirrors api/_lib/aaoifi.js) */
   function classify(rec) {
@@ -385,7 +391,7 @@
     const j = (u) => fetch(u, { headers: { accept: 'application/json' } }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
     const [feed, prices, followers] = await Promise.allSettled([j('/api/feed?performance=1'), j('/api/prices'), j('/api/follower-counts')]);
     if (feed.status === 'fulfilled' && Array.isArray(feed.value) && feed.value.length) {
-      S.rows = feed.value.map((r) => ({ ...r, label: r.label || labelOf(r) }));
+      S.rows = feed.value.map((r) => ({ ...r, company: coName(r.company), label: r.label || labelOf(r) }));
       S.live = true;
     }
     if (prices.status === 'fulfilled' && prices.value && typeof prices.value === 'object') S.prices = prices.value;
@@ -495,20 +501,33 @@
     return out;
   }
 
-  // THE shared chart. `hist` = [{d,c}]. opts: { cls: 'mz-chart--full|--card|--spark', compare:[{d,c}], empty }.
+  // THE shared chart. `hist` = [{d,c}]. opts: { cls, compare:[{d,c}], empty,
+  //   markers:[{d,side,label}] (disclosed trades pinned on the line — cobalt buy / ink sell),
+  //   today: string (a value label shown top-end, e.g. "$146 · today") }.
   function chart(hist, opts) {
     opts = opts || {};
     const cls = opts.cls || 'mz-chart--full';
     const h = cls === 'mz-chart--spark' ? 28 : cls === 'mz-chart--card' ? 40 : 120;
     const data = (hist || []).filter((p) => p && isFinite(+p.c));
     if (data.length < 2) return `<div class="mz-chart ${cls} mz-chart__empty" style="height:${h}px">${opts.empty || '—'}</div>`;
-    const closes = data.map((p) => +p.c), mn = Math.min(...closes), mx = Math.max(...closes);
+    const closes = data.map((p) => +p.c), mn = Math.min(...closes), mx = Math.max(...closes), rng = (mx - mn) || 1;
     const W = 320, H = 100, sw = cls === 'mz-chart--full' ? 1.7 : 1.4;
     const line = `<polyline points="${chartPath(closes, W, H, mn, mx)}" fill="none" stroke="var(--mz-cobalt-600)" stroke-width="${sw}" stroke-linejoin="round"/>`;
     let cmp = '';
     if (opts.compare) { const c2 = (opts.compare || []).filter((p) => p && isFinite(+p.c)).map((p) => +p.c); if (c2.length >= 2) cmp = `<polyline points="${chartPath(c2, W, H, mn, mx)}" fill="none" stroke="var(--mz-ink-400)" stroke-width="1.2" stroke-dasharray="3 3"/>`; }
+    // % positions (the SVG is stretched to fill, so a data point maps to left = i/(n-1), top = 1-(c-mn)/rng).
+    const at = (i) => ({ x: (i / (data.length - 1) * 100), y: ((1 - (closes[i] - mn) / rng) * 100) });
+    let markers = '';
+    if (opts.markers && opts.markers.length) {
+      const nearest = (d) => { const t0 = Date.parse(d); if (!isFinite(t0)) return -1; let bi = -1, bd = Infinity; for (let i = 0; i < data.length; i++) { const dd = Math.abs(Date.parse(data[i].d) - t0); if (dd < bd) { bd = dd; bi = i; } } return bi; };
+      markers = opts.markers.map((m) => { const i = nearest(m.d); if (i < 0) return ''; const p = at(i); const sell = String(m.side).toUpperCase() === 'SELL'; return `<span class="mz-chart__mk" data-side="${sell ? 'sell' : 'buy'}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${esc((sell ? 'Sold' : 'Bought') + (m.label ? ' ' + m.label : '') + ' · ' + shortDate(m.d))}"></span>`; }).join('');
+    }
+    // "Today" endpoint dot (detail charts) + optional value label so the line's end reads as now.
+    const lastP = at(data.length - 1);
+    const todayDot = cls === 'mz-chart--full' ? `<span class="mz-chart__today" style="left:${lastP.x.toFixed(2)}%;top:${lastP.y.toFixed(2)}%"></span>` : '';
+    const todayLab = opts.today ? `<span class="mz-chart__todaylab">${esc(opts.today)}</span>` : '';
     const series = esc(JSON.stringify(data.map((p) => [p.d, +p.c])));
-    return `<div class="mz-chart ${cls}" data-series="${series}" data-min="${mn}" data-max="${mx}" style="height:${h}px"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${cmp}${line}</svg><span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
+    return `<div class="mz-chart ${cls}" data-series="${series}" data-min="${mn}" data-max="${mx}" style="height:${h}px"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${cmp}${line}</svg>${markers}${todayDot}${todayLab}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
   }
 
   // Interactive scrub — ONE handler drives every chart (touch + pointer). Registered once.
@@ -806,13 +825,20 @@
     const stats = dtlStat(buyers, LANG === 'ar' ? 'جهة تشتري' : (buyers === 1 ? 'filer buying' : 'filers buying')) +
       dtlStat(filers, LANG === 'ar' ? 'إجمالي المُفصِحين' : (filers === 1 ? 'filer total' : 'total filers')) +
       dtlStat(fresh <= 900 ? fresh + 'd' : '—', LANG === 'ar' ? 'منذ آخر إفصاح' : 'since last filing');
-    // Who bought & sold — the disclosure log, newest-value first, each with amount + date + filing lag.
-    const log = [...rows].sort((a, b) => fAmt(b) - fAmt(a)).slice(0, 6);
+    // Who bought & sold — the disclosure log as a TIMELINE (most recent trade first), each with
+    // amount + date + filing lag. (Was sorted by dollar size, which jumbled the dates.)
+    const dOf = (r) => Date.parse(fDisclosed(r) || r[FIELD.filedDate] || '') || 0;
+    const log = [...rows].sort((a, b) => dOf(b) - dOf(a) || fAmt(b) - fAmt(a)).slice(0, 8);
     const following = S.follows.has(ticker);
     const who = { avatar: `<span class="mz-ltr" style="font-weight:800;font-size:.72rem">${esc(ticker.slice(0, 4))}</span>`, name: ticker, sub: rows[0].company || ticker, ltr: true };
+    // Chart: pin each disclosed trade on the line (cobalt buy / ink sell) + a "today" price label.
+    const shist = sliceTf(histOf(ticker));
+    const quote = (S.prices[ticker] && S.prices[ticker].quote != null) ? +S.prices[ticker].quote : (shist.length ? +shist[shist.length - 1].c : null);
+    const todayLab = quote != null ? `$${quote.toLocaleString('en-US', { maximumFractionDigits: 2 })} · ${LANG === 'ar' ? 'اليوم' : 'today'}` : '';
+    const marks = rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.actor }));
     return drawerHead(t('dtl.stock'), { back: true, tag: badge(label) }) +
       detailHero(who, headline, returnOf(histOf(ticker), perf), stats) +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(sliceTf(histOf(ticker)), { empty: t('dtl.pending') })}</div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(shist, { markers: marks, today: todayLab, empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ● بيع مُفصَح عنه — اسحب لأي تاريخ.' : '● disclosed buy · ● sell — scrub the line for the value on any date.'}</p></div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.who')}</div>${log.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); return `<div class="mz-hold"><div class="mz-hold__n"><div style="font-weight:700">${esc(r.actor)}</div><div class="mz-entity__meta">${esc(r.source || r.kind || '')} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div></div>${sideTag(r.side)}<span class="mz-cell-num" style="font-weight:750;margin-inline-start:.5rem">${fmtMoney(fAmt(r))}</span></div>`; }).join('')}</div>` +
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
       `<div class="mz-drawer__footer" style="display:grid;grid-template-columns:1fr auto;gap:.5rem"><button class="mz-button mz-button--primary" data-follow="${esc(ticker)}">${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button><button class="mz-button mz-button--ghost" data-nav="alerts">${I.bell}${t('common.watch')}</button></div>`;
@@ -835,7 +861,7 @@
     // Top holdings, value-weighted, each carrying its weight (% of portfolio) + disclosure date,
     // its own compliance chip, and a neutral price return.
     const holdings = {};
-    for (const r of p.rows) { const h = holdings[r.ticker] || (holdings[r.ticker] = { ticker: r.ticker, company: r.company, label: r.label, v: 0, d: null }); h.v += fAmt(r); const dd = fDisclosed(r); if (dd && (!h.d || Date.parse(dd) > Date.parse(h.d))) h.d = dd; }
+    for (const r of p.rows) { const h = holdings[r.ticker] || (holdings[r.ticker] = { ticker: r.ticker, company: r.company, label: r.label, v: 0, d: null }); h.v += fWeightBasis(r); const dd = fDisclosed(r); if (dd && (!h.d || Date.parse(dd) > Date.parse(h.d))) h.d = dd; }
     const totalV = Object.values(holdings).reduce((a, h) => a + h.v, 0) || 1;
     const hs = Object.values(holdings).sort((a, b) => b.v - a.v).slice(0, 6);
     // Disclosure facts — recent trades, newest first (quiet, below the conclusion).
@@ -844,7 +870,7 @@
     const who = { avatar: `<span style="color:var(--mz-cobalt-700);font-weight:800;font-size:.8rem">${esc(p.initials)}</span>`, name, sub: `${typeLabel(p.kind)} · ${p.count} ${disclosuresLbl}` };
     return drawerHead(t('dtl.portfolio'), { back: true, tag: compTag }) +
       detailHero(who, headline, p.ret, stats) +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(idxH, { empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? 'مؤشّر متساوي الأوزان للحيازات المُفصَح عنها. أدلة، ليست نصيحة.' : 'Equal-weight index of the disclosed holdings. Evidence, not advice.'}</p></div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(idxH, { markers: p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker })), empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ● بيع مُفصَح عنه على مؤشّر متساوي الأوزان للحيازات. أدلة، ليست نصيحة.' : '● disclosed buy · ● sell, on an equal-weight index of the holdings. Evidence, not advice.'}</p></div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.holdings')}</div>${hs.map((h) => { const w = Math.round(h.v / totalV * 100); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || '')} · ${w}% ${t('dtl.weight')}${h.d ? ` · ${t('dtl.disclosed')} ${esc(shortDate(h.d))}` : ''}</div></div>${badge(h.label)}<span style="margin-inline-start:.5rem;min-width:3.4rem;text-align:end">${retNode(priceReturn(h.ticker))}</span></div>`; }).join('')}</div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.activity')}</div>${acts.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${fmtMoney(fAmt(r))} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div></div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +

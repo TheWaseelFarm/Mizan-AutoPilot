@@ -37,6 +37,16 @@
   .mz-chart__dot { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--mz-cobalt-600);
     box-shadow: 0 0 0 2px var(--mz-surface); transform: translate(-3.5px, -3.5px); opacity: 0; pointer-events: none; }
   .mz-chart.is-active .mz-chart__cx, .mz-chart.is-active .mz-chart__dot { opacity: 1; }
+  /* Disclosed-trade markers pinned on the line (neutral cobalt buy / ink sell) + a "today" endpoint. */
+  .mz-chart__mk { position: absolute; width: 8px; height: 8px; transform: translate(-50%, -50%); border-radius: 50%;
+    border: 1.5px solid var(--mz-surface); pointer-events: none; }
+  .mz-chart__mk[data-side="buy"] { background: var(--mz-cobalt-600); }
+  .mz-chart__mk[data-side="sell"] { background: var(--mz-ink-400); }
+  .mz-chart__today { position: absolute; width: 9px; height: 9px; transform: translate(-50%, -50%); border-radius: 50%;
+    background: var(--mz-cobalt-700); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mz-cobalt-600) 22%, transparent); pointer-events: none; }
+  .mz-chart__todaylab { position: absolute; top: 4px; inset-inline-end: 6px; font-size: 0.68rem; font-weight: 750;
+    color: var(--mz-ink-700); background: var(--mz-surface); padding: 1px 6px; border-radius: var(--mz-radius-sm);
+    border: 1px solid var(--mz-ink-100); pointer-events: none; }
   .mz-chart__empty { display: grid; place-items: center; color: var(--mz-ink-400); font-size: var(--mz-text-xs);
     font-weight: 600; background: var(--mz-ink-50); border-radius: var(--mz-radius-sm); cursor: default; }
   .mz-chart-tip { position: fixed; z-index: 90; pointer-events: none; transform: translate(-50%, calc(-100% - 10px));
