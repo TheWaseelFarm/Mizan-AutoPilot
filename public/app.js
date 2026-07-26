@@ -118,7 +118,9 @@
     filedDate: 'filingDate',        // when it was filed (drives the filing-lag figure)
     priceHistory: 'history',        // S.prices[TICKER][FIELD.priceHistory] = [{ d, c }]
   };
-  const MIN_HOLDINGS = 3;           // a ranked / followable portfolio needs ≥ this many distinct holdings
+  const MIN_HOLDINGS = 2;           // a ranked / followable portfolio needs ≥ this many distinct holdings
+                                    // (2 excludes only misleading single-stock entries; officials rarely
+                                    //  disclose 3+ names in a window, so 3 hid almost everyone on real data)
   const fAmt = (r) => Math.abs(+r[FIELD.amount] || 0);
   // Weight basis: prefer the filer's exact disclosed POSITION size (13F) for a true portfolio
   // weight; fall back to trade value (amountMid) for congressional/insider filings, which only
@@ -529,17 +531,20 @@
     if (opts.compare) { const c2 = (opts.compare || []).filter((p) => p && isFinite(+p.c)).map((p) => +p.c); if (c2.length >= 2) cmp = `<polyline points="${chartPath(c2, W, H, mn, mx)}" fill="none" stroke="var(--mz-ink-400)" stroke-width="1.2" stroke-dasharray="3 3"/>`; }
     // % positions (the SVG is stretched to fill, so a data point maps to left = i/(n-1), top = 1-(c-mn)/rng).
     const at = (i) => ({ x: (i / (data.length - 1) * 100), y: ((1 - (closes[i] - mn) / rng) * 100) });
-    let markers = '';
+    let markers = '', marksAttr = '';
     if (opts.markers && opts.markers.length) {
       const nearest = (d) => { const t0 = Date.parse(d); if (!isFinite(t0)) return -1; let bi = -1, bd = Infinity; for (let i = 0; i < data.length; i++) { const dd = Math.abs(Date.parse(data[i].d) - t0); if (dd < bd) { bd = dd; bi = i; } } return bi; };
-      markers = opts.markers.map((m) => { const i = nearest(m.d); if (i < 0) return ''; const p = at(i); const sell = String(m.side).toUpperCase() === 'SELL'; return `<span class="mz-chart__mk" data-side="${sell ? 'sell' : 'buy'}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${esc((sell ? 'Sold' : 'Bought') + (m.label ? ' ' + m.label : '') + ' · ' + shortDate(m.d))}"></span>`; }).join('');
+      const valid = opts.markers.filter((m) => m && m.d);
+      markers = valid.map((m) => { const i = nearest(m.d); if (i < 0) return ''; const p = at(i); const sell = String(m.side).toUpperCase() === 'SELL'; return `<span class="mz-chart__mk" data-side="${sell ? 'sell' : 'buy'}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${esc((sell ? 'Sold' : 'Bought') + (m.label ? ' ' + m.label : '') + ' · ' + shortDate(m.d))}"></span>`; }).join('');
+      // Encode markers so the scrub tooltip can reveal WHAT was traded when it passes over a dot.
+      marksAttr = ` data-marks="${esc(JSON.stringify(valid.map((m) => [m.d, String(m.side).toUpperCase() === 'SELL' ? 'S' : 'B', m.label || ''])))}"`;
     }
     // "Today" endpoint dot (detail charts) + optional value label so the line's end reads as now.
     const lastP = at(data.length - 1);
     const todayDot = cls === 'mz-chart--full' ? `<span class="mz-chart__today" style="left:${lastP.x.toFixed(2)}%;top:${lastP.y.toFixed(2)}%"></span>` : '';
     const todayLab = opts.today ? `<span class="mz-chart__todaylab">${esc(opts.today)}</span>` : '';
     const series = esc(JSON.stringify(data.map((p) => [p.d, +p.c])));
-    return `<div class="mz-chart ${cls}" data-series="${series}" data-min="${mn}" data-max="${mx}" style="height:${h}px"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${cmp}${line}</svg>${markers}${todayDot}${todayLab}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
+    return `<div class="mz-chart ${cls}" data-series="${series}" data-min="${mn}" data-max="${mx}"${marksAttr} style="height:${h}px"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${cmp}${line}</svg>${markers}${todayDot}${todayLab}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
   }
 
   // Interactive scrub — ONE handler drives every chart (touch + pointer). Registered once.
@@ -558,7 +563,15 @@
     const cx = el.querySelector('.mz-chart__cx'), dot = el.querySelector('.mz-chart__dot');
     if (cx) cx.style.left = px + 'px';
     if (dot) { dot.style.left = px + 'px'; dot.style.top = py + 'px'; }
-    chartTip.textContent = `$${c.toFixed(2)} · ${shortDate(d)}`;
+    // If a disclosed-trade marker sits at this point, reveal WHAT was traded.
+    let extra = '';
+    if (el.dataset.marks) {
+      try {
+        const near = JSON.parse(el.dataset.marks).find((m) => { const mt = Date.parse(m[0]); let bi = 0, bd = Infinity; for (let k = 0; k < n; k++) { const dd = Math.abs(Date.parse(data[k][0]) - mt); if (dd < bd) { bd = dd; bi = k; } } return bi === i; });
+        if (near) extra = ` · ${near[1] === 'S' ? '▼ ' + (LANG === 'ar' ? 'بيع' : 'Sold') : '▲ ' + (LANG === 'ar' ? 'شراء' : 'Bought')}${near[2] ? ' ' + near[2] : ''}`;
+      } catch (e) { /* ignore */ }
+    }
+    chartTip.textContent = `$${c.toFixed(2)} · ${shortDate(d)}${extra}`;
     chartTip.style.left = (rect.left + px) + 'px'; chartTip.style.top = (rect.top + py) + 'px';
     chartTip.classList.add('is-on');
   }
