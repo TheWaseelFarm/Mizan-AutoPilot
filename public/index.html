@@ -101,6 +101,27 @@
   .mz-signal[data-tone="up"] { color: var(--mz-cobalt-700); background: var(--mz-cobalt-50); border-color: var(--mz-cobalt-100); }
   .mz-signal[data-tone="down"], .mz-signal[data-tone="muted"] { color: var(--mz-ink-600); background: var(--mz-ink-50); border-color: var(--mz-ink-200); }
   .mz-read { font-size: var(--mz-text-sm); line-height: 1.5; color: var(--mz-ink-800); font-weight: 600; }
+  /* Conclusion-first detail screens — the composed headline is the hero; return + attraction
+     lead; compliance stays a quiet label. Return is cobalt/ink only, never a verdict hue. */
+  .mz-dtl-who { display: flex; align-items: center; gap: 0.6rem; margin-block-end: 0.7rem; }
+  .mz-dtl-name { font-size: var(--mz-text-lg); font-weight: 840; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mz-dtl-whosub { font-size: var(--mz-text-xs); color: var(--mz-ink-500); margin-block-start: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mz-dtl-headline { font-size: var(--mz-text-lg); font-weight: 800; line-height: 1.3; letter-spacing: -0.01em; color: var(--mz-ink-950); margin: 0; }
+  .mz-dtl-heros { display: grid; grid-template-columns: 1.25fr 1fr; gap: var(--mz-space-2); margin-block-start: var(--mz-space-4); }
+  .mz-dtl-card { border: var(--mz-border); border-radius: var(--mz-radius-md); padding: var(--mz-space-3) var(--mz-space-4); background: var(--mz-surface); }
+  .mz-dtl-lab { font-size: 0.625rem; font-weight: 850; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mz-ink-400); }
+  .mz-dtl-big { font-size: var(--mz-text-2xl); font-weight: 850; letter-spacing: -0.02em; margin-block-start: 0.3rem; color: var(--mz-cobalt-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .mz-dtl-big[data-up="false"] { color: var(--mz-ink-600); }
+  .mz-dtl-big.mz-dtl-neutral { color: var(--mz-ink-800); font-size: var(--mz-text-xl); }
+  .mz-dtl-sub { font-size: 0.7rem; color: var(--mz-ink-500); margin-block-start: 0.2rem; line-height: 1.35; }
+  .mz-dtl-stat { display: flex; align-items: baseline; gap: 0.35rem; margin-block-start: 0.35rem; font-size: 0.72rem; color: var(--mz-ink-500); }
+  .mz-dtl-stat:first-of-type { margin-block-start: 0.3rem; }
+  .mz-dtl-stat b { color: var(--mz-ink-800); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .mz-ret { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--mz-cobalt-700); white-space: nowrap; }
+  .mz-ret[data-up="false"] { color: var(--mz-ink-600); }
+  .mz-hold { display: flex; align-items: center; gap: 0.6rem; padding-block: 0.55rem; border-block-end: var(--mz-border); }
+  .mz-hold:last-child { border-block-end: 0; }
+  .mz-hold__n { flex: 1; min-width: 0; }
   .mz-linkbtn { white-space: nowrap; }
   #freshness { white-space: nowrap; }
   /* Toolbar rows: the time selector sits on its own row above the controls. */
