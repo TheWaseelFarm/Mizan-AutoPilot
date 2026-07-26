@@ -132,6 +132,9 @@
   .mz-hold { display: flex; align-items: center; gap: 0.6rem; padding-block: 0.55rem; border-block-end: var(--mz-border); }
   .mz-hold:last-child { border-block-end: 0; }
   .mz-hold__n { flex: 1; min-width: 0; }
+  /* "Bought-at → now" evidence line — tabular, neutral; the ▲/▼ % uses .mz-ret (cobalt/ink). */
+  .mz-entry { display: inline-flex; align-items: baseline; gap: 0.25rem; flex-wrap: wrap; font-size: var(--mz-text-xs); font-variant-numeric: tabular-nums; }
+  .mz-entry b { font-weight: 750; color: var(--mz-ink-800); }
   /* Context suffix on a return number ("· 1M" / "· indic.") — muted, never competes with the value. */
   .mz-perf-ctx { font-size: 0.62em; font-weight: 700; color: var(--mz-ink-400); letter-spacing: 0; }
   .mz-dtl-ctx { font-size: 0.5em; font-weight: 750; color: var(--mz-ink-400); vertical-align: middle; }
