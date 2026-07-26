@@ -543,8 +543,12 @@
     const lastP = at(data.length - 1);
     const todayDot = cls === 'mz-chart--full' ? `<span class="mz-chart__today" style="left:${lastP.x.toFixed(2)}%;top:${lastP.y.toFixed(2)}%"></span>` : '';
     const todayLab = opts.today ? `<span class="mz-chart__todaylab">${esc(opts.today)}</span>` : '';
+    // Date axis (detail charts): start date … last date, so marker positions read as "when".
+    const axisEls = (opts.axis && cls === 'mz-chart--full')
+      ? `<span class="mz-chart__ax mz-chart__ax--start">${esc(shortDate(data[0].d))}</span><span class="mz-chart__ax mz-chart__ax--end">${esc(shortDate(data[data.length - 1].d))}</span>`
+      : '';
     const series = esc(JSON.stringify(data.map((p) => [p.d, +p.c])));
-    return `<div class="mz-chart ${cls}" data-series="${series}" data-min="${mn}" data-max="${mx}"${marksAttr} style="height:${h}px"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${cmp}${line}</svg>${markers}${todayDot}${todayLab}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
+    return `<div class="mz-chart ${cls}" data-series="${series}" data-min="${mn}" data-max="${mx}"${marksAttr} style="height:${h}px"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${cmp}${line}</svg>${markers}${todayDot}${todayLab}${axisEls}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
   }
 
   // Interactive scrub — ONE handler drives every chart (touch + pointer). Registered once.
@@ -865,8 +869,8 @@
     const marks = rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.actor }));
     return drawerHead(t('dtl.stock'), { back: true, tag: badge(label) }) +
       detailHero(who, headline, returnOf(histOf(ticker), perf), stats) +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(shist, { markers: marks, today: todayLab, empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ● بيع مُفصَح عنه — اسحب لأي تاريخ.' : '● disclosed buy · ● sell — scrub the line for the value on any date.'}</p></div>` +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.who')}</div>${log.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); const evn = entryVsNow(r); return `<div class="mz-hold"><div class="mz-hold__n"><div style="font-weight:700">${esc(r.actor)}</div><div class="mz-entity__meta">${esc(r.source || r.kind || '')} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div>${evn ? `<div class="mz-entity__meta">${evn}</div>` : ''}</div>${sideTag(r.side)}<span class="mz-cell-num" style="font-weight:750;margin-inline-start:.5rem">${fmtMoney(fAmt(r))}</span></div>`; }).join('')}${freshNote ? `<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0;line-height:1.4">${I.info} ${esc(freshNote)}</p>` : ''}</div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(shist, { markers: marks, today: todayLab, axis: true, empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ● بيع مُفصَح عنه — اسحب لأي نقطة لرؤية التاريخ.' : '● disclosed buy · ● sell — scrub any point for its date & value.'}</p></div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.who')}</div>${log.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); const evn = entryVsNow(r); return `<div class="mz-hold"><div class="mz-hold__n"><div style="font-weight:700">${esc(r.actor)}</div><div class="mz-entity__meta">${esc(r.source || r.kind || '')} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div>${evn ? `<div class="mz-entity__meta">${evn}</div>` : ''}</div>${sideTag(r.side)}<span class="mz-cell-num" style="font-weight:750;margin-inline-start:.5rem">${fmtMoney(fAmt(r))}</span></div>`; }).join('')}${freshNote ? `<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0;line-height:1.4;display:flex;gap:.35rem;align-items:flex-start">${miniIcon(I.info)}<span>${esc(freshNote)}</span></p>` : ''}</div>` +
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
       `<div class="mz-drawer__footer" style="display:grid;grid-template-columns:1fr auto;gap:.5rem"><button class="mz-button mz-button--primary" data-follow="${esc(ticker)}">${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button><button class="mz-button mz-button--ghost" data-nav="alerts">${I.bell}${t('common.watch')}</button></div>`;
   }
@@ -885,6 +889,8 @@
     // Evidence: the disclosed-holdings performance — a single neutral line (compliance never
     // changes the performance shown). Timeframe-aware via sliceTf(), like every chart.
     const idxH = sliceTf(portfolioIndexHist(p.rows));
+    const idxRet = seriesReturn(idxH.map((x) => +x.c)); // index's own return over the shown window
+    const idxToday = idxRet == null ? '' : `${idxRet >= 0 ? '▲' : '▼'} ${Math.abs(idxRet).toFixed(1)}% · ${LANG === 'ar' ? 'حتى اليوم' : 'to date'}`;
     // Top holdings, value-weighted, each carrying its weight (% of portfolio) + disclosure date,
     // its own compliance chip, and a neutral price return.
     const holdings = {};
@@ -897,7 +903,7 @@
     const who = { avatar: `<span style="color:var(--mz-cobalt-700);font-weight:800;font-size:.8rem">${esc(p.initials)}</span>`, name, sub: `${typeLabel(p.kind)} · ${p.count} ${disclosuresLbl}` };
     return drawerHead(t('dtl.portfolio'), { back: true, tag: compTag }) +
       detailHero(who, headline, p.ret, stats) +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(idxH, { markers: p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker })), empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ● بيع مُفصَح عنه على مؤشّر متساوي الأوزان للحيازات. أدلة، ليست نصيحة.' : '● disclosed buy · ● sell, on an equal-weight index of the holdings. Evidence, not advice.'}</p></div>` +
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(idxH, { markers: p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker })), today: idxToday, axis: true, empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ● بيع مُفصَح عنه على مؤشّر متساوي الأوزان للحيازات. اسحب لأي نقطة لرؤية التاريخ.' : '● disclosed buy · ● sell, on an equal-weight index of the holdings. Scrub any point for its date.'}</p></div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.holdings')}</div>${hs.map((h) => { const w = Math.round(h.v / totalV * 100); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || '')} · ${w}% ${t('dtl.weight')}${h.d ? ` · ${t('dtl.disclosed')} ${esc(shortDate(h.d))}` : ''}</div></div>${badge(h.label)}<span style="margin-inline-start:.5rem;min-width:3.4rem;text-align:end">${retNode(priceReturn(h.ticker))}</span></div>`; }).join('')}</div>` +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.activity')}</div>${acts.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); const evn = entryVsNow(r); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${fmtMoney(fAmt(r))} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div>${evn ? `<div class="mz-entity__meta">${evn}</div>` : ''}</div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +

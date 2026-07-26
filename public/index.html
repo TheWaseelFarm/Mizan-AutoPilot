@@ -47,6 +47,11 @@
   .mz-chart__todaylab { position: absolute; top: 4px; inset-inline-end: 6px; font-size: 0.68rem; font-weight: 750;
     color: var(--mz-ink-700); background: var(--mz-surface); padding: 1px 6px; border-radius: var(--mz-radius-sm);
     border: 1px solid var(--mz-ink-100); pointer-events: none; }
+  /* Date axis on detail charts — start … last date, so marker positions read as "when". */
+  .mz-chart__ax { position: absolute; bottom: 1px; font-size: 0.6rem; font-weight: 650; color: var(--mz-ink-400);
+    background: color-mix(in srgb, var(--mz-surface) 82%, transparent); padding: 0 3px; border-radius: 3px; pointer-events: none; }
+  .mz-chart__ax--start { inset-inline-start: 1px; }
+  .mz-chart__ax--end { inset-inline-end: 1px; }
   .mz-chart__empty { display: grid; place-items: center; color: var(--mz-ink-400); font-size: var(--mz-text-xs);
     font-weight: 600; background: var(--mz-ink-50); border-radius: var(--mz-radius-sm); cursor: default; }
   .mz-chart-tip { position: fixed; z-index: 90; pointer-events: none; transform: translate(-50%, calc(-100% - 10px));
