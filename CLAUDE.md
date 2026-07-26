@@ -21,7 +21,10 @@ It is **intelligence, not advice** — never a brokerage, copy-trading, or a fat
 3. **AAOIFI 30/30/5** is the screen (see `api/_lib/aaoifi.js`). Interest-bearing
    debt < 30% of market cap, cash + interest-bearing securities < 30%,
    non-permissible income < 5% of revenue. 33% is the S&P/MSCI index
-   methodology, **not** AAOIFI — do not conflate them.
+   methodology, **not** AAOIFI — do not conflate them. **The app screens ONLY with
+   AAOIFI** (debt over 30% *fails* a name). "Framework B" is the owner's *personal*
+   methodology (where debt is advisory, not disqualifying) and is **deliberately not
+   in the product** — never reintroduce it, or debt-as-advisory, into the app.
 4. **Informative, not just a data dump.** Synthesize a plain-language "read" +
    signal tags so a user can judge a setup at a glance.
 
