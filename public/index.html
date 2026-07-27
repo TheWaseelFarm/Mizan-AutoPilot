@@ -157,6 +157,14 @@
      with an elevated selected chip) — distinct from the icon-based bottom tab bar. */
   .mz-product-tabs { border-radius: var(--mz-radius-pill); }
   .mz-product-tab { border-radius: var(--mz-radius-pill); }
+  /* ── Interaction hierarchy (within cobalt/ink — verdict hues stay reserved) ──
+     Cobalt FILL = the one PRIMARY action per screen (Follow, Import). Everything else is neutral
+     ink so it stops competing: SECONDARY actions = ink outline; INFO-reveal / utility / nav links
+     = quiet ink text (+ⓘ where it reveals information). Blue now signals "the main action here." */
+  .mz-button--secondary { border-color: var(--mz-ink-300); color: var(--mz-ink-800); background: var(--mz-surface); }
+  .mz-button--secondary:hover { border-color: var(--mz-ink-400); background: var(--mz-ink-50); color: var(--mz-ink-800); }
+  .mz-linkbtn { color: var(--mz-ink-600); }
+  .mz-linkbtn:hover { color: var(--mz-ink-800); }
   .mz-linkbtn { white-space: nowrap; }
   #freshness { white-space: nowrap; }
   /* Toolbar rows: the time selector sits on its own row above the controls. */
