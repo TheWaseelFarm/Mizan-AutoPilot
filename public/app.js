@@ -359,18 +359,124 @@
       .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   }
 
+  /* ---------------------------------------------------------------- "My portfolio" (read-only)
+     A consent-based, read-only lens: import your OWN holdings and see them through Mizān's
+     screen — your Sharia exposure + how you overlap with any tracked portfolio. NOT a wallet,
+     NOT a budget, NOT copy-trading: no broker, no orders. Held only in THIS browser.
+     TODO(open-banking): swap the manual import for a consent-based aggregator (broker OAuth /
+     SAMA Open Banking AIS) behind this same {ticker, value} contract — read-only, revocable. */
+  const HOLDING_FIELD = { ticker: 'ticker', value: 'value' }; // value = position market value (optional)
+  const MY_KEY = 'mz_my_holdings';
+  function loadMyHoldings() { try { const j = JSON.parse(localStorage.getItem(MY_KEY) || '[]'); return Array.isArray(j) ? j.filter((h) => h && h.ticker) : []; } catch (e) { return []; } }
+  function saveMyHoldings() { try { localStorage.setItem(MY_KEY, JSON.stringify(S.myHoldings || [])); } catch (e) { /* private mode */ } }
+  const MY_SAMPLE = [{ ticker: 'AAPL', value: 22000 }, { ticker: 'MSFT', value: 15000 }, { ticker: 'NVDA', value: 12000 }, { ticker: 'JPM', value: 9000 }, { ticker: 'COST', value: 7000 }];
+
   /* ---------------------------------------------------------------- state */
   const S = {
     tab: 'portfolios', pMetric: 'top', sMetric: 'bought', tf: 'ALL', query: '',
     compliance: 'all', evFilter: 'all', followedOnly: false, compareMode: false,
     selected: [], follows: new Set(), drawer: null, // {type:'compare'|'evidence'|'detail', ...}
     openMenu: null, rows: SAMPLE, live: false, prices: {}, followerCounts: {},
+    myHoldings: loadMyHoldings(),
   };
   const P_SUB = [['top', 'sv.top'], ['active', 'sv.active'], ['followed', 'sv.followed'], ['alloc', 'sv.alloc'], ['conc', 'sv.conc'], ['lag', 'sv.lag']];
   const S_SUB = [['bought', 'sv.bought', 'BUY', 'value'], ['sold', 'sv.sold', 'SELL', 'value'], ['flow', 'sv.flow', '', 'net'], ['new', 'sv.new', 'BUY', 'filers'], ['incr', 'sv.incr', 'BUY', 'weight'], ['red', 'sv.red', 'SELL', 'weight'], ['exit', 'sv.exit', 'SELL', 'filers']];
   const P_SORT = { top: 'so.return', active: 'so.activity', followed: 'so.followers', alloc: 'so.alloc', conc: 'so.conc', lag: 'so.lag' };
   const S_SORT = { value: 'so.value', weight: 'so.weight', filers: 'so.filers', net: 'so.net' };
   const TFS = [['1W', '1W'], ['1M', '1M'], ['3M', '3M'], ['6M', '6M'], ['1Y', '1Y'], ['3Y', '3Y'], ['5Y', '5Y'], ['ALL', 'All']];
+
+  /* ---- My-portfolio derivation (read-only lens) ---- */
+  // A held ticker's verdict comes from the screening we already have (the disclosed feed); a
+  // name we've never screened reads as "under review" — never defaulted to compliant.
+  function securityInfo(ticker) {
+    const r = S.rows.find((x) => x.ticker === ticker);
+    if (!r) return { company: '', label: 'unscreened', impurePct: null };
+    return { company: r.company || ticker, label: r.label || labelOf(r), impurePct: +r.impurePct || 0 };
+  }
+  // Parse pasted holdings: "TICKER [amount]" per line/comma. Amount optional (equal-weight then).
+  function parseHoldings(text) {
+    const out = [], seen = new Set();
+    String(text || '').split(/[\n,;]+/).forEach((chunk) => {
+      const m = chunk.trim().match(/^([A-Za-z.\-]{1,6})(?:[\s:=]+\$?([\d,]+(?:\.\d+)?))?$/);
+      if (!m) return;
+      const ticker = m[1].toUpperCase();
+      if (seen.has(ticker)) return; seen.add(ticker);
+      out.push({ ticker, value: m[2] ? +m[2].replace(/,/g, '') : null });
+    });
+    return out;
+  }
+  const cleanShare = (mix) => { const tot = (mix.clean + mix.purify + mix.fail + mix.unscreened) || 1; return (mix.clean + mix.purify) / tot; };
+  // Derive my Sharia exposure from S.myHoldings (weights from value, else equal-weight).
+  function myExposure() {
+    const hs = (S.myHoldings || []).filter((h) => h && h.ticker);
+    if (!hs.length) return null;
+    const anyVal = hs.some((h) => h.value != null && isFinite(+h.value));
+    const rows = hs.map((h) => { const info = securityInfo(h.ticker); return { ticker: h.ticker, company: info.company, label: info.label, impurePct: info.impurePct, w: anyVal ? (Math.abs(+h.value) || 0) : 1, value: h.value }; });
+    const totW = rows.reduce((a, h) => a + h.w, 0) || 1;
+    rows.forEach((h) => { h.weight = h.w / totW; });
+    const mix = { clean: 0, purify: 0, fail: 0, unscreened: 0 };
+    rows.forEach((h) => { mix[h.label] = (mix[h.label] || 0) + h.weight; });
+    const own = rows.filter((h) => h.label === 'clean' || h.label === 'purify');
+    const ownW = own.reduce((a, h) => a + h.weight, 0) || 1;
+    const purifyPct = own.reduce((a, h) => a + (h.impurePct || 0) * h.weight, 0) / ownW;
+    return { rows: rows.sort((a, b) => b.weight - a.weight), mix, purifyPct: +purifyPct.toFixed(2), count: rows.length, hasValues: anyVal, totalValue: anyVal ? Math.round(totW) : null };
+  }
+  // Overlap between my holdings and a tracked portfolio p.
+  function compareToMine(p) {
+    const mine = myExposure(); if (!mine) return null;
+    const mineSet = new Set(mine.rows.map((h) => h.ticker));
+    const theirs = new Map();
+    for (const r of p.rows) if (!theirs.has(r.ticker)) theirs.set(r.ticker, { ticker: r.ticker, company: r.company, label: r.label });
+    return {
+      mine,
+      overlap: mine.rows.filter((h) => theirs.has(h.ticker)),
+      yoursOnly: mine.rows.filter((h) => !theirs.has(h.ticker)),
+      theirsOnly: [...theirs.values()].filter((t) => !mineSet.has(t.ticker)),
+      theirCompliant: cleanShare(p.mix),
+    };
+  }
+  // Weighted Sharia-exposure bar (all four states, verdict hues) + a compact legend.
+  const EXP_SEG = [['clean', 'compliant'], ['purify', 'purify'], ['fail', 'noncompliant'], ['unscreened', 'review']];
+  function exposureBar(mix) { return `<div class="mz-allocation__bar">${EXP_SEG.map(([k, c]) => mix[k] > 0.0005 ? `<span style="flex:${mix[k]};background:var(--mz-${c}-600)"></span>` : '').join('')}</div>`; }
+  function legendFor(mix) { return [['clean', 'compliant', 'v.compliant'], ['purify', 'purify', 'v.purify'], ['fail', 'noncompliant', 'v.noncompliant'], ['unscreened', 'review', 'v.review']].filter(([k]) => mix[k] > 0.0005).map(([k, c, lk]) => `<span><span class="mz-dot" style="background:var(--mz-${c}-600)"></span>${t(lk)} ${Math.round(mix[k] * 100)}%</span>`).join(''); }
+  const wpct = (x) => Math.round(x * 100) + '%';
+
+  // Account panel: import your holdings (read-only) and see your Sharia exposure.
+  function myPortfolioPanel() {
+    const ar = LANG === 'ar', exp = myExposure();
+    const tag = `<span class="mz-badge" style="min-height:1.3rem;font-size:.62rem;background:var(--mz-cobalt-50);color:var(--mz-cobalt-700);border:1px solid var(--mz-cobalt-100)">${ar ? 'قراءة فقط' : 'Read-only'}</span>`;
+    const head = `<div style="display:flex;align-items:center;gap:.5rem"><h3 style="margin:0">${ar ? 'محفظتي' : 'My portfolio'}</h3>${tag}</div>`;
+    const note = `<p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;margin:.4rem 0 0">${ar ? 'أضِف حيازاتك لرؤية التزامك الشرعي وكيف تتقاطع مع المحافظ المتابَعة. لأغراض معلوماتية فقط — لا وسيط، لا أوامر، لا ميزانية. تُحفظ في هذا المتصفح فقط.' : 'Add your holdings to see your Sharia exposure and how you overlap with tracked portfolios. Informational only — no broker, no orders, no budget. Stored only in this browser.'}</p>`;
+    if (!exp) {
+      return `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)">${head}${note}<textarea id="myHoldingsInput" rows="3" placeholder="AAPL 20000, MSFT 15000, JPM 10000" style="width:100%;box-sizing:border-box;margin-block-start:.75rem;padding:.6rem;border:var(--mz-border);border-radius:var(--mz-radius-sm);font:inherit;font-size:var(--mz-text-sm);resize:vertical"></textarea><div style="display:flex;gap:.5rem;margin-block-start:.6rem;flex-wrap:wrap"><button class="mz-button mz-button--primary" id="myImportBtn">${ar ? 'تحليل الحيازات' : 'Import holdings'}</button><button class="mz-button mz-button--secondary" id="mySampleBtn">${ar ? 'تحميل عيّنة (محاكاة Open Banking)' : 'Load sample (mock Open Banking)'}</button></div><p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${ar ? 'الصيغة: رمز ثم قيمة اختيارية، لكل سطر أو مفصولة بفواصل. بدون قيم = أوزان متساوية.' : 'Format: ticker then optional amount, per line or comma-separated. No amounts = equal weight.'}</p></section>`;
+    }
+    const holdings = exp.rows.map((h) => `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || (ar ? 'قيد المراجعة' : 'under review'))} · ${wpct(h.weight)}${ar ? ' وزن' : ' weight'}</div></div>${badge(h.label)}</div>`).join('');
+    return `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)">${head}
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-start:.75rem"><span class="mz-muted" style="font-size:var(--mz-text-xs)">${exp.count} ${ar ? 'اسم' : (exp.count === 1 ? 'holding' : 'holdings')}${exp.totalValue != null ? ` · ${fmtMoney(exp.totalValue)}` : ''}</span><span style="font-size:var(--mz-text-xs);font-weight:750;color:var(--mz-cobalt-700)">${wpct(exp.mix.clean + exp.mix.purify)} ${ar ? 'متوافق' : 'compliant'}</span></div>
+      <div style="margin-block-start:.5rem">${exposureBar(exp.mix)}</div>
+      <div class="mz-legend" style="margin-block-start:.6rem">${legendFor(exp.mix)}</div>
+      ${exp.mix.purify > 0 && exp.purifyPct > 0 ? `<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${ar ? `تطهير تقديري ~${exp.purifyPct}% من أرباح الأسماء القابلة للتملّك.` : `Est. purification ~${exp.purifyPct}% of dividends on the ownable names.`}</p>` : ''}
+      <div style="margin-block-start:.8rem">${holdings}</div>
+      <button class="mz-button mz-button--ghost" id="myClearBtn" style="margin-block-start:.6rem">${ar ? 'مسح محفظتي' : 'Clear my portfolio'}</button>
+      <p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;margin:.6rem 0 0">${ar ? 'لا وسيط، لا أوامر، لا نسخ تداول. أدلة، ليست نصيحة. تُحفظ محليًا فقط.' : 'No broker, no orders, no copy-trading. Evidence, not advice. Stored locally only.'}</p></section>`;
+  }
+
+  // Portfolio-drawer section: how the tracked portfolio compares to MY holdings.
+  function vsMineSection(p) {
+    const ar = LANG === 'ar', cmp = compareToMine(p);
+    if (!cmp) {
+      return `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.4rem">${ar ? 'مقابل محفظتك' : 'Vs your portfolio'}</div><p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;margin:0 0 .55rem">${ar ? 'أضِف حيازاتك (قراءة فقط) لترى التقاطع والتزامك الشرعي مقابل هذه المحفظة.' : 'Add your holdings (read-only) to see the overlap and your Sharia exposure vs this portfolio.'}</p><button class="mz-button mz-button--secondary" data-nav="account">${ar ? 'أضِف محفظتي' : 'Add my portfolio'}</button></div>`;
+    }
+    const yourComp = cmp.mine.mix.clean + cmp.mine.mix.purify;
+    const stat = (lab, val, col) => `<div style="flex:1"><div class="mz-muted" style="font-size:var(--mz-text-xs)">${lab}</div><div style="font-weight:800;font-variant-numeric:tabular-nums;${col ? `color:${col}` : ''}">${val}</div></div>`;
+    const chip = (tk, fail) => `<span class="mz-signal" data-tone="muted"><span class="mz-ltr" style="font-weight:700${fail ? ';text-decoration:line-through' : ''}">${esc(tk)}</span></span>`;
+    const list = (arr, empty, showFail) => arr.length ? `<span class="mz-signals">${arr.slice(0, 8).map((h) => chip(h.ticker, showFail && h.label === 'fail')).join('')}</span>` : `<span class="mz-muted" style="font-size:var(--mz-text-xs)">${empty}</span>`;
+    return `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${ar ? 'مقابل محفظتك' : 'Vs your portfolio'}</div>
+      <div style="display:flex;gap:1rem;margin-block-end:.65rem">${stat(ar ? 'التزامك' : 'You compliant', wpct(yourComp), 'var(--mz-cobalt-700)')}${stat(ar ? 'التزامهم' : 'Them compliant', wpct(cmp.theirCompliant), 'var(--mz-cobalt-700)')}${stat(ar ? 'مشترك' : 'Shared', String(cmp.overlap.length))}</div>
+      <div style="margin-block-end:.55rem"><div class="mz-entity__meta" style="margin-block-end:.3rem">${ar ? 'تملكونه معًا' : 'You both hold'}</div>${list(cmp.overlap, ar ? 'لا تقاطع' : 'No overlap')}</div>
+      <div><div class="mz-entity__meta" style="margin-block-end:.3rem">${ar ? 'يملكونه ولا تملكه' : 'They hold, you don’t'}</div>${list(cmp.theirsOnly, '—', true)}</div>
+      <p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;margin:.6rem 0 0">${ar ? 'لأغراض معلوماتية فقط — للتوعية، ليست توصية بالشراء أو البيع. الأسماء المشطوبة غير متوافقة.' : 'Informational only — for awareness, not a recommendation. Struck-through names are non-compliant.'}</p></div>`;
+  }
 
   /* ---------------------------------------------------------------- routing */
   function parsePath() {
@@ -776,6 +882,7 @@
     if (S.tab === 'account') {
       const seg = (val, cur, opts) => `<div class="mz-segmented">${opts.map(([k, l]) => `<button class="mz-segmented__item" ${val}="${k}" aria-selected="${cur === k}">${l}</button>`).join('')}</div>`;
       div.innerHTML =
+        myPortfolioPanel() +
         `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)"><h3>${t('acct.lang')}</h3>${seg('data-lang', LANG, [['en', 'English'], ['ar', 'العربية']])}</section>` +
         `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)"><h3>${LANG === 'ar' ? 'حساسية الحكم' : 'Verdict tolerance'}</h3><p class="mz-muted" style="margin:.25rem 0 .75rem;font-size:var(--mz-text-sm)">${LANG === 'ar' ? 'يضبط الافتراضي لكل القوائم.' : 'Sets the default across every list.'}</p>${seg('data-fc', S.compliance, [['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('f.fully')], ['exclude', t('f.exclude')]])}</section>` +
         `<section class="mz-surface" style="padding:var(--mz-space-5)"><h3>${t('sec.methodology')}</h3><p class="mz-muted" style="margin:0;line-height:1.55">${t('sec.mtext')}</p></section>`;
@@ -934,6 +1041,7 @@
       detailHero(who, headline, p.ret, stats) +
       perfSection +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.holdings')} <span class="mz-muted" style="font-weight:500;text-transform:none;letter-spacing:0">· ${LANG === 'ar' ? 'اضغط لعرضه في الرسم' : 'tap to chart'}</span></div>${hs.map((h) => { const w = Math.round(h.v / totalV * 100); const on = pick === h.ticker; return `<div class="mz-hold mz-hold--pick" data-holding="${esc(h.ticker)}" data-active="${on}"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || '')} · ${w}% ${t('dtl.weight')}${h.d ? ` · ${t('dtl.disclosed')} ${esc(shortDate(h.d))}` : ''}</div></div>${badge(h.label)}<span style="margin-inline-start:.5rem;min-width:3.4rem;text-align:end">${retNode(priceReturn(h.ticker))}</span></div>`; }).join('')}</div>` +
+      vsMineSection(p) +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.activity')}</div>${acts.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); const evn = entryVsNow(r); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${fmtMoney(fAmt(r))} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div>${evn ? `<div class="mz-entity__meta">${evn}</div>` : ''}</div>${sideTag(r.side)}</div>`; }).join('')}</div>` +
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
       `<div class="mz-drawer__footer"><button class="mz-button mz-button--secondary" style="width:100%" data-follow="${esc(name)}">${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button></div>`;
@@ -953,7 +1061,7 @@
 
   /* ---------------------------------------------------------------- events (delegated) */
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-star],[data-select],[data-holding],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#drawerBack,#clearChips,#trayOpen,#bellBtn');
+    const el = e.target.closest('[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-star],[data-select],[data-holding],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#drawerBack,#clearChips,#trayOpen,#bellBtn,#myImportBtn,#mySampleBtn,#myClearBtn');
     if (!el) { if (S.openMenu) { S.openMenu = null; closeMenus(); } return; }
     const has = (a) => el.hasAttribute(a) || el.id === a;
 
@@ -973,6 +1081,9 @@
     if (el.id === 'filterBtn') { toggleMenu('filter'); return; }
     if (el.id === 'whyBtn') { toggleMenu('why'); return; }
     if (el.dataset.holding != null) { e.stopPropagation(); if (S.drawer) { S.drawer.chartTicker = S.drawer.chartTicker === el.dataset.holding ? null : el.dataset.holding; renderDrawer(); } return; }
+    if (el.id === 'myImportBtn') { const ta = document.getElementById('myHoldingsInput'); const parsed = parseHoldings(ta ? ta.value : ''); if (parsed.length) { S.myHoldings = parsed; saveMyHoldings(); render(); } return; }
+    if (el.id === 'mySampleBtn') { S.myHoldings = MY_SAMPLE.slice(); saveMyHoldings(); render(); return; }
+    if (el.id === 'myClearBtn') { S.myHoldings = []; saveMyHoldings(); render(); return; }
     if (el.id === 'drawerClose' || el.id === 'drawerBack') { closeDrawer(); return; }
     if (el.id === 'clearChips') { S.compliance = 'all'; S.evFilter = 'all'; S.followedOnly = false; render(); return; }
     if (el.dataset.chip != null) { const chips = document.getElementById('chips')._chips; chips && chips[+el.dataset.chip] && chips[+el.dataset.chip][1](); return; }
