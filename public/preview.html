@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Mizan preview — financial screening with a selectable framework.">
+<title>Mizān</title>
+<style>
+  /* Corporate fintech: white surfaces, crisp dividers, numbers as the hero, verdict as a quiet labeled badge. */
+  :root{
+    --bg:#F5F7FB; --panel:#FFFFFF; --panel-2:#F2F5FA; --ink:#0E1726; --muted:#5A6B86; --faint:#8A97AD;
+    --line:rgba(14,23,38,.08); --line-2:rgba(14,23,38,.14); --brand:#0E1726; --gold:#B5892B;
+    --meet:#12925A; --meet-soft:#E6F4EC; --fail:#D24A41; --fail-soft:#FBECEA; --warn:#B87A0C; --warn-soft:#FBF1DE;
+    --slate:#6B7690; --slate-soft:#EEF1F6;
+    --shadow:0 1px 2px rgba(14,23,38,.04), 0 8px 24px -16px rgba(14,23,38,.30);
+    --ui:"Hanken Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#070B12; --panel:#0E1726; --panel-2:#131E30; --ink:#EAF0F8; --muted:#9BA8BE; --faint:#6B7890;
+    --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.16); --brand:#EAF0F8; --gold:#D9B450;
+    --meet:#3ECB86; --meet-soft:#12271D; --fail:#F0625A; --fail-soft:#2A1513; --warn:#F3B24A; --warn-soft:#2A2110;
+    --slate:#AAB3C4; --slate-soft:#14202F;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.7); color-scheme:dark;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#070B12; --panel:#0E1726; --panel-2:#131E30; --ink:#EAF0F8; --muted:#9BA8BE; --faint:#6B7890;
+    --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.16); --brand:#EAF0F8; --gold:#D9B450;
+    --meet:#3ECB86; --meet-soft:#12271D; --fail:#F0625A; --fail-soft:#2A1513; --warn:#F3B24A; --warn-soft:#2A2110;
+    --slate:#AAB3C4; --slate-soft:#14202F; --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.7); color-scheme:dark;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);line-height:1.45;-webkit-font-smoothing:antialiased;}
+  .app{max-width:440px;margin:0 auto;min-height:100%;background:var(--bg);display:flex;flex-direction:column;position:relative;border-left:1px solid var(--line);border-right:1px solid var(--line);}
+  .tnum{font-variant-numeric:tabular-nums;}
+  /* top bar */
+  .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);}
+  .brand{display:flex;align-items:center;gap:9px;}
+  .brand svg{display:block;}
+  .brand b{font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--ink);}
+  .sample{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gold);background:color-mix(in srgb,var(--gold) 14%,transparent);padding:4px 8px;border-radius:999px;}
+  .scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding:0 0 108px;}
+  .scroll::-webkit-scrollbar{display:none;}
+  .pad{padding:16px 18px;}
+  .h2{font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin:6px 2px 10px;}
+  /* search */
+  .search{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px 14px;box-shadow:var(--shadow);}
+  .search input{border:0;background:transparent;outline:0;font:inherit;font-size:15px;color:var(--ink);width:100%;}
+  .search svg{flex:none;color:var(--faint);}
+  /* stock row */
+  .row{display:flex;align-items:center;gap:13px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:10px;cursor:pointer;box-shadow:var(--shadow);transition:transform .12s;}
+  .row:active{transform:scale(.99);}
+  .logo{width:42px;height:42px;border-radius:12px;flex:none;display:grid;place-items:center;font-size:13px;font-weight:800;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);}
+  .row .mid{flex:1;min-width:0;}
+  .row .tk{font-size:15.5px;font-weight:750;letter-spacing:-.01em;}
+  .row .co{font-size:12.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row .right{text-align:right;flex:none;}
+  .px{font-size:15px;font-weight:700;}
+  .chg{font-size:12px;font-weight:600;margin-top:1px;}
+  .chg.up{color:var(--meet);} .chg.down{color:var(--fail);}
+  /* badge */
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:750;padding:5px 10px;border-radius:999px;white-space:nowrap;}
+  .badge .pdot{width:7px;height:7px;border-radius:50%;flex:none;}
+  .badge.meet{color:var(--meet);background:var(--meet-soft);} .badge.meet .pdot{background:var(--meet);}
+  .badge.fail{color:var(--fail);background:var(--fail-soft);} .badge.fail .pdot{background:var(--fail);}
+  .badge.warn{color:var(--warn);background:var(--warn-soft);} .badge.warn .pdot{background:var(--warn);}
+  .badge.unk{color:var(--slate);background:var(--slate-soft);} .badge.unk .pdot{background:var(--slate);}
+  .badge.sm{font-size:11px;padding:4px 9px;}
+  /* detail */
+  .back{display:flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:14.5px;font-weight:650;cursor:pointer;padding:4px 6px 4px 0;}
+  .d-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-top:6px;}
+  .d-name{font-size:14px;color:var(--muted);font-weight:600;}
+  .d-tk{font-size:30px;font-weight:820;letter-spacing:-.02em;line-height:1.05;margin-top:2px;}
+  .d-sector{font-size:12.5px;color:var(--faint);margin-top:4px;}
+  .d-px{font-size:26px;font-weight:800;letter-spacing:-.01em;text-align:right;}
+  .d-chg{font-size:13px;font-weight:650;text-align:right;margin-top:2px;}
+  .spark{width:100%;height:46px;display:block;color:var(--slate);margin:14px 0 2px;}
+  .panelc{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px;box-shadow:var(--shadow);}
+  .verdict-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .picker{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-2);background:var(--panel-2);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:750;color:var(--ink);cursor:pointer;}
+  .picker svg{color:var(--faint);}
+  .verdict-line{font-size:13.5px;color:var(--muted);margin-top:11px;line-height:1.5;}
+  .verdict-line b{color:var(--ink);}
+  /* meters */
+  .meter{margin-top:16px;}
+  .meter .mrow{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:7px;}
+  .meter .mlab{font-size:13px;font-weight:650;color:var(--muted);}
+  .meter .mval{font-size:15px;font-weight:750;}
+  .track{position:relative;height:9px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;overflow:visible;}
+  .fill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--meet);}
+  .fill.over{background:var(--fail);}
+  .cut{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:2px;}
+  .cut.adv{background:var(--faint);opacity:.6;}
+  .cutlab{position:absolute;top:13px;transform:translateX(-50%);font-size:10px;font-weight:700;color:var(--faint);white-space:nowrap;}
+  .mnote{font-size:12px;color:var(--faint);margin-top:26px;line-height:1.45;}
+  .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
+  .cmp{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--panel-2);}
+  .cmp .cf{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:8px;}
+  /* accordions */
+  .acc{border-top:1px solid var(--line);}
+  .acc:first-of-type{border-top:0;}
+  .acc button{width:100%;border:0;background:transparent;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 0;cursor:pointer;text-align:left;font:inherit;}
+  .acc .at{font-size:14px;font-weight:700;color:var(--ink);} .acc .as{font-size:12.5px;color:var(--faint);margin-top:2px;}
+  .acc .caret{color:var(--faint);font-size:18px;}
+  .acc .body{padding:0 0 15px;font-size:13px;color:var(--muted);line-height:1.55;}
+  .facts{display:flex;flex-direction:column;gap:9px;}
+  .facts>div{display:flex;justify-content:space-between;gap:12px;font-size:13px;}
+  .facts span:first-child{color:var(--faint);} .facts span:last-child{color:var(--ink);font-weight:600;text-align:right;}
+  .disc{font-size:11px;font-style:italic;color:var(--faint);text-align:center;line-height:1.5;margin:18px 6px 2px;}
+  /* placeholder views */
+  .empty{padding:60px 24px;text-align:center;color:var(--faint);}
+  .empty .big{font-size:15px;font-weight:700;color:var(--muted);margin-bottom:6px;}
+  /* tab bar */
+  .tabbar{position:sticky;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;padding:9px 10px calc(9px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(16px);border-top:1px solid var(--line);}
+  .tabbar button{border:0;background:transparent;display:grid;place-items:center;gap:3px;padding:4px;color:var(--faint);font:inherit;font-size:10.5px;font-weight:650;cursor:pointer;}
+  .tabbar button svg{display:block;}
+  .tabbar button[aria-selected="true"]{color:var(--gold);}
+  .chip-sample{font-size:11px;color:var(--faint);background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin:0 0 14px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-hidden="true"><path d="M4 20 L4 9 L13 15 L22 9 L22 20" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <b>Mizān</b>
+    </div>
+    <span class="sample">Sample data · preview</span>
+  </div>
+
+  <div class="scroll" id="scroll">
+    <!-- SCREEN (list) -->
+    <section id="v-screen" class="pad">
+      <div class="search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input placeholder="Screen any stock — ticker or company" aria-label="Search"/>
+      </div>
+      <div class="h2" style="margin-top:20px;">Screened against <span id="fwName" style="color:var(--gold)">AAOIFI</span></div>
+      <div id="list"></div>
+      <p class="disc">Illustrative figures for preview. Verdicts are a transparent screen against the framework you choose — informational, not a fatwa and not investment advice.</p>
+    </section>
+
+    <!-- DETAIL -->
+    <section id="v-detail" class="pad" hidden></section>
+
+    <!-- WATCHLIST / PORTFOLIO placeholders -->
+    <section id="v-watch" class="pad" hidden>
+      <div class="h2">Watchlist</div>
+      <div class="chip-sample">Follow sources and tickers; get an alert the day a holding stops meeting your framework.</div>
+      <div id="watchlist"></div>
+    </section>
+    <section id="v-portfolio" class="pad" hidden>
+      <div class="h2">Your holdings</div>
+      <div class="empty"><div class="big">Check the stocks you own</div>Connect or add your holdings to see each one screened, a running purification estimate, and an alert if one stops meeting your framework.</div>
+    </section>
+  </div>
+
+  <nav class="tabbar" role="tablist">
+    <button role="tab" aria-selected="true" data-view="screen"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 18V9m5 9V5m5 13v-6m5 6V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Screen</button>
+    <button role="tab" aria-selected="false" data-view="watch"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5c-5 0-8 4.5-9 7 1 2.5 4 7 9 7s8-4.5 9-7c-1-2.5-4-7-9-7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="2"/></svg>Watchlist</button>
+    <button role="tab" aria-selected="false" data-view="portfolio"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="18" height="13" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7" stroke="currentColor" stroke-width="2"/></svg>Portfolio</button>
+    <button role="tab" aria-selected="false" data-view="settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2l-.3-2.5H9.7l-.3 2.5a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.3 2.5h4.6l.3-2.5a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Settings</button>
+  </nav>
+</div>
+
+<script>
+  // ---- sample data (illustrative; real financials wire in via the data connector) ----
+  const SPARK_UP=[8,9,8.4,10,11,10.6,12,13,12.4,14,15.2,16];
+  const SPARK_DN=[16,15,15.4,14,13.2,13.6,12,11,11.6,10,9.4,9];
+  const STOCKS=[
+    {t:"NVDA",n:"NVIDIA Corp.",sector:"Semiconductors",activity:"permissible",debt:2.1,impure:0.0,px:183.22,chg:+1.24,spark:SPARK_UP,
+      reason:"Permissible business (chip design) with negligible debt and no impure income."},
+    {t:"VZ",n:"Verizon Communications",sector:"Telecom services",activity:"permissible",debt:86.0,impure:0.4,px:43.15,chg:-0.82,spark:SPARK_DN,
+      reason:"Permissible business; debt is high relative to market cap — the only line that differs between frameworks."},
+    {t:"JPM",n:"JPMorgan Chase & Co.",sector:"Banks — diversified",activity:"impermissible",debt:0,impure:71,px:291.40,chg:-0.36,spark:SPARK_DN,
+      reason:"Excluded at the business-activity level: conventional interest-based banking."},
+    {t:"ARM",n:"Arm Holdings plc",sector:"Semiconductors",activity:"permissible",debt:1.2,impure:null,px:138.90,chg:+0.51,spark:SPARK_UP,
+      reason:"Business is permissible, but the latest income disclosure needed to confirm impure income isn't available yet."}
+  ];
+  // frameworks: debt is a HARD filter for AAOIFI (33%), ADVISORY for Framework B (never fails)
+  const FW={
+    AAOIFI:{label:"AAOIFI",debtMax:33,debtAdvisory:false,impureMax:5},
+    "Framework B":{label:"Framework B",debtMax:33,debtAdvisory:true,impureMax:5}
+  };
+  let fw="AAOIFI";
+
+  function verdict(s,key){
+    const f=FW[key];
+    if(s.activity==="impermissible") return "fail";
+    if(s.impure===null) return "unk";
+    if(s.impure>f.impureMax) return "fail";
+    if(!f.debtAdvisory && s.debt>f.debtMax) return "fail";
+    return "meet";
+  }
+  const VLABEL={meet:"Meets",fail:"Doesn’t meet",unk:"Can’t verify"};
+  function badge(v,key,sm){
+    const cls={meet:"meet",fail:"fail",unk:"unk"}[v];
+    const txt = v==="unk" ? "Can’t verify" : VLABEL[v]+" "+key;
+    return `<span class="badge ${cls}${sm?' sm':''}"><span class="pdot"></span>${txt}</span>`;
+  }
+  const fmtPx=n=>"$"+n.toFixed(2);
+  const fmtChg=c=>(c>=0?"▲ ":"▼ ")+Math.abs(c).toFixed(2)+"%";
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+  function sparkSVG(data){
+    const w=300,h=46,p=3,mn=Math.min(...data),mx=Math.max(...data),r=(mx-mn)||1,n=data.length;
+    const pts=data.map((v,i)=>`${(p+i/(n-1)*(w-2*p)).toFixed(1)},${(p+(1-(v-mn)/r)*(h-2*p)).toFixed(1)}`).join(" ");
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+
+  // ---- render list ----
+  function renderList(){
+    document.getElementById("fwName").textContent=fw;
+    document.getElementById("list").innerHTML=STOCKS.map((s,i)=>{
+      const v=verdict(s,fw);
+      return `<div class="row" data-i="${i}" role="button">
+        <div class="logo">${s.t.slice(0,2)}</div>
+        <div class="mid"><div class="tk">${s.t} <span class="co">· ${esc(s.n)}</span></div>
+          <div style="margin-top:7px">${badge(v,fw,true)}</div></div>
+        <div class="right"><div class="px tnum">${fmtPx(s.px)}</div><div class="chg tnum ${s.chg>=0?'up':'down'}">${fmtChg(s.chg)}</div></div>
+      </div>`;
+    }).join("");
+    document.getElementById("watchlist").innerHTML=STOCKS.slice(0,2).map((s,i)=>{
+      const v=verdict(s,fw);
+      return `<div class="row" data-i="${i}" role="button"><div class="logo">${s.t.slice(0,2)}</div>
+        <div class="mid"><div class="tk">${s.t} <span class="co">· ${esc(s.n)}</span></div><div style="margin-top:7px">${badge(v,fw,true)}</div></div>
+        <div class="right"><div class="px tnum">${fmtPx(s.px)}</div></div></div>`;
+    }).join("");
+  }
+
+  // ---- meter ----
+  function meter(label,val,unit,key,{threshold,advisory,scaleMax}){
+    const over = !advisory && val>threshold;
+    const pct=Math.min(100, val/scaleMax*100);
+    const cutPct=Math.min(100, threshold/scaleMax*100);
+    const valColor = over? "color:var(--fail)" : (val===0?"color:var(--muted)":"color:var(--ink)");
+    return `<div class="meter">
+      <div class="mrow"><span class="mlab">${label}</span><span class="mval tnum" style="${valColor}">${val===null?"—":val+unit}</span></div>
+      <div class="track">
+        <div class="fill ${over?'over':''}" style="width:${val===null?0:pct}%"></div>
+        <div class="cut ${advisory?'adv':''}" style="left:${cutPct}%"></div>
+        <div class="cutlab" style="left:${cutPct}%">${threshold}${unit}${advisory?" · advisory":" limit"}</div>
+      </div></div>`;
+  }
+
+  // ---- render detail ----
+  let curIdx=0, openAcc={};
+  function renderDetail(){
+    const s=STOCKS[curIdx], v=verdict(s,fw), f=FW[fw];
+    const el=document.getElementById("v-detail");
+    const altKey = fw==="AAOIFI" ? "Framework B" : "AAOIFI";
+    const impureStr = s.impure===null? "Can’t verify" : (s.impure>0? "≈"+s.impure+"% of any gain owed to charity at sale" : "None");
+    el.innerHTML=`
+      <button class="back" id="backBtn"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Screen</button>
+      <div class="d-top">
+        <div><div class="d-name">${esc(s.n)}</div><div class="d-tk">${s.t}</div><div class="d-sector">${esc(s.sector)}</div></div>
+        <div><div class="d-px tnum">${fmtPx(s.px)}</div><div class="d-chg tnum ${s.chg>=0?'chg up':'chg down'}" style="color:${s.chg>=0?'var(--meet)':'var(--fail)'}">${fmtChg(s.chg)}</div></div>
+      </div>
+      ${sparkSVG(s.spark)}
+
+      <div class="panelc">
+        <div class="verdict-head">
+          ${badge(v,fw)}
+          <button class="picker" id="pickBtn">${f.label} <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="verdict-line">${esc(s.reason)} <b>You, or your scholar, draw the final ruling.</b></div>
+
+        ${ s.activity==="impermissible"
+          ? `<p class="mnote" style="margin-top:16px">Business activity is the disqualifying test here, so the financial ratios below don’t change the outcome under any framework.</p>`
+          : meter("Impure income", s.impure, "%", fw, {threshold:f.impureMax, advisory:false, scaleMax:6})
+            + meter("Debt vs market cap", s.debt, "%", fw, {threshold:f.debtMax, advisory:f.debtAdvisory, scaleMax:100})
+            + `<p class="mnote">${ f.debtAdvisory
+                ? "Under Framework B, debt is <b>advisory</b> — shown for context, it never changes the verdict on its own."
+                : "Under AAOIFI, debt above the limit is a hard fail." } Business activity: <b>permissible</b> (${esc(s.sector.toLowerCase())}).</p>`
+        }
+      </div>
+
+      <div class="panelc">
+        <div class="h2" style="margin:0 0 10px">Compare frameworks</div>
+        <div class="compare-grid">
+          ${["AAOIFI","Framework B"].map(k=>`<div class="cmp"><div class="cf">${k}</div>${badge(verdict(s,k),k,true)}</div>`).join("")}
+        </div>
+        <p class="mnote" style="margin-top:12px">${ verdict(s,"AAOIFI")!==verdict(s,"Framework B")
+          ? "The numbers are identical — only the <b>rule you choose</b> changes the verdict. That difference is the debt treatment."
+          : "Both frameworks agree on this one." }</p>
+      </div>
+
+      <div class="panelc">
+        ${acc("why","Why this verdict", v==="unk"?"Missing disclosure":(s.activity==="impermissible"?"Excluded business activity":"Within the limits you chose"),
+          `<div class="facts"><div><span>Business activity</span><span>${s.activity==="impermissible"?"Excluded":"Permissible"}</span></div>
+           <div><span>Impure income</span><span>${s.impure===null?"— (can’t verify)":s.impure+"% (limit ≤ "+f.impureMax+"%)"}</span></div>
+           <div><span>Debt vs market cap</span><span>${s.debt}% ${f.debtAdvisory?"(advisory)":"(limit ≤ "+f.debtMax+"%)"}</span></div></div>`)}
+        ${acc("pur","Purification",(s.impure===null?"Pending data":(s.impure>0?"≈"+s.impure+"% at sale":"None")), `<p style="margin:0">${impureStr}. ${s.impure>0?"A purification estimate updates with your holding; the impure share of any realised gain is given to charity at sale.":"Nothing to purify."}</p>`)}
+        ${acc("disc","Disclosure & data","Latest filing · sample",
+          `<div class="facts"><div><span>Screened on</span><span>Latest annual filing</span></div><div><span>Market cap, debt</span><span>From financial statements</span></div><div><span>Data</span><span>Illustrative (preview)</span></div></div>`)}
+      </div>
+      <p class="disc">Mizān is a financial screening tool with a transparent, user-selected framework. Informational only — not a fatwa, brokerage, or investment advice.</p>
+    `;
+    // wire
+    el.querySelector("#backBtn").onclick=()=>show("screen");
+    el.querySelector("#pickBtn").onclick=cycleFw;
+    el.querySelectorAll("[data-acc]").forEach(b=>b.onclick=()=>{openAcc[b.dataset.acc]=!openAcc[b.dataset.acc];renderDetail();});
+  }
+  function acc(id,title,sub,body){
+    const open=!!openAcc[id];
+    return `<div class="acc"><button data-acc="${id}"><div><div class="at">${title}</div><div class="as">${sub}</div></div><span class="caret">${open?"–":"+"}</span></button>${open?`<div class="body">${body}</div>`:""}</div>`;
+  }
+  function cycleFw(){ fw = fw==="AAOIFI" ? "Framework B" : "AAOIFI"; renderList(); if(!document.getElementById("v-detail").hidden) renderDetail(); }
+
+  // ---- nav ----
+  const views=["screen","detail","watch","portfolio","settings"];
+  function show(v){
+    document.getElementById("v-screen").hidden = v!=="screen";
+    document.getElementById("v-detail").hidden = v!=="detail";
+    document.getElementById("v-watch").hidden = v!=="watch";
+    document.getElementById("v-portfolio").hidden = !(v==="portfolio"||v==="settings");
+    if(v==="settings"){ document.getElementById("v-portfolio").innerHTML='<div class="h2">Settings</div><div class="chip-sample">Default framework, data sources, scholar attestation, and alerts live here.</div>'; }
+    else if(v==="portfolio"){ document.getElementById("v-portfolio").innerHTML='<div class="h2">Your holdings</div><div class="empty"><div class="big">Check the stocks you own</div>Add your holdings to see each screened, a running purification estimate, and an alert if one stops meeting your framework.</div>'; }
+    document.querySelectorAll(".tabbar button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.view===v || (v==="detail"&&b.dataset.view==="screen"))));
+    document.getElementById("scroll").scrollTop=0;
+  }
+  document.querySelectorAll(".tabbar button").forEach(b=>b.onclick=()=>show(b.dataset.view));
+  document.getElementById("list").addEventListener("click",e=>{const r=e.target.closest("[data-i]");if(!r)return;curIdx=+r.dataset.i;openAcc={};renderDetail();show("detail");});
+  document.getElementById("watchlist").addEventListener("click",e=>{const r=e.target.closest("[data-i]");if(!r)return;curIdx=+r.dataset.i;openAcc={};renderDetail();show("detail");});
+
+  renderList();
+</script>
+</body>
+</html>
