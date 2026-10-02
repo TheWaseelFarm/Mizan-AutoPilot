@@ -262,7 +262,7 @@
 }
 @media (max-width: 74.99rem) {
   .mz-portfolios-page #freshness { display: flex; margin-inline-end: 1rem; }
-  .mz-portfolios-page .mz-pfsum { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.625rem; }
+  .mz-portfolios-page .mz-pfsum { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--mz-space-3); }
 }
 @media (max-width: 47.99rem) {
   .mz-portfolios-page .mz-main { padding: 1rem; }
@@ -282,4 +282,15 @@
   .mz-portfolios-page .mz-pf-controls .mz-pf-search { flex: 1 1 100%; }
   .mz-portfolios-page .mz-portfolio-card { padding: 1rem; }
   .mz-portfolios-page #drawer { padding-block-end: calc(var(--mz-mobile-nav-height) + env(safe-area-inset-bottom)); }
+}
+
+/* Keep the approved Portfolios dashboard split in flow at every viewport. */
+@media (max-width: 1199px) {
+  .mz-portfolios-page .mz-content-grid--drawer-open { grid-template-columns: minmax(0, 1fr); }
+  .mz-portfolios-page #drawer { position: static; width: 100%; max-height: none; border: var(--mz-border); border-radius: var(--mz-radius-md); padding-block-end: 0; }
+}
+@media (max-width: 47.99rem) {
+  .mz-portfolios-page .mz-topbar { height: var(--mz-header-height); min-height: var(--mz-header-height); flex-wrap: nowrap; padding-block: 0; }
+  .mz-portfolios-page .mz-topbar > .mz-search { display: none; }
+  .mz-portfolios-page .mz-pfsum { gap: var(--mz-space-3); }
 }

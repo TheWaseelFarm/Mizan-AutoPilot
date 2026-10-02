@@ -146,7 +146,10 @@
     fail: { cls: 'noncompliant', k: 'v.noncompliant' }, unscreened: { cls: 'review', k: 'v.review' },
   };
   const labelOf = (r) => (r.screened === false ? 'unscreened' : classify(r));
-  const badge = (label) => `<span class="mz-badge mz-badge--${VER[label].cls}" title="AAOIFI Standard No. 21"><span class="mz-dot" style="width:.45rem;height:.45rem;background:currentColor"></span>${t(VER[label].k)}</span>`;
+  const badge = (label) => {
+    const verdict = VER[S.tab === 'portfolios' && label === 'unscreened' ? 'purify' : label];
+    return `<span class="mz-badge mz-badge--${verdict.cls}" title="AAOIFI Standard No. 21"><span class="mz-dot" style="width:.45rem;height:.45rem;background:currentColor"></span>${t(verdict.k)}</span>`;
+  };
 
   /* ---------------------------------------------------------------- sample fallback */
   const SAMPLE = [
@@ -812,7 +815,7 @@
     cmp.dataset.active = S.compareMode;
     document.getElementById('portfolioControls')?.remove();
     if (isP) {
-      document.getElementById('controlRow').insertAdjacentHTML('afterbegin', `<div id="portfolioControls" class="mz-pf-controls"><label>${LANG === 'ar' ? 'ترتيب حسب' : 'Sort by'}<select id="portfolioSort">${P_SUB.map(([k]) => `<option value="${k}" ${k === S.pMetric ? 'selected' : ''}>${t(P_SORT[k])}</option>`).join('')}</select></label><label>${LANG === 'ar' ? 'الحالة' : 'Status'}<select id="portfolioStatus">${[['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('v.compliant')], ['watch', t('v.purify')], ['excluded', t('v.noncompliant')], ...(S.compliance === 'exclude' ? [['exclude', t('f.exclude')]] : [])].map(([k, label]) => `<option value="${k}" ${S.compliance === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label><div class="mz-search mz-pf-search"><span class="mz-search__icon">${I.search}</span><input id="portfolioSearch" type="search" aria-label="${LANG === 'ar' ? 'بحث المحافظ' : 'Search portfolios'}" placeholder="${LANG === 'ar' ? 'بحث المحافظ…' : 'Search portfolios...'}" value="${esc(S.query)}"></div></div>`);
+      document.getElementById('controlRow').insertAdjacentHTML('afterbegin', `<div id="portfolioControls" class="mz-pf-controls"><label>${LANG === 'ar' ? 'ترتيب حسب' : 'Sort by'}<select id="portfolioSort">${P_SUB.map(([k]) => `<option value="${k}" ${k === S.pMetric ? 'selected' : ''}>${t(P_SORT[k])}</option>`).join('')}</select></label><label>${LANG === 'ar' ? 'حالة ميزان' : 'Mizan Status'}<select id="portfolioStatus">${[['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('v.compliant')], ['watch', t('v.purify')], ['excluded', t('v.noncompliant')], ...(S.compliance === 'exclude' ? [['exclude', t('f.exclude')]] : [])].map(([k, label]) => `<option value="${k}" ${S.compliance === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label><div class="mz-search mz-pf-search"><span class="mz-search__icon">${I.search}</span><input id="portfolioSearch" type="search" aria-label="${LANG === 'ar' ? 'بحث المحافظ' : 'Search portfolios'}" placeholder="${LANG === 'ar' ? 'بحث المحافظ…' : 'Search portfolios...'}" value="${esc(S.query)}"></div></div>`);
     }
     // applied chips
     const chips = [];
@@ -886,7 +889,7 @@
       document.getElementById('thead').innerHTML = '';
       document.getElementById('cards').innerHTML = '';
       document.getElementById('tableWrap').style.display = '';
-      document.getElementById('tbody').innerHTML = `<tr><td colspan="8"><div class="mz-state"><div class="mz-state__content"><p class="mz-muted">${LANG === 'ar' ? 'جارٍ تحميل البيانات الحية…' : 'Loading live data…'}</p></div></div></td></tr>`;
+      document.getElementById('tbody').innerHTML = `<tr><td colspan="8"><div class="mz-state"><div class="mz-state__content"><p class="mz-muted">${isP ? (LANG === 'ar' ? 'جارٍ تحميل البيانات المتأخرة…' : 'Loading delayed data…') : (LANG === 'ar' ? 'جارٍ تحميل البيانات الحية…' : 'Loading live data…')}</p></div></div></td></tr>`;
       return;
     }
     document.getElementById('marketBrief').hidden = ['following', 'alerts', 'account'].includes(S.tab);
@@ -900,12 +903,12 @@
     document.getElementById('guardrail').textContent = isP ? (LANG === 'ar' ? 'العوائد من البيانات المُفصَح عنها للفترة المحددة. معلومات فقط، وليست نصيحة استثمارية.' : 'Returns reflect disclosed data for the selected period. Informational only — not investment advice.') : t('g.disclaimer');
 
     if (isP) {
-      thead.innerHTML = `<tr><th>#</th><th>${t('h.portfolio')}</th><th>${t('h.return')} (${esc(tfLabelNow())})</th><th>${t('h.activity')}</th><th>${t('dtl.holdings')}</th><th>${LANG === 'ar' ? 'آخر تقديم' : 'Last filing'}</th><th>${LANG === 'ar' ? 'حالة ميزان' : 'Mizan Status'}</th><th>${t('common.follow')}</th></tr>`;
+      thead.innerHTML = `<tr><th>#</th><th>${t('h.portfolio')}</th><th class="mz-cell-num">${t('h.return')} (${esc(tfLabelNow())})</th><th class="mz-cell-num">${t('h.activity')}</th><th class="mz-cell-num">${t('dtl.holdings')}</th><th>${LANG === 'ar' ? 'آخر تقديم' : 'Last filing'}</th><th>${LANG === 'ar' ? 'حالة ميزان' : 'Mizan Status'}</th><th>${t('common.follow')}</th></tr>`;
       tbody.innerHTML = list.map((p, i) => {
         const sel = S.compareMode ? S.selected.includes(p.name) : S.drawer?.type === 'detail' && S.drawer.name === p.name;
         const first = S.compareMode ? `<button class="mz-check-btn" data-select="${esc(p.name)}" data-on="${sel}" aria-label="Select">${sel ? I.check : ''}</button>` : `<span class="mz-rank">${i + 1}</span>`;
         const date = latestFiling(p.rows);
-        return `<tr tabindex="0" role="button" data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(esc(p.initials), p.name, esc(typeLabel(p.kind)))}</td><td><div class="mz-perf-cell">${portfolioReturn(p.ret)}${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--spark', unit: 'index', color: portfolioColor(p.ret.val) })}</div></td><td class="mz-cell-num">${p.count}<span class="mz-cell-context">${LANG === 'ar' ? 'إفصاح' : p.count === 1 ? 'Disclosure' : 'Disclosures'}</span></td><td class="mz-cell-num">${p.holdings}<span class="mz-cell-context">${LANG === 'ar' ? 'أسهم' : p.holdings === 1 ? 'Stock' : 'Stocks'}</span></td><td>${date ? esc(shortDate(date)) : '—'}<span class="mz-cell-context">${p.fresh == null ? t('dtl.pending') : `${p.fresh}${LANG === 'ar' ? 'ي مضت' : 'd ago'}`}</span></td><td>${compliancePill(portfolioTone(p))}</td><td>${starBtn(p.name)}</td></tr>`;
+        return `<tr tabindex="0" role="button" data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(esc(p.initials), p.name, esc(typeLabel(p.kind)))}</td><td class="mz-cell-num"><div class="mz-perf-cell">${portfolioReturn(p.ret)}${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--spark', unit: 'index', color: portfolioColor(p.ret.val) })}</div></td><td class="mz-cell-num">${p.count}<span class="mz-cell-context">${LANG === 'ar' ? 'إفصاح' : p.count === 1 ? 'Disclosure' : 'Disclosures'}</span></td><td class="mz-cell-num">${p.holdings}<span class="mz-cell-context">${LANG === 'ar' ? 'أسهم' : p.holdings === 1 ? 'Stock' : 'Stocks'}</span></td><td>${date ? esc(shortDate(date)) : '—'}<span class="mz-cell-context">${p.fresh == null ? t('dtl.pending') : `${p.fresh}${LANG === 'ar' ? 'ي مضت' : 'd ago'}`}</span></td><td>${compliancePill(portfolioTone(p))}</td><td>${starBtn(p.name)}</td></tr>`;
       }).join('') || emptyRow(8);
       cards.innerHTML = list.map((p, i) => portfolioCard(p, i)).join('');
     } else if (S.sMetric === 'flow') {
@@ -1047,8 +1050,8 @@
     const scrim = document.getElementById('scrim');
     if (!S.drawer) { grid.classList.remove('mz-content-grid--drawer-open'); d.hidden = true; d.innerHTML = ''; scrim.hidden = true; lockBodyScroll(false); return; }
     grid.classList.add('mz-content-grid--drawer-open'); d.hidden = false;
-    // Scrim only under the sheet/side-panel on tablet & mobile (desktop drawer is in-grid).
-    scrim.hidden = window.matchMedia('(min-width: 75rem)').matches;
+    // Portfolios stays in-grid; other pages use a scrim for their tablet/mobile drawer.
+    scrim.hidden = S.tab === 'portfolios' || window.matchMedia('(min-width: 75rem)').matches;
     // Freeze the page behind the sheet/side-panel so scrolling it never leaks to the list below.
     lockBodyScroll(!scrim.hidden);
     if (S.drawer.type === 'compare') d.innerHTML = compareDrawer();

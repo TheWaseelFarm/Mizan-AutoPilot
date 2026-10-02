@@ -28,6 +28,8 @@
   --mz-canvas: #f5f7fa;
   --mz-surface: #ffffff;
   --mz-surface-raised: #ffffff;
+  --mz-surface-hover: #f3f5f7;
+  --mz-surface-insight: #fafbfc;
   --mz-surface-selected: #ebf3fa;
 
   /* ------------------------------------------------------------------ performance
@@ -106,6 +108,7 @@
   --mz-radius-md: 0.625rem;
   --mz-radius-lg: 0.875rem;
   --mz-radius-pill: 999px;
+  --mz-radius-nav: 0.5rem;
 
   /* Borders and elevation — restrained institutional shadows (spec §10). */
   --mz-border: 1px solid var(--mz-ink-200);
@@ -131,6 +134,8 @@
   --mz-canvas: #0f1724;
   --mz-surface: #172232;
   --mz-surface-raised: #1e2c40;
+  --mz-surface-hover: var(--mz-ink-100);
+  --mz-surface-insight: var(--mz-ink-50);
   --mz-surface-selected: #213454;
   --mz-ink-950: #edf2fa;
   --mz-ink-800: #dce4f0;
