@@ -691,6 +691,34 @@
 .mz-brief__facts strong { font-size: 2.2rem; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.04em; }
 .mz-brief__facts strong.mz-brief__date { font-size: 1.4rem; }
 .mz-brief__facts .mz-muted { font-size: var(--mz-text-xs); }
+
+/* Compact summary strip (spec §2) — replaces the oversized hero on the Portfolios page. */
+.mz-pfsum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mz-space-6);
+  margin-block: var(--mz-space-4) var(--mz-space-5);
+  padding: var(--mz-space-4) var(--mz-space-5);
+  background: var(--mz-surface);
+  border: var(--mz-border);
+  border-radius: var(--mz-radius-md);
+  box-shadow: var(--mz-shadow-sm);
+}
+.mz-pfsum__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 7rem;
+  padding-inline-end: var(--mz-space-6);
+  border-inline-end: var(--mz-border);
+}
+.mz-pfsum__item:last-child { padding-inline-end: 0; border-inline-end: 0; }
+.mz-pfsum__label { font-size: var(--mz-text-xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--mz-ink-500); }
+.mz-pfsum__val { font-size: var(--mz-text-xl); font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.mz-pfsum__sub { font-size: var(--mz-text-xs); color: var(--mz-ink-500); }
+@media (max-width: 47.99rem) {
+  .mz-pfsum__item { border-inline-end: 0; padding-inline-end: 0; min-width: 42%; }
+}
 .mz-cell-context { display: block; margin-block-start: 3px; font-size: 0.65rem; font-weight: 500; color: var(--mz-ink-500); }
 .mz-table tbody tr:last-child td { border-block-end: 0; }
 .mz-table tbody tr[data-row], article[data-row] { cursor: pointer; }
