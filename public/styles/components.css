@@ -77,6 +77,10 @@
   font-size: var(--mz-text-sm);
   font-weight: 600;
   text-align: start;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 /* Primary nav now lives in the sidebar (spec §7/§12); the topbar is context only (§13). */
