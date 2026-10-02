@@ -1017,6 +1017,24 @@
     const buyers = new Set(rows.filter((r) => sideUp(r.side)).map((r) => r.actor)).size;
     const fresh = Math.min(...rows.map((r) => daysSince(r.filingDate) ?? 999));
     const label = rows[0].label;
+    const ar = LANG === 'ar';
+    // Disclosure conviction: share of disclosed trades for this name that are BUYS (0–100,
+    // 50 = balanced). A factual read of disclosed flow — cobalt/ink, never a verdict hue —
+    // weighted for credibility by filer breadth. Informational, not advice.
+    const convBuys = rows.filter((r) => sideUp(r.side)).length;
+    const convSells = rows.length - convBuys;
+    const convScore = rows.length ? Math.round((100 * convBuys) / rows.length) : null;
+    const convStrength = filers >= 5 ? (ar ? 'إشارة واسعة' : 'Broad signal')
+      : filers >= 2 ? (ar ? 'إشارة متوسطة' : 'Moderate signal')
+      : (ar ? 'مُفصِح واحد' : 'Single filer');
+    const convDir = convScore == null ? '' : convScore > 55 ? (ar ? 'شراء صافٍ' : 'net buying')
+      : convScore < 45 ? (ar ? 'بيع صافٍ' : 'net selling') : (ar ? 'متوازن' : 'balanced');
+    const convictionHtml = convScore == null ? '' :
+      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${ar ? 'مؤشر القناعة في الإفصاح' : 'Disclosure conviction'}</div>` +
+      `<div style="display:flex;align-items:baseline;gap:.4rem"><b class="mz-ltr" style="font-size:var(--mz-text-2xl);font-weight:800;color:var(--mz-cobalt-700);line-height:1">${convScore}</b><span class="mz-muted" style="font-size:var(--mz-text-xs)">/100 · ${convDir}</span></div>` +
+      `<div style="position:relative;height:.5rem;border-radius:var(--mz-radius-pill);background:var(--mz-ink-100);margin:.55rem 0;overflow:hidden"><span style="position:absolute;inset-block:0;inset-inline-start:0;width:${convScore}%;background:var(--mz-cobalt-600);border-radius:var(--mz-radius-pill)"></span><i style="position:absolute;inset-block:-2px;inset-inline-start:50%;width:1px;background:var(--mz-ink-300)"></i></div>` +
+      `<div class="mz-entity__meta" style="display:flex;justify-content:space-between;gap:.5rem"><span>${convBuys} ${ar ? 'شراء' : (convBuys === 1 ? 'buy' : 'buys')} · ${convSells} ${ar ? 'بيع' : (convSells === 1 ? 'sell' : 'sells')}</span><span>${convStrength}</span></div>` +
+      `<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.4rem 0 0;line-height:1.4">${ar ? 'نسبة عمليات الشراء من إجمالي الصفقات المُفصَح عنها — معلوماتي، ليس نصيحة.' : 'Share of disclosed trades that are buys — informational, not advice.'}</p></div>`;
     const perfs = rows.map((r) => r.performance && r.performance.sinceDisclosed).filter((x) => x != null && isFinite(x));
     const perf = perfs.length ? +(perfs.reduce((a, b) => a + b, 0) / perfs.length).toFixed(1) : null;
     const headline = composeHeadline(returnOf(histOf(ticker), perf).val, { hasActivity: true, buyers, active: filers >= 3 });
@@ -1041,6 +1059,7 @@
     return drawerHead(t('dtl.stock'), { back: true, tag: badge(label) }) +
       detailHero(who, headline, returnOf(histOf(ticker), perf), stats) +
       `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.perf')}</div>${chart(shist, { markers: marks, today: todayLab, axis: true, empty: t('dtl.pending') })}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${LANG === 'ar' ? '● شراء · ○ بيع مُفصَح عنه — اسحب لأي نقطة لرؤية التاريخ.' : '● disclosed buy · ○ sell — scrub any point for its date & value.'}</p></div>` +
+      convictionHtml +
       screeningSection([rows[0]]) +
       `<details class="mz-disclosure mz-drawer__section"><summary>${t('dtl.who')}<span>${log.length}</span></summary>${log.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); const evn = entryVsNow(r); return `<div class="mz-hold"><div class="mz-hold__n"><div style="font-weight:700">${esc(r.actor)}</div><div class="mz-entity__meta">${esc(r.source || r.kind || '')} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div>${evn ? `<div class="mz-entity__meta">${evn}</div>` : ''}</div>${sideTag(r.side)}<span class="mz-cell-num" style="font-weight:750;margin-inline-start:.5rem">${disclosedMoney(r)}</span></div>`; }).join('')}${freshNote ? `<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0;line-height:1.4;display:flex;gap:.35rem;align-items:flex-start">${miniIcon(I.info)}<span>${esc(freshNote)}</span></p>` : ''}</details>` +
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
