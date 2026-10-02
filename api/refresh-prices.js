@@ -3,14 +3,14 @@
 // OLDEST updated_at first. Batched to respect the FMP free tier (250 calls/day):
 // each ticker costs ~2 FMP calls (quote + history), so MAX_TICKERS keeps a run well under cap.
 // Idempotent; returns { done, failed, remaining } so cron-job.org can call it repeatedly.
+import { requireCron } from "./_lib/cron.js";
 import { supabase } from "./_lib/supabase.js";
 import { fetchPrice } from "./_lib/prices/fmp.js";
 
 const MAX_TICKERS = 40; // ~80 FMP calls/run; 2–3 runs/day stays under 250.
 
 export default async function handler(req, res) {
-  const secret = req.query.secret || req.headers["x-cron-secret"];
-  if (secret !== process.env.CRON_SECRET) return res.status(401).json({ error: "Unauthorized" });
+  if (!requireCron(req, res)) return;
   try {
     const db = supabase();
 

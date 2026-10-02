@@ -2,6 +2,7 @@
 // Rebuilds the smart_money_trends cache from disclosures (spec §A3) so the Stocks tab never
 // aggregates raw trades on every request. Idempotent: recomputes all (ticker,timeframe,side)
 // rows and upserts them. Returns a summary. Tolerates the table being absent.
+import { requireCron } from "./_lib/cron.js";
 import { supabase } from "./_lib/supabase.js";
 import { classifyAAOIFI } from "./_lib/aaoifi.js";
 import { aggregateTrends } from "./_lib/trends.js";
@@ -26,8 +27,7 @@ function toRec(row) {
 }
 
 export default async function handler(req, res) {
-  const secret = req.query.secret || req.headers["x-cron-secret"];
-  if (secret !== process.env.CRON_SECRET) return res.status(401).json({ error: "Unauthorized" });
+  if (!requireCron(req, res)) return;
   try {
     const db = supabase();
     const { data, error } = await db.from("disclosures").select("*").limit(2000);

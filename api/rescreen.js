@@ -6,6 +6,7 @@
 //
 // NOTE: requires supabase/screenings.sql to have been run — the sweep uses that cache's
 // fetched_at to page through tickers across repeated calls.
+import { requireCron } from "./_lib/cron.js";
 import { supabase } from "./_lib/supabase.js";
 import { classifyAAOIFI } from "./_lib/aaoifi.js";
 import { screenOnce, usingLiveScreener } from "./_lib/screening/index.js";
@@ -14,8 +15,7 @@ const BATCH = 25;
 const GRACE_MS = 10 * 60 * 1000; // a ticker refreshed within this window counts as done for the sweep
 
 export default async function handler(req, res) {
-  const secret = req.query.secret || req.headers["x-cron-secret"];
-  if (secret !== process.env.CRON_SECRET) return res.status(401).json({ error: "Unauthorized" });
+  if (!requireCron(req, res)) return;
   try {
     const db = supabase();
 
