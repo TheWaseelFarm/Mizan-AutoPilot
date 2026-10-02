@@ -395,6 +395,7 @@
     compliance: 'all', evFilter: 'all', followedOnly: false, compareMode: false,
     selected: [], follows: new Set(), drawer: null, // {type:'compare'|'evidence'|'detail', ...}
     openMenu: null, rows: [], live: false, loading: true, prices: {}, followerCounts: {},
+    status: null, // /api/status readiness probe — drives the honest "why is this empty" note
     myHoldings: loadMyHoldings(),
   };
   const P_SUB = [['top', 'sv.top'], ['active', 'sv.active'], ['followed', 'sv.followed'], ['alloc', 'sv.alloc'], ['conc', 'sv.conc'], ['lag', 'sv.lag']];
@@ -516,7 +517,7 @@
   /* ---------------------------------------------------------------- data load */
   async function load() {
     const j = (u) => fetch(u, { headers: { accept: 'application/json' } }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    const [feed, prices, followers] = await Promise.allSettled([j('/api/feed?performance=1'), j('/api/prices'), j('/api/follower-counts')]);
+    const [feed, prices, followers, status] = await Promise.allSettled([j('/api/feed?performance=1'), j('/api/prices'), j('/api/follower-counts'), j('/api/status')]);
     if (feed.status === 'fulfilled' && Array.isArray(feed.value) && feed.value.length) {
       S.rows = feed.value.map((r) => ({ ...r, company: coName(r.company), label: r.label || labelOf(r) }));
       S.live = true;
@@ -528,6 +529,7 @@
     if (prices.status === 'fulfilled' && prices.value && typeof prices.value === 'object' && Object.keys(prices.value).length) S.prices = prices.value;
     else S.prices = SAMPLE_PRICES;
     if (followers.status === 'fulfilled' && followers.value && typeof followers.value === 'object') S.followerCounts = followers.value;
+    if (status.status === 'fulfilled' && status.value && typeof status.value === 'object') S.status = status.value;
     S.loading = false;
     render();
   }
@@ -927,7 +929,28 @@
     // Non-compliant names remain labeled for market awareness.
     document.getElementById('guardrail').textContent = t('flow.note');
   }
-  const emptyRow = (cols) => `<tr><td colspan="${cols}"><div class="mz-state"><div class="mz-state__content"><h3>${t('empty.title')}</h3><p class="mz-muted">${t('empty.body')}</p></div></div></td></tr>`;
+  // Honest "why is this empty" note. When most disclosed names have no Sharia verdict yet they
+  // are (correctly) hidden — an unscreened name is never shown as compliant — so the board can
+  // read empty while real data exists. This explains that with the real counts from /api/status
+  // (total disclosures) and the live feed (S.rows = the screened names that passed the gate),
+  // instead of a silent zero. Returns '' when the data is healthy or status is unavailable.
+  function readinessNote() {
+    const st = S.status;
+    if (!st || !st.data || !st.data.disclosures) return '';
+    const total = Number(st.data.disclosures.total || 0);
+    if (!total) return '';
+    const screenedShown = S.live ? S.rows.length : 0;
+    const screeningOff = st.config && st.config.screening === false;
+    if (!screeningOff && screenedShown >= total) return ''; // healthy — nothing to explain
+    const hidden = Math.max(0, total - screenedShown);
+    if (!hidden && !screeningOff) return '';
+    const ar = LANG === 'ar';
+    const en = `Sharia screening ${screeningOff ? "isn’t enabled yet" : 'is still catching up'} — ${screenedShown} of ${total} disclosed ${total === 1 ? 'name has' : 'names have'} a verdict, so ${hidden} ${hidden === 1 ? 'name is' : 'names are'} hidden (an unscreened name is never shown as compliant). Rankings fill in once screening ${screeningOff ? 'is turned on' : 'completes'}.`;
+    const arS = `الفحص الشرعي ${screeningOff ? 'غير مُفعَّل بعد' : 'لا يزال قيد الاستكمال'} — ${screenedShown} من ${total} اسمًا مُفصحًا لها حكم، لذا تُخفى ${hidden} اسمًا (لا يُعرض الاسم غير المفحوص كمتوافق). تُعبّأ القوائم بمجرد ${screeningOff ? 'تفعيل الفحص' : 'اكتمال الفحص'}.`;
+    return `<p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.6;margin:.6rem auto 0;max-width:40rem">${ar ? arS : en}</p>`;
+  }
+
+  const emptyRow = (cols) => `<tr><td colspan="${cols}"><div class="mz-state"><div class="mz-state__content"><h3>${t('empty.title')}</h3><p class="mz-muted">${t('empty.body')}</p>${readinessNote()}</div></div></td></tr>`;
 
   function portfolioCard(p, i) {
     const flag = portfolioFlag(p), sel = S.compareMode ? S.selected.includes(p.name) : S.drawer?.type === 'detail' && S.drawer.name === p.name;
