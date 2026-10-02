@@ -103,7 +103,8 @@ h3 {
 }
 
 :focus-visible {
-  outline: none;
+  outline: 2px solid var(--mz-cobalt-600);
+  outline-offset: 3px;
   box-shadow: var(--mz-focus-ring);
 }
 
@@ -112,3 +113,9 @@ h3 {
   color: var(--mz-ink-950);
 }
 
+
+button, a, summary, [data-row], [data-holding] { -webkit-tap-highlight-color: transparent; }
+textarea { background: var(--mz-surface); }
+.mz-skip { position: fixed; inset-block-start: -5rem; inset-inline-start: 1rem; z-index: 100; padding: 1rem; background: var(--mz-surface); }
+.mz-skip:focus { inset-block-start: 1rem; }
+[dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] .mz-dtl-headline { letter-spacing: 0; }

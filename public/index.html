@@ -6,203 +6,26 @@
 <title>Mizān — Sharia market intelligence</title>
 <meta name="description" content="Mizān — a Sharia-aware market-intelligence terminal. Disclosed portfolios and stocks with AAOIFI Standard No. 21 screening." />
 <meta name="theme-color" content="#2457d6" />
-<link rel="stylesheet" href="/styles/index.css" />
-<style>
-  /* App-local glue only — the design system lives entirely in /styles/*.css (the handoff). */
-  .mz-app__brandmark { color: var(--mz-cobalt-600); font-weight: 800; font-size: var(--mz-text-lg); letter-spacing: -0.02em; }
-  .mz-avatar { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border-radius: 50%;
-    background: var(--mz-cobalt-600); color: #fff; font-weight: 800; font-size: var(--mz-text-xs); }
-  .mz-subtabs { display: flex; gap: var(--mz-space-1); overflow-x: auto; scrollbar-width: none; border-block-end: var(--mz-border); }
-  .mz-subtabs::-webkit-scrollbar { display: none; }
-  .mz-subtab { padding: var(--mz-space-3) var(--mz-space-3); border: 0; border-block-end: 2px solid transparent;
-    margin-block-end: -1px; background: transparent; color: var(--mz-ink-500); font-weight: 650; font-size: var(--mz-text-sm);
-    white-space: nowrap; cursor: pointer; }
-  .mz-subtab[aria-selected="true"] { color: var(--mz-cobalt-700); border-block-end-color: var(--mz-cobalt-600); }
-  .mz-linkbtn { border: 0; background: transparent; color: var(--mz-cobalt-700); font-weight: 650; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 0.35rem; font-size: var(--mz-text-sm); }
-  .mz-star { border: 0; background: transparent; cursor: pointer; color: var(--mz-ink-400); display: inline-grid; place-items: center; }
-  .mz-star[data-on="true"] { color: var(--mz-cobalt-600); }
-  .mz-check-btn { border: 1.5px solid var(--mz-ink-300); border-radius: 0.35rem; width: 1.25rem; height: 1.25rem;
-    background: var(--mz-surface); cursor: pointer; display: inline-grid; place-items: center; color: #fff; padding: 0; }
-  .mz-check-btn[data-on="true"] { background: var(--mz-cobalt-600); border-color: var(--mz-cobalt-600); }
-  /* ONE shared interactive chart component — every chart in the app is `.mz-chart`
-     (see CLAUDE.md, Global consistency rule). Neutral cobalt/ink only, never a verdict hue. */
-  .mz-chart { position: relative; width: 100%; display: block; touch-action: pan-y; cursor: crosshair; }
-  .mz-chart svg { width: 100%; height: 100%; display: block; overflow: visible; }
-  .mz-chart--spark { width: 5rem; height: 28px; flex: 0 0 auto; }
-  .mz-chart--card { height: 40px; }
-  .mz-chart--full { height: 120px; }
-  .mz-chart__cx { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--mz-ink-300);
-    transform: translateX(-0.5px); opacity: 0; pointer-events: none; }
-  .mz-chart__dot { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--mz-cobalt-600);
-    box-shadow: 0 0 0 2px var(--mz-surface); transform: translate(-3.5px, -3.5px); opacity: 0; pointer-events: none; }
-  .mz-chart.is-active .mz-chart__cx, .mz-chart.is-active .mz-chart__dot { opacity: 1; }
-  /* Disclosed-trade markers pinned on the line: SOLID cobalt = buy, HOLLOW = sell. A white ring
-     lifts them off the (cobalt) line so buys don't vanish into it. Neutral only — no verdict hue. */
-  .mz-chart__mk { position: absolute; width: 9px; height: 9px; transform: translate(-50%, -50%); border-radius: 50%;
-    pointer-events: none; box-shadow: 0 0 0 2px var(--mz-surface); }
-  .mz-chart__mk[data-side="buy"] { background: var(--mz-cobalt-600); }
-  .mz-chart__mk[data-side="sell"] { background: var(--mz-surface); border: 1.6px solid var(--mz-ink-500); }
-  .mz-chart__today { position: absolute; width: 9px; height: 9px; transform: translate(-50%, -50%); border-radius: 50%;
-    background: var(--mz-cobalt-700); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mz-cobalt-600) 22%, transparent); pointer-events: none; }
-  .mz-chart__todaylab { position: absolute; top: 4px; inset-inline-end: 6px; font-size: 0.68rem; font-weight: 750;
-    color: var(--mz-ink-700); background: var(--mz-surface); padding: 1px 6px; border-radius: var(--mz-radius-sm);
-    border: 1px solid var(--mz-ink-100); pointer-events: none; }
-  /* Date axis on detail charts — start … last date, so marker positions read as "when". */
-  .mz-chart__ax { position: absolute; bottom: 1px; font-size: 0.6rem; font-weight: 650; color: var(--mz-ink-400);
-    background: color-mix(in srgb, var(--mz-surface) 82%, transparent); padding: 0 3px; border-radius: 3px; pointer-events: none; }
-  .mz-chart__ax--start { inset-inline-start: 1px; }
-  .mz-chart__ax--end { inset-inline-end: 1px; }
-  .mz-chart__empty { display: grid; place-items: center; color: var(--mz-ink-400); font-size: var(--mz-text-xs);
-    font-weight: 600; background: var(--mz-ink-50); border-radius: var(--mz-radius-sm); cursor: default; }
-  .mz-chart-tip { position: fixed; z-index: 90; pointer-events: none; transform: translate(-50%, calc(-100% - 10px));
-    padding: 0.25rem 0.5rem; border-radius: var(--mz-radius-sm); background: var(--mz-ink-900, #0f1729); color: #fff;
-    font-size: var(--mz-text-xs); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
-    box-shadow: var(--mz-shadow-drawer); opacity: 0; transition: opacity 0.08s ease; }
-  .mz-chart-tip.is-on { opacity: 1; }
-  .mz-fresh { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--mz-ink-500); font-size: var(--mz-text-xs); font-weight: 600; white-space: nowrap; }
-  .mz-fresh[data-fresh="true"] { color: var(--mz-cobalt-700); }
-  .mz-rank { color: var(--mz-ink-400); font-weight: 800; font-variant-numeric: tabular-nums; }
-  .mz-legend { display: flex; flex-wrap: wrap; gap: var(--mz-space-4); margin-block-start: var(--mz-space-4);
-    color: var(--mz-ink-500); font-size: var(--mz-text-xs); font-weight: 650; }
-  .mz-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
-  .mz-dot { width: 0.6rem; height: 0.6rem; border-radius: 3px; display: inline-block; }
-  .mz-guardrail { margin-block-start: var(--mz-space-5); color: var(--mz-ink-400); font-size: var(--mz-text-xs); line-height: 1.5; }
-  .mz-info { display: inline-grid; place-items: center; width: 1.05rem; height: 1.05rem; color: var(--mz-ink-400); vertical-align: -2px; }
-  .mz-drawer__title { display: flex; align-items: center; justify-content: space-between; gap: var(--mz-space-3); }
-  .mz-cmp-head { display: grid; grid-template-columns: 1fr 1fr; gap: var(--mz-space-3); text-align: center; }
-  .mz-cmp-metric__label { color: var(--mz-ink-500); font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
-  .mz-cmp-vals { display: grid; grid-template-columns: 1fr 1fr; gap: var(--mz-space-3); font-weight: 750; font-variant-numeric: tabular-nums; }
-  .mz-why-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--mz-space-2); }
-  .mz-why-list li { display: flex; gap: var(--mz-space-2); align-items: flex-start; color: var(--mz-ink-700); }
-  .mz-menu { position: absolute; z-index: 80; margin-block-start: 0.35rem; min-width: 15rem; padding: var(--mz-space-2);
-    border: var(--mz-border); border-radius: var(--mz-radius-md); background: var(--mz-surface); box-shadow: var(--mz-shadow-drawer); }
-  .mz-menu button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--mz-space-3);
-    padding: var(--mz-space-2) var(--mz-space-3); border: 0; border-radius: var(--mz-radius-sm); background: transparent;
-    color: var(--mz-ink-700); font-weight: 600; cursor: pointer; text-align: start; font-size: var(--mz-text-sm); }
-  .mz-menu button:hover { background: var(--mz-ink-50); }
-  .mz-menu button[aria-selected="true"] { color: var(--mz-cobalt-700); }
-  .mz-menu small { display: block; color: var(--mz-ink-500); font-weight: 500; }
-  .mz-pos { position: relative; }
-  .mz-cell-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  /* Inline-icon sizing — SVGs have viewBoxes but no intrinsic size; constrain per context. */
-  .mz-button svg, .mz-chip svg, .mz-linkbtn svg, .mz-menu button svg, .mz-why-list svg { width: 1.05rem; height: 1.05rem; flex: 0 0 auto; }
-  .mz-button--primary svg, .mz-button--secondary svg, .mz-button--ghost svg { width: 1.1rem; height: 1.1rem; }
-  .mz-rail-link svg, .mz-mobile-nav__item svg { width: 1.35rem; height: 1.35rem; }
-  .mz-search__icon svg { width: 1rem; height: 1rem; }
-  .mz-fresh svg { width: 0.85rem; height: 0.85rem; }
-  .mz-star svg { width: 1.15rem; height: 1.15rem; }
-  .mz-entity__meta svg { width: 0.9rem; height: 0.9rem; }
-  .mz-check-btn svg { width: 0.85rem; height: 0.85rem; }
-  /* Performance-led hierarchy: the return is the hero, in cobalt (never a Sharia hue). */
-  .mz-perf-hero { display: inline-flex; align-items: center; gap: 0.15rem; font-size: var(--mz-text-lg);
-    font-weight: 800; font-variant-numeric: tabular-nums; color: var(--mz-cobalt-700); letter-spacing: -0.01em; white-space: nowrap; }
-  .mz-perf-hero[data-up="false"] { color: var(--mz-ink-600); }
-  .mz-perf-hero svg { width: 0.72rem; height: 0.72rem; }
-  .mz-perf-cell { display: flex; align-items: center; gap: 0.65rem; }
-  /* Diverging net-flow bar (Smart Money): gross sold on the start side, gross bought on the
-     end side, a center zero line, and an ink tick marking the net. */
-  .mz-flow-bar { position: relative; height: 14px; }
-  .mz-flow-axis { position: absolute; inset-inline: 0; top: 6px; height: 2px; background: var(--mz-ink-200); border-radius: 1px; }
-  .mz-flow-sell { position: absolute; inset-inline-end: 50%; top: 1px; height: 12px; background: var(--mz-ink-400);
-    border-start-start-radius: 12px; border-end-start-radius: 12px; }
-  .mz-flow-buy { position: absolute; inset-inline-start: 50%; top: 1px; height: 12px; background: var(--mz-ink-700);
-    border-start-end-radius: 12px; border-end-end-radius: 12px; }
-  .mz-flow-zero { position: absolute; inset-inline-start: 50%; top: -2px; height: 18px; width: 1.5px; background: var(--mz-ink-950); }
-  .mz-flow-net { position: absolute; top: -3px; height: 20px; width: 2px; background: var(--mz-cobalt-600); }
-  /* Decision-support signal tags — cobalt/ink only (never a Sharia hue). */
-  .mz-signals { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-  .mz-signal { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: var(--mz-radius-pill);
-    font-size: 0.65rem; font-weight: 700; border: 1px solid; white-space: nowrap; }
-  .mz-signal[data-tone="up"] { color: var(--mz-cobalt-700); background: var(--mz-cobalt-50); border-color: var(--mz-cobalt-100); }
-  .mz-signal[data-tone="down"], .mz-signal[data-tone="muted"] { color: var(--mz-ink-600); background: var(--mz-ink-50); border-color: var(--mz-ink-200); }
-  .mz-read { font-size: var(--mz-text-sm); line-height: 1.5; color: var(--mz-ink-800); font-weight: 600; }
-  /* Conclusion-first detail screens — the composed headline is the hero; return + attraction
-     lead; compliance stays a quiet label. Return is cobalt/ink only, never a verdict hue. */
-  .mz-dtl-who { display: flex; align-items: center; gap: 0.6rem; margin-block-end: 0.7rem; }
-  .mz-dtl-name { font-size: var(--mz-text-lg); font-weight: 840; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mz-dtl-whosub { font-size: var(--mz-text-xs); color: var(--mz-ink-500); margin-block-start: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mz-dtl-headline { font-size: var(--mz-text-lg); font-weight: 800; line-height: 1.3; letter-spacing: -0.01em; color: var(--mz-ink-950); margin: 0; }
-  .mz-dtl-heros { display: grid; grid-template-columns: 1.25fr 1fr; gap: var(--mz-space-2); margin-block-start: var(--mz-space-4); }
-  .mz-dtl-card { border: var(--mz-border); border-radius: var(--mz-radius-md); padding: var(--mz-space-3) var(--mz-space-4); background: var(--mz-surface); }
-  .mz-dtl-lab { font-size: 0.625rem; font-weight: 850; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mz-ink-400); }
-  .mz-dtl-big { font-size: var(--mz-text-2xl); font-weight: 850; letter-spacing: -0.02em; margin-block-start: 0.3rem; color: var(--mz-cobalt-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .mz-dtl-big[data-up="false"] { color: var(--mz-ink-600); }
-  .mz-dtl-big.mz-dtl-neutral { color: var(--mz-ink-800); font-size: var(--mz-text-xl); }
-  .mz-dtl-sub { font-size: 0.7rem; color: var(--mz-ink-500); margin-block-start: 0.2rem; line-height: 1.35; }
-  .mz-dtl-stat { display: flex; align-items: baseline; gap: 0.35rem; margin-block-start: 0.35rem; font-size: 0.72rem; color: var(--mz-ink-500); }
-  .mz-dtl-stat:first-of-type { margin-block-start: 0.3rem; }
-  .mz-dtl-stat b { color: var(--mz-ink-800); font-weight: 800; font-variant-numeric: tabular-nums; }
-  .mz-ret { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--mz-cobalt-700); white-space: nowrap; }
-  .mz-ret[data-up="false"] { color: var(--mz-ink-600); }
-  .mz-hold { display: flex; align-items: center; gap: 0.6rem; padding-block: 0.55rem; border-block-end: var(--mz-border); }
-  .mz-hold:last-child { border-block-end: 0; }
-  .mz-hold__n { flex: 1; min-width: 0; }
-  /* Tappable holding that drills the portfolio chart into that stock. */
-  .mz-hold--pick { cursor: pointer; margin-inline: calc(var(--mz-space-2) * -1); padding-inline: var(--mz-space-2); border-radius: var(--mz-radius-sm); }
-  .mz-hold--pick:hover { background: var(--mz-ink-50); }
-  .mz-hold--pick[data-active="true"] { background: var(--mz-cobalt-50); box-shadow: inset 2px 0 0 var(--mz-cobalt-600); }
-  /* "Bought-at → now" evidence line — tabular, neutral; the ▲/▼ % uses .mz-ret (cobalt/ink). */
-  .mz-entry { display: inline-flex; align-items: baseline; gap: 0.25rem; flex-wrap: wrap; font-size: var(--mz-text-xs); font-variant-numeric: tabular-nums; }
-  .mz-entry b { font-weight: 750; color: var(--mz-ink-800); }
-  /* Context suffix on a return number ("· 1M" / "· indic.") — muted, never competes with the value. */
-  .mz-perf-ctx { font-size: 0.62em; font-weight: 700; color: var(--mz-ink-400); letter-spacing: 0; }
-  .mz-dtl-ctx { font-size: 0.5em; font-weight: 750; color: var(--mz-ink-400); vertical-align: middle; }
-  /* Trade direction — NEUTRAL cobalt(buy)/ink(sell). Verdict hues stay reserved for compliance. */
-  .mz-side { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: var(--mz-radius-pill);
-    font-size: 0.68rem; font-weight: 750; border: 1px solid; white-space: nowrap; min-height: 1.3rem; }
-  .mz-side[data-side="buy"] { color: var(--mz-cobalt-700); background: var(--mz-cobalt-50); border-color: var(--mz-cobalt-100); }
-  .mz-side[data-side="sell"] { color: var(--mz-ink-600); background: var(--mz-ink-50); border-color: var(--mz-ink-200); }
-  /* Make the top Portfolios|Stocks control read unmistakably as a segmented toggle (a pill track
-     with an elevated selected chip) — distinct from the icon-based bottom tab bar. */
-  .mz-product-tabs { border-radius: var(--mz-radius-pill); }
-  .mz-product-tab { border-radius: var(--mz-radius-pill); }
-  /* ── Interaction hierarchy (within cobalt/ink — verdict hues stay reserved) ──
-     Cobalt FILL = the one PRIMARY action per screen (Follow, Import). Everything else is neutral
-     ink so it stops competing: SECONDARY actions = ink outline; INFO-reveal / utility / nav links
-     = quiet ink text (+ⓘ where it reveals information). Blue now signals "the main action here." */
-  .mz-button--secondary { border-color: var(--mz-ink-300); color: var(--mz-ink-800); background: var(--mz-surface); }
-  .mz-button--secondary:hover { border-color: var(--mz-ink-400); background: var(--mz-ink-50); color: var(--mz-ink-800); }
-  .mz-linkbtn { color: var(--mz-ink-600); }
-  .mz-linkbtn:hover { color: var(--mz-ink-800); }
-  .mz-linkbtn { white-space: nowrap; }
-  #freshness { white-space: nowrap; }
-  /* Toolbar rows: the time selector sits on its own row above the controls. */
-  #controlRow { margin-block-start: var(--mz-space-2); }
-  /* Mobile drawer scrim (bottom sheet / side sheet on < desktop). */
-  .mz-scrim { position: fixed; inset: 0; z-index: 50; background: rgb(16 24 40 / 0.42); overscroll-behavior: contain; touch-action: none; }
-  @media (min-width: 75rem) { .mz-scrim { display: none !important; } }
-  /* Mobile bottom sheet: pad its scroll area so the last content (Follow, etc.) clears the fixed
-     bottom nav — otherwise the sheet's tail sits behind the nav and can't be scrolled into view. */
-  @media (max-width: 47.99rem) {
-    .mz-drawer { padding-block-end: calc(var(--mz-mobile-nav-height, 3.5rem) + env(safe-area-inset-bottom) + var(--mz-space-3)); }
-  }
-  /* Keep a scroll gesture inside the open sheet — never chain it to the page behind. */
-  .mz-drawer { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-  /* Background scroll-lock while a sheet/side-panel is open (iOS-safe: freeze the body in place). */
-  body.mz-locked { position: fixed; inset-inline: 0; width: 100%; overflow: hidden; }
-  @media (max-width: 47.99rem) {
-    #freshness { display: none; }
-    .mz-topbar .mz-product-tabs { grid-template-columns: repeat(2, minmax(4.5rem, 1fr)); }
-    .mz-topbar { gap: var(--mz-space-2); }
-    #controlRow { margin-block-start: var(--mz-space-1); }
-  }
-  [hidden] { display: none !important; }
-</style>
+<script>if (location.protocol !== "file:") document.write('<base href="/">');</script>
+<link rel="stylesheet" href="./styles/index.css" />
+
 </head>
 <body>
 <div class="mz-app">
   <nav class="mz-utility-rail" aria-label="Utility">
-    <span class="mz-utility-rail__brand mz-app__brandmark" title="Mizān">M</span>
+    <span class="mz-utility-rail__brand mz-app__brandmark" title="Mizān">m<span class="mz-brand-balance" aria-hidden="true"></span></span>
     <a href="/following" class="mz-rail-link" data-rail="following"></a>
     <a href="/alerts" class="mz-rail-link" data-rail="alerts"></a>
     <a href="/account" class="mz-rail-link" data-rail="account"></a>
     <span class="mz-utility-rail__spacer"></span>
+    <button class="mz-rail-link" id="themeToggle" type="button"></button>
     <button class="mz-rail-link" id="langToggle" type="button"></button>
   </nav>
 
   <div class="mz-shell">
+    <a class="mz-skip" href="#main">Skip to content / انتقل للمحتوى</a>
     <header class="mz-topbar">
+      <span class="mz-wordmark">mizān<span id="brandCaption"></span></span>
       <div class="mz-product-tabs" role="tablist" id="topTabs">
         <button class="mz-product-tab" role="tab" data-tab="portfolios" type="button"></button>
         <button class="mz-product-tab" role="tab" data-tab="stocks" type="button"></button>
@@ -218,7 +41,7 @@
       </div>
     </header>
 
-    <main class="mz-main">
+    <main class="mz-main" id="main">
       <div class="mz-page-heading">
         <div>
           <h1 id="pageTitle"></h1>
@@ -226,6 +49,8 @@
         </div>
         <div id="headingEnd"></div>
       </div>
+
+      <section class="mz-brief" id="marketBrief"></section>
 
       <div class="mz-subtabs" role="tablist" id="subtabs"></div>
 
@@ -264,6 +89,6 @@
   </div>
   <div class="mz-scrim" id="scrim" hidden></div>
 </div>
-<script src="/app.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>

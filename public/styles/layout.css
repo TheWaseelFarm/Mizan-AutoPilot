@@ -15,7 +15,7 @@
   gap: var(--mz-space-3);
   padding: var(--mz-space-5) var(--mz-space-2);
   border-inline-end: var(--mz-border);
-  background: var(--mz-surface);
+  background: var(--mz-rail-bg);
 }
 
 .mz-utility-rail__brand {
@@ -45,7 +45,7 @@
   gap: var(--mz-space-4);
   padding-inline: clamp(var(--mz-space-4), 3vw, var(--mz-space-8));
   border-block-end: var(--mz-border);
-  background: rgb(255 255 255 / 0.94);
+  background: color-mix(in srgb, var(--mz-surface) 94%, transparent);
   backdrop-filter: blur(12px);
 }
 
@@ -59,7 +59,7 @@
 .mz-main {
   width: min(100%, var(--mz-content-max));
   margin-inline: auto;
-  padding: clamp(var(--mz-space-4), 3vw, var(--mz-space-8));
+  padding: var(--mz-space-8) clamp(var(--mz-space-4), 3vw, var(--mz-space-10));
 }
 
 .mz-product-header {

@@ -2,27 +2,27 @@
   color-scheme: light;
 
   /* Brand and semantic color */
-  --mz-ink-950: #101828;
-  --mz-ink-800: #1d2939;
-  --mz-ink-700: #344054;
-  --mz-ink-600: #475467;
-  --mz-ink-500: #667085;
-  --mz-ink-400: #98a2b3;
-  --mz-ink-300: #d0d5dd;
-  --mz-ink-200: #e4e7ec;
-  --mz-ink-100: #f2f4f7;
-  --mz-ink-50: #f9fafb;
+  --mz-ink-950: #142237;
+  --mz-ink-800: #243349;
+  --mz-ink-700: #3a485b;
+  --mz-ink-600: #526075;
+  --mz-ink-500: #657187;
+  --mz-ink-400: #69768b;
+  --mz-ink-300: #c8ced7;
+  --mz-ink-200: #e1e5eb;
+  --mz-ink-100: #eef1f5;
+  --mz-ink-50: #f7f8fa;
 
-  --mz-canvas: #f6f7fa;
+  --mz-canvas: #f2f3f5;
   --mz-surface: #ffffff;
   --mz-surface-raised: #ffffff;
-  --mz-surface-selected: #f3f7ff;
+  --mz-surface-selected: #edf2ff;
 
-  --mz-cobalt-700: #1849a9;
-  --mz-cobalt-600: #2457d6;
-  --mz-cobalt-500: #356ae6;
-  --mz-cobalt-100: #dbe7ff;
-  --mz-cobalt-50: #f2f6ff;
+  --mz-cobalt-700: #234db1;
+  --mz-cobalt-600: #315ed4;
+  --mz-cobalt-500: #4874e3;
+  --mz-cobalt-100: #dfe8ff;
+  --mz-cobalt-50: #f0f4ff;
 
   --mz-compliant-700: #08644f;
   --mz-compliant-600: #14866d;
@@ -39,29 +39,36 @@
   --mz-noncompliant-100: #ffd9dc;
   --mz-noncompliant-50: #fff2f3;
 
-  --mz-review-700: #475467;
-  --mz-review-100: #e4e7ec;
-  --mz-review-50: #f9fafb;
+  --mz-review-700: #526075;
+  --mz-review-100: #e1e5eb;
+  --mz-review-50: #f7f8fa;
 
   --mz-info-700: var(--mz-cobalt-700);
   --mz-info-50: var(--mz-cobalt-50);
-  --mz-warning-700: #b54708;
-  --mz-warning-50: #fffaeb;
-  --mz-danger-700: #b42318;
-  --mz-danger-50: #fef3f2;
+  --mz-warning-700: var(--mz-ink-700);
+  --mz-warning-50: var(--mz-ink-50);
+  --mz-danger-700: var(--mz-ink-700);
+  --mz-danger-50: var(--mz-ink-50);
 
-  /* Typography */
-  --mz-font-sans: Inter, "IBM Plex Sans Arabic", "Noto Sans Arabic",
+  --mz-on-accent: #ffffff;
+  --mz-rail-bg: #18283f;
+  --mz-rail-ink: #b4c2d7;
+  --mz-rail-active: #ffffff;
+  --mz-ink-900: #18283f;
+  --mz-review-600: #69768b;
+
+  /* Typography — installed system faces keep the terminal fully offline. */
+  --mz-font-sans: "Avenir Next", Avenir, "Segoe UI", "Geeza Pro", "IBM Plex Sans Arabic",
     system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mz-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
   --mz-text-xs: 0.75rem;
   --mz-text-sm: 0.875rem;
   --mz-text-md: 1rem;
-  --mz-text-lg: 1.125rem;
-  --mz-text-xl: 1.375rem;
-  --mz-text-2xl: 1.75rem;
-  --mz-text-3xl: 2.25rem;
+  --mz-text-lg: 1.25rem;
+  --mz-text-xl: 1.5rem;
+  --mz-text-2xl: 2rem;
+  --mz-text-3xl: 2.75rem;
 
   --mz-leading-tight: 1.2;
   --mz-leading-normal: 1.5;
@@ -79,22 +86,22 @@
   --mz-space-12: 3rem;
 
   /* Shape */
-  --mz-radius-sm: 0.5rem;
-  --mz-radius-md: 0.75rem;
-  --mz-radius-lg: 0.875rem;
+  --mz-radius-sm: 0.375rem;
+  --mz-radius-md: 0.625rem;
+  --mz-radius-lg: 1rem;
   --mz-radius-pill: 999px;
 
   /* Borders and elevation */
   --mz-border: 1px solid var(--mz-ink-200);
-  --mz-shadow-sm: 0 1px 2px rgb(16 24 40 / 0.04);
-  --mz-shadow-drawer: -12px 0 32px rgb(16 24 40 / 0.10);
+  --mz-shadow-sm: 0 2px 8px rgb(20 34 55 / 0.025), 0 12px 28px rgb(20 34 55 / 0.025);
+  --mz-shadow-drawer: 0 12px 48px rgb(20 34 55 / 0.12);
   --mz-focus-ring: 0 0 0 3px rgb(36 87 214 / 0.22);
 
   /* Layout */
-  --mz-utility-rail: 5rem;
-  --mz-header-height: 4.5rem;
+  --mz-utility-rail: 5.5rem;
+  --mz-header-height: 5rem;
   --mz-mobile-nav-height: 4.75rem;
-  --mz-drawer-width: 24rem;
+  --mz-drawer-width: 29rem;
   --mz-content-max: 100rem;
 
   /* Motion */
@@ -105,19 +112,43 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --mz-canvas: #0c111d;
-  --mz-surface: #161b26;
-  --mz-surface-raised: #1d2433;
-  --mz-surface-selected: #18264a;
-  --mz-ink-950: #f9fafb;
-  --mz-ink-800: #f2f4f7;
-  --mz-ink-700: #eaecf0;
-  --mz-ink-600: #d0d5dd;
-  --mz-ink-500: #98a2b3;
-  --mz-ink-400: #667085;
-  --mz-ink-300: #475467;
-  --mz-ink-200: #344054;
-  --mz-ink-100: #1d2939;
-  --mz-ink-50: #161b26;
+  --mz-canvas: #0f1724;
+  --mz-surface: #172232;
+  --mz-surface-raised: #1e2c40;
+  --mz-surface-selected: #213454;
+  --mz-ink-950: #edf2fa;
+  --mz-ink-800: #dce4f0;
+  --mz-ink-700: #c0cde0;
+  --mz-ink-600: #aabbd2;
+  --mz-ink-500: #96a7bf;
+  --mz-ink-400: #8999b1;
+  --mz-ink-300: #4c5c73;
+  --mz-ink-200: #2d3c51;
+  --mz-ink-100: #233247;
+  --mz-ink-50: #1b293b;
+  --mz-cobalt-700: #9ab9ff;
+  --mz-cobalt-600: #729dff;
+  --mz-cobalt-500: #87adff;
+  --mz-cobalt-100: #314b78;
+  --mz-cobalt-50: #20334f;
+  --mz-compliant-700: #83d9c2;
+  --mz-compliant-600: #5ac3a9;
+  --mz-compliant-100: #285347;
+  --mz-compliant-50: #1b3833;
+  --mz-purify-700: #edca83;
+  --mz-purify-600: #d9b36a;
+  --mz-purify-100: #594a30;
+  --mz-purify-50: #373025;
+  --mz-noncompliant-700: #f2a1a9;
+  --mz-noncompliant-600: #e88490;
+  --mz-noncompliant-100: #623a46;
+  --mz-noncompliant-50: #3c2935;
+  --mz-review-700: var(--mz-ink-600);
+  --mz-review-600: var(--mz-ink-400);
+  --mz-review-100: var(--mz-ink-200);
+  --mz-review-50: var(--mz-ink-50);
+  --mz-on-accent: #10213d;
+  --mz-rail-bg: #0b1320;
+  --mz-shadow-sm: 0 4px 20px rgb(0 0 0 / 0.08);
+  --mz-shadow-drawer: 0 16px 56px rgb(0 0 0 / 0.28);
 }
-
