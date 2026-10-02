@@ -540,7 +540,7 @@
       // misleading, so a portfolio must disclose ≥ MIN_HOLDINGS distinct names to be ranked.
       let list = derivePortfolios(rows).filter((p) => p.holdings >= MIN_HOLDINGS);
       if (S.query) { const q = S.query.toLowerCase(); list = list.filter((p) => p.name.toLowerCase().includes(q) || p.rows.some((r) => (r.ticker || '').toLowerCase().includes(q))); }
-      if (S.compliance !== 'all') list = list.filter((p) => { const tone = portfolioFlag(p).tone; return S.compliance === 'fully' ? tone === 'clean' : tone !== 'fail'; });
+      if (S.compliance !== 'all') list = list.filter((p) => { const tone = portfolioFlag(p).tone; return S.compliance === 'fully' ? portfolioTone(p) === 'clean' : S.compliance === 'watch' ? portfolioTone(p) === 'purify' : S.compliance === 'excluded' ? tone === 'fail' : tone !== 'fail'; });
       if (S.followedOnly) list = list.filter((p) => S.follows.has(p.name));
       const cmp = {
         top: (a, b) => ((b.ret && b.ret.val) ?? -1e9) - ((a.ret && a.ret.val) ?? -1e9), // rank by the SAME number shown
@@ -597,6 +597,12 @@
   };
   // Compact compliance tag — small pill, no longer the loud hero (performance-led).
   const compliancePill = (tone) => badge(tone);
+  // Portfolios use the owner's sign-based performance palette; other views keep cobalt.
+  const portfolioColor = (val) => val == null ? 'var(--mz-ink-400)' : val >= 0 ? 'var(--mz-compliant-600)' : 'var(--mz-noncompliant-600)';
+  const portfolioTone = (p) => p.mix.unscreened > 0 && portfolioFlag(p).tone === 'clean' ? 'purify' : portfolioFlag(p).tone;
+  const latestFiling = (rows) => rows.map((r) => r[FIELD.filedDate]).filter((d) => d && isFinite(Date.parse(d))).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+  const portfolioReturn = (ret) => `<span class="mz-pf-return" style="color:${portfolioColor(ret.val)}">${ret.val == null ? '—' : fmtPct(ret.val)}</span>${ret.indicative ? `<span class="mz-cell-context">${LANG === 'ar' ? 'تقديري · منذ الإفصاح' : 'indicative · since disclosed'}</span>` : ''}`;
+
   const starBtn = (id) => `<button class="mz-star" data-star="${esc(id)}" data-on="${S.follows.has(id)}" aria-label="${t('common.follow')}" aria-pressed="${S.follows.has(id)}">${S.follows.has(id) ? I.starOn : I.star}</button>`;
   // Trade direction — NEUTRAL (cobalt buy / ink sell). Verdict hues (green/amber/red) are reserved
   // for the Sharia label only, so buy/sell must never borrow them.
@@ -659,6 +665,7 @@
 
   // THE shared chart. `hist` = [{d,c}]. opts: { cls, compare:[{d,c}], empty,
   //   markers:[{d,side,label}] (disclosed trades pinned on the line — cobalt buy / ink sell),
+  //   color: optional CSS color (Portfolios sign palette), area/valueAxis: optional detail styling,
   //   today: string (a value label shown top-end, e.g. "$146 · today") }.
   function chart(hist, opts) {
     opts = opts || {};
@@ -668,7 +675,9 @@
     if (data.length < 2) return `<div class="mz-chart ${cls} mz-chart__empty" style="height:${h}px">${opts.empty || '—'}</div>`;
     const closes = data.map((p) => +p.c), mn = Math.min(...closes), mx = Math.max(...closes), rng = (mx - mn) || 1;
     const W = 320, H = 100, sw = cls === 'mz-chart--full' ? 1.7 : 1.4;
-    const line = `<polyline points="${chartPath(closes, W, H, mn, mx)}" fill="none" stroke="var(--mz-cobalt-600)" stroke-width="${sw}" stroke-linejoin="round"/>`;
+    const line = `<polyline points="${chartPath(closes, W, H, mn, mx)}" fill="none" stroke="${esc(opts.color || 'var(--mz-cobalt-600)')}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+    const area = opts.area ? `<polygon points="0,${H} ${chartPath(closes, W, H, mn, mx)} ${W},${H}" fill="${esc(opts.color || 'var(--mz-cobalt-600)')}" opacity="0.08"/>` : '';
+    const valueAxis = opts.valueAxis ? `<span class="mz-chart__value-axis">${[mx, (mn + mx) / 2, mn].map((v) => `<span>${(v / closes[0] * 100 - 100).toFixed(0)}%</span>`).join('')}</span>` : '';
     let cmp = '';
     if (opts.compare) { const c2 = (opts.compare || []).filter((p) => p && isFinite(+p.c)).map((p) => +p.c); if (c2.length >= 2) cmp = `<polyline points="${chartPath(c2, W, H, mn, mx)}" fill="none" stroke="var(--mz-ink-400)" stroke-width="1.2" stroke-dasharray="3 3"/>`; }
     // % positions (the SVG is stretched to fill, so a data point maps to left = i/(n-1), top = 1-(c-mn)/rng).
@@ -691,7 +700,7 @@
       : '';
     const series = esc(JSON.stringify(data.map((p) => [p.d, +p.c])));
     const unit = opts.unit === 'index' ? 'index' : 'price';
-    return `<div class="mz-chart ${cls}" data-series="${series}" data-unit="${unit}" data-min="${mn}" data-max="${mx}"${marksAttr} style="height:${h}px"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${cmp}${line}</svg>${markers}${todayDot}${todayLab}${axisEls}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
+    return `<div class="mz-chart ${cls}" data-series="${series}" data-unit="${unit}" data-min="${mn}" data-max="${mx}"${marksAttr} style="height:${h}px;--mz-chart-color:${esc(opts.color || 'var(--mz-cobalt-600)')}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${area}${cmp}${line}</svg>${valueAxis}${markers}${todayDot}${todayLab}${axisEls}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
   }
 
   // Interactive scrub — ONE handler drives every chart (touch + pointer). Registered once.
@@ -751,6 +760,9 @@
   /* ---------------------------------------------------------------- chrome */
   function renderChrome() {
     document.documentElement.lang = LANG; document.documentElement.dir = LANG === 'ar' ? 'rtl' : 'ltr';
+    document.body.classList.toggle('mz-portfolios-page', S.tab === 'portfolios');
+    const brand = document.querySelector('.mz-utility-rail__brand');
+    brand.innerHTML = S.tab === 'portfolios' ? 'mizan<small>Financial Intelligence</small>' : 'm<span class="mz-brand-balance" aria-hidden="true"></span>';
     // rail
     const navItems = [['portfolios', I.portfolios, 'tab.portfolios'], ['stocks', I.stocks, 'tab.stocks'], ['following', I.star, 'tab.following'], ['alerts', I.bell, 'tab.alerts'], ['account', I.user, 'tab.account']];
     document.getElementById('railNav').innerHTML = navItems.map(([k, ic, lk]) => `<a href="/${k}" class="mz-rail-link" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
@@ -767,7 +779,7 @@
     document.getElementById('bellBtn').setAttribute('aria-label', t('tab.alerts'));
     document.getElementById('langToggle').setAttribute('aria-label', t('acct.lang'));
     document.getElementById('themeToggle').setAttribute('aria-label', LANG === 'ar' ? 'تبديل المظهر' : 'Toggle appearance');
-    document.getElementById('freshness').textContent = S.live ? t('live') : t('sample');
+    document.getElementById('freshness').innerHTML = S.tab === 'portfolios' ? `${I.clock}<span>${LANG === 'ar' ? 'بيانات متأخرة' : 'Delayed data'}</span>` : esc(S.live ? t('live') : t('sample'));
     // mobile nav
     document.getElementById('mobileNav').innerHTML = navItems.map(([k, ic, lk]) => `<a href="/${k}" class="mz-mobile-nav__item" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
   }
@@ -792,11 +804,17 @@
     document.getElementById('filterBtn').innerHTML = `${I.filter}<span>${t('c.filter')}</span>${fCount ? `<span class="mz-count">${fCount}</span>` : ''}`;
     document.getElementById('filterBtn').dataset.active = fCount > 0;
     const cmp = document.getElementById('compareBtn');
+    cmp.title = t('c.compare'); cmp.setAttribute('aria-label', t('c.compare'));
     cmp.style.display = isP ? '' : 'none';
     cmp.innerHTML = `${I.compare}<span>${t('c.compare')}${S.compareMode && S.selected.length ? ` (${S.selected.length})` : ''}</span>`;
     cmp.dataset.active = S.compareMode;
+    document.getElementById('portfolioControls')?.remove();
+    if (isP) {
+      document.getElementById('controlRow').insertAdjacentHTML('afterbegin', `<div id="portfolioControls" class="mz-pf-controls"><label>${LANG === 'ar' ? 'ترتيب حسب' : 'Sort by'}<select id="portfolioSort">${P_SUB.map(([k]) => `<option value="${k}" ${k === S.pMetric ? 'selected' : ''}>${t(P_SORT[k])}</option>`).join('')}</select></label><label>${LANG === 'ar' ? 'الحالة' : 'Status'}<select id="portfolioStatus">${[['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('v.compliant')], ['watch', t('v.purify')], ['excluded', t('v.noncompliant')], ...(S.compliance === 'exclude' ? [['exclude', t('f.exclude')]] : [])].map(([k, label]) => `<option value="${k}" ${S.compliance === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label><div class="mz-search mz-pf-search"><span class="mz-search__icon">${I.search}</span><input id="portfolioSearch" type="search" aria-label="${LANG === 'ar' ? 'بحث المحافظ' : 'Search portfolios'}" placeholder="${LANG === 'ar' ? 'بحث المحافظ…' : 'Search portfolios...'}" value="${esc(S.query)}"></div></div>`);
+    }
     // applied chips
     const chips = [];
+    if (isP && ['watch', 'excluded'].includes(S.compliance)) chips.push([t(S.compliance === 'watch' ? 'v.purify' : 'v.noncompliant'), () => { S.compliance = 'all'; render(); }]);
     if (S.compliance === 'fully') chips.push([t('v.compliant') + (LANG === 'ar' ? ' فقط' : ' only'), () => { S.compliance = 'all'; render(); }]);
     if (S.compliance === 'exclude') chips.push([t('v.compliant') + ' + ' + t('v.purify'), () => { S.compliance = 'all'; render(); }]);
     if (!isP && S.evFilter !== 'all') chips.push([t('ev.' + S.evFilter) + ' ' + t('h.evidence').toLowerCase(), () => { S.evFilter = 'all'; render(); }]);
@@ -810,20 +828,19 @@
     const ar = LANG === 'ar', isP = S.tab === 'portfolios', lead = list[0];
     const el = document.getElementById('marketBrief');
     if (isP) {
-      // Compact summary strip (spec §2) — real-data metrics only, no oversized hero.
       el.className = 'mz-pfsum';
-      const ranked = [...list].filter((p) => p.ret && p.ret.val != null && isFinite(p.ret.val)).sort((a, b) => b.ret.val - a.ret.val);
-      const top = ranked[0];
-      const sdates = S.rows.map((r) => r[FIELD.filedDate]).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a));
-      const latest = sdates.length && isFinite(Date.parse(sdates[0])) ? esc(shortDate(sdates[0])) : t('dtl.pending');
-      const attn = list.filter((p) => portfolioFlag(p).tone === 'fail').length;
-      const item = (label, value, sub) => `<div class="mz-pfsum__item"><span class="mz-pfsum__label">${label}</span><strong class="mz-pfsum__val">${value}</strong><span class="mz-pfsum__sub">${sub || ''}</span></div>`;
+      const known = list.filter((p) => p.ret.val != null && isFinite(p.ret.val));
+      const avg = known.length ? known.reduce((sum, p) => sum + p.ret.val, 0) / known.length : null;
+      const indicative = known.some((p) => p.ret.indicative);
+      const rows = list.flatMap((p) => p.rows), latest = latestFiling(rows);
+      const attn = list.filter((p) => portfolioTone(p) !== 'clean').length;
+      const item = (label, value, sub, icon, color) => `<div class="mz-pfsum__item"><span class="mz-pfsum__label">${label}</span><strong class="mz-pfsum__val"${color ? ` style="color:${color}"` : ''}>${value}</strong><span class="mz-pfsum__sub">${sub}</span><span class="mz-pfsum__icon">${icon}</span></div>`;
       el.innerHTML =
-        item(ar ? 'محافظ متابَعة' : 'Portfolios tracked', String(list.length), ar ? 'في هذا العرض' : 'in this view') +
-        item(ar ? 'أعلى عائد' : 'Top return', top ? `<span style="color:var(--mz-cobalt-700)">${fmtPct(top.ret.val)}</span>` : '—', top ? `${esc(top.name)} · ${esc(tfLabelNow())}` : esc(tfLabelNow())) +
-        item(ar ? 'إفصاحات' : 'Disclosures', String(S.rows.length), ar ? 'في النطاق' : 'in range') +
-        item(ar ? 'أحدث إفصاح' : 'Latest filing', latest, ar ? 'تاريخ التقديم' : 'filing date') +
-        item(ar ? 'تحتاج انتباهًا' : 'Needs attention', String(attn), attn ? (ar ? 'مُستبعَدة' : 'excluded') : (ar ? 'لا شيء' : 'none'));
+        item(ar ? 'محافظ متابَعة' : 'Portfolios tracked', list.length, ar ? 'في هذا العرض' : 'In this view', I.briefcase) +
+        item(ar ? `متوسط العائد (${tfLabelNow()})` : `Average return (${tfLabelNow()})`, avg == null ? '—' : fmtPct(avg), indicative ? (ar ? 'تقديري · منذ الإفصاح' : 'Indicative · since disclosed') : (ar ? 'للفترة المحددة' : 'Selected period'), I.stocks, portfolioColor(avg)) +
+        item(ar ? 'إجمالي الإفصاحات' : 'Total disclosures', rows.length, ar ? 'المحافظ المعروضة' : 'Displayed portfolios', I.portfolios) +
+        item(ar ? 'أحدث تاريخ تقديم' : 'Latest filing date', latest ? esc(shortDate(latest)) : '—', latest ? `${daysSince(latest)}${ar ? 'ي مضت' : 'd ago'}` : t('dtl.pending'), I.clock) +
+        item(ar ? 'تحتاج انتباهًا' : 'Requiring attention', attn, ar ? 'مراقبة أو مستبعدة' : 'Watch or excluded', I.info, 'var(--mz-purify-600)');
       return;
     }
     // Stocks keeps its existing hero — this redesign is scoped to the Portfolios page.
@@ -878,19 +895,16 @@
     document.getElementById('tableWrap').style.display = '';
     // Spec: the compliance legend is removed from the primary Portfolios experience; kept on Stocks.
     document.getElementById('legend').innerHTML = isP ? '' : ['clean', 'purify', 'fail', 'unscreened'].map((k) => `<span><span class="mz-dot" style="background:var(--mz-${VER[k].cls === 'compliant' ? 'compliant' : VER[k].cls === 'purify' ? 'purify' : VER[k].cls === 'noncompliant' ? 'noncompliant' : 'review'}-600)"></span>${t(VER[k].k)}</span>`).join('');
-    document.getElementById('guardrail').textContent = t(isP ? 'g.portfolios' : 'g.disclaimer');
+    document.getElementById('guardrail').textContent = isP ? (LANG === 'ar' ? 'العوائد من البيانات المُفصَح عنها للفترة المحددة. معلومات فقط، وليست نصيحة استثمارية.' : 'Returns reflect disclosed data for the selected period. Informational only — not investment advice.') : t('g.disclaimer');
 
     if (isP) {
-      // Performance-led: Return is the hero column (2nd), compliance is a compact tag near the end.
-      thead.innerHTML = `<tr><th>${t('h.rank')}</th><th>${t('h.portfolio')}</th><th>${t('h.return')}</th><th>${t('h.activity')}</th><th>${t('h.freshness')}</th><th>${LANG === 'ar' ? 'حالة ميزان' : 'Mizan Status'}</th><th>${t('common.follow')}</th></tr>`;
+      thead.innerHTML = `<tr><th>#</th><th>${t('h.portfolio')}</th><th>${t('h.return')} (${esc(tfLabelNow())})</th><th>${t('h.activity')}</th><th>${t('dtl.holdings')}</th><th>${LANG === 'ar' ? 'آخر تقديم' : 'Last filing'}</th><th>${LANG === 'ar' ? 'حالة ميزان' : 'Mizan Status'}</th><th>${t('common.follow')}</th></tr>`;
       tbody.innerHTML = list.map((p, i) => {
-        const flag = portfolioFlag(p), sel = S.selected.includes(p.name);
+        const sel = S.compareMode ? S.selected.includes(p.name) : S.drawer?.type === 'detail' && S.drawer.name === p.name;
         const first = S.compareMode ? `<button class="mz-check-btn" data-select="${esc(p.name)}" data-on="${sel}" aria-label="Select">${sel ? I.check : ''}</button>` : `<span class="mz-rank">${i + 1}</span>`;
-        const av = `<span style="color:var(--mz-cobalt-700);font-weight:800;font-size:.8rem">${esc(p.initials)}</span>`;
-        const tags = portfolioRead(p).tags.slice(0, 2);
-        const meta = `<span style="display:inline-flex;gap:.4rem;align-items:center;flex-wrap:wrap">${miniIcon(groupIcon(p.group))}${esc(typeLabel(p.kind))}${signalRow(tags)}</span>`;
-        return `<tr tabindex="0" role="button" data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(av, p.name, meta)}</td><td><div class="mz-perf-cell">${perfHero(p.ret)}${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--spark', unit: 'index' })}</div></td><td class="mz-cell-num">${p.count}<span class="mz-cell-context">${t('cmp.disclosures')}</span></td><td>${freshEl(p.fresh)}</td><td>${compliancePill(flag.tone)}</td><td>${starBtn(p.name)}</td></tr>`;
-      }).join('') || emptyRow(7);
+        const date = latestFiling(p.rows);
+        return `<tr tabindex="0" role="button" data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(esc(p.initials), p.name, esc(typeLabel(p.kind)))}</td><td><div class="mz-perf-cell">${portfolioReturn(p.ret)}${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--spark', unit: 'index', color: portfolioColor(p.ret.val) })}</div></td><td class="mz-cell-num">${p.count}<span class="mz-cell-context">${LANG === 'ar' ? 'إفصاح' : p.count === 1 ? 'Disclosure' : 'Disclosures'}</span></td><td class="mz-cell-num">${p.holdings}<span class="mz-cell-context">${LANG === 'ar' ? 'أسهم' : p.holdings === 1 ? 'Stock' : 'Stocks'}</span></td><td>${date ? esc(shortDate(date)) : '—'}<span class="mz-cell-context">${p.fresh == null ? t('dtl.pending') : `${p.fresh}${LANG === 'ar' ? 'ي مضت' : 'd ago'}`}</span></td><td>${compliancePill(portfolioTone(p))}</td><td>${starBtn(p.name)}</td></tr>`;
+      }).join('') || emptyRow(8);
       cards.innerHTML = list.map((p, i) => portfolioCard(p, i)).join('');
     } else if (S.sMetric === 'flow') {
       renderFlowBoard(list, thead, tbody, cards);
@@ -916,17 +930,17 @@
   const emptyRow = (cols) => `<tr><td colspan="${cols}"><div class="mz-state"><div class="mz-state__content"><h3>${t('empty.title')}</h3><p class="mz-muted">${t('empty.body')}</p></div></div></td></tr>`;
 
   function portfolioCard(p, i) {
-    const flag = portfolioFlag(p), sel = S.selected.includes(p.name);
+    const flag = portfolioFlag(p), sel = S.compareMode ? S.selected.includes(p.name) : S.drawer?.type === 'detail' && S.drawer.name === p.name;
     return `<article class="mz-portfolio-card" tabindex="0" role="button" data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}">
       <div style="display:flex;gap:.75rem;align-items:center">
         ${S.compareMode ? `<button class="mz-check-btn" aria-label="${LANG === 'ar' ? 'اختر للمقارنة' : 'Select for comparison'}" data-select="${esc(p.name)}" data-on="${sel}">${sel ? I.check : ''}</button>` : `<span class="mz-rank">${i + 1}</span>`}
         <span class="mz-entity__avatar"><span style="color:var(--mz-cobalt-700);font-weight:800">${esc(p.initials)}</span></span>
         <div style="flex:1;min-width:0"><div class="mz-entity__name">${esc(p.name)}</div><div class="mz-entity__meta">${esc(typeLabel(p.kind))}${p.fresh != null ? ` · ${p.fresh}${LANG === 'ar' ? 'ي منذ الإفصاح' : 'd since filing'}` : ''}</div></div>
-        <div style="text-align:end">${perfHero(p.ret)}</div>
+        <div style="text-align:end">${S.tab === 'portfolios' ? portfolioReturn(p.ret) : perfHero(p.ret)}</div>
       </div>
-      <div style="margin-block-start:.65rem">${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--card', unit: 'index' })}</div>
+      <div style="margin-block-start:.65rem">${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--card', unit: 'index', color: S.tab === 'portfolios' ? portfolioColor(p.ret.val) : undefined })}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-block-start:.6rem;gap:.5rem">
-        ${compliancePill(flag.tone)}
+        ${compliancePill(S.tab === 'portfolios' ? portfolioTone(p) : flag.tone)}
         <span class="mz-muted" style="font-size:var(--mz-text-xs)">${p.count} ${LANG === 'ar' ? 'إفصاح' : (p.count === 1 ? 'disclosure' : 'disclosures')} · ${starBtn(p.name)}</span>
       </div>
     </article>`;
@@ -1006,6 +1020,7 @@
     } else if (S.drawer && S.drawer.type === 'compare') {
       S.drawer = null;
     }
+    document.body.classList.toggle('mz-pf-panel-open', S.tab === 'portfolios' && S.drawer?.type === 'detail');
     const scrim = document.getElementById('scrim');
     if (!S.drawer) { grid.classList.remove('mz-content-grid--drawer-open'); d.hidden = true; d.innerHTML = ''; scrim.hidden = true; lockBodyScroll(false); return; }
     grid.classList.add('mz-content-grid--drawer-open'); d.hidden = false;
@@ -1103,60 +1118,32 @@
   }
   function portfolioDrawer(name) {
     const p = derivePortfolios(S.rows).find((x) => x.name === name); if (!p) return drawerHead(esc(name), { back: true });
-    const flag = portfolioFlag(p);
-    const fc = followerCountOf(name), rk = returnRank(name);
-    const headline = composeHeadline(p.ret.val, { hasActivity: p.count > 0, active: p.count >= 5, quiet: p.count > 0 && p.count < 3, wellFollowed: fc != null && fc >= 100 });
-    // Attraction: lead with a signal that exists. Followers only appear once meaningful — never a
-    // hollow "— followers" line; otherwise rank-by-return carries the attraction.
     const disclosuresLbl = LANG === 'ar' ? 'إفصاح' : (p.count === 1 ? 'disclosure' : 'disclosures');
-    const stats = (fc != null ? dtlStat(fc.toLocaleString(), LANG === 'ar' ? t('dtl.followers') : fc === 1 ? 'follower' : 'followers') : '') +
-      dtlStat(rk ? '#' + rk.rank : '—', rk ? (LANG === 'ar' ? `من ${rk.total} بالعائد` : `of ${rk.total} by return`) : (LANG === 'ar' ? 'الترتيب' : 'rank')) +
-      dtlStat(p.count, disclosuresLbl);
-    const compTag = compliancePill(flag.tone); // compact quiet label (full wording lives in the holdings chips)
-    // Evidence: the disclosed-holdings performance — a single neutral line (compliance never
-    // changes the performance shown). Timeframe-aware via sliceTf(), like every chart.
-    // On "All", frame to the trade window so the (recent) markers spread across the chart.
-    const idxH = frameToTrades(portfolioIndexHist(p.rows), p.rows);
-    // Top holdings, value-weighted, each carrying its weight (% of portfolio) + disclosure date,
-    // its own compliance chip, and a neutral price return.
+    // Preserve the existing disclosed-value weights and holding drill-down.
     const holdings = {};
     for (const r of p.rows) { const h = holdings[r.ticker] || (holdings[r.ticker] = { ticker: r.ticker, company: r.company, label: r.label, v: 0, known: true, d: null }); h.known = h.known && (r[FIELD.positionValue] != null ? isFinite(+r[FIELD.positionValue]) : hasAmount(r)); h.v += fWeightBasis(r); const dd = fDisclosed(r); if (dd && (!h.d || Date.parse(dd) > Date.parse(h.d))) h.d = dd; }
     const weightsKnown = Object.values(holdings).every((h) => h.known);
     const positionWeights = p.rows.every((r) => r[FIELD.positionValue] != null);
     const weightLabel = positionWeights ? t('dtl.weight') : (LANG === 'ar' ? 'من قيمة الإفصاحات' : 'of disclosed value');
     const totalV = Object.values(holdings).reduce((a, h) => a + h.v, 0) || 1;
-    const hs = Object.values(holdings).sort((a, b) => b.v - a.v).slice(0, 6);
-    // Disclosure facts — recent trades, newest first (quiet, below the conclusion).
-    const acts = [...p.rows].sort((a, b) => Date.parse(b.filingDate || '') - Date.parse(a.filingDate || '')).slice(0, 4);
-    const following = S.follows.has(name);
-    const who = { avatar: `<span style="color:var(--mz-cobalt-700);font-weight:800;font-size:.8rem">${esc(p.initials)}</span>`, name, sub: `${typeLabel(p.kind)} · ${p.count} ${disclosuresLbl}` };
-    // Performance chart: the FUND (equal-weight index of holdings) by default; drilling into a
-    // holding (tap it below) swaps the chart to THAT stock with its own disclosed buy/sell points.
     const pick = (S.drawer && S.drawer.chartTicker && histOf(S.drawer.chartTicker).length >= 2) ? S.drawer.chartTicker : null;
-    let perfChart, perfLabel, perfCaption;
-    if (pick) {
-      const trows = p.rows.filter((r) => r.ticker === pick);
-      const th = frameToTrades(histOf(pick), trows);
-      const q = (S.prices[pick] && S.prices[pick].quote != null) ? +S.prices[pick].quote : (th.length ? +th[th.length - 1].c : null);
-      const tl = q != null ? `${fmtPrice(q)} · ${th.length ? shortDate(th[th.length - 1].d) : (LANG === 'ar' ? 'آخر سعر مخزّن' : 'latest cached')}` : '';
-      perfChart = chart(th, { markers: trows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker })), today: tl, axis: true, empty: t('dtl.pending') });
-      perfLabel = `<span class="mz-ltr">${esc(pick)}</span> <button class="mz-linkbtn" data-holding="${esc(pick)}" style="font-size:var(--mz-text-xs)">${LANG === 'ar' ? 'الصندوق ↩' : '↩ Fund'}</button>`;
-      perfCaption = LANG === 'ar' ? `● شراء · ○ بيع مُفصَح عنه لسهم ${esc(pick)} — اسحب لأي نقطة.` : `● disclosed buy · ○ sell for ${esc(pick)} — scrub any point.`;
-    } else {
-      perfChart = chart(idxH, { unit: 'index', markers: p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker })), axis: true, empty: t('dtl.pending') });
-      perfLabel = LANG === 'ar' ? 'الصندوق' : 'Fund';
-      perfCaption = (LANG === 'ar' ? '● شراء · ○ بيع على مؤشّر متساوي الأوزان للحيازات. اضغط سهمًا أدناه لعرض أدائه.' : '● disclosed buy · ○ sell, on an equal-weight index of the holdings. Tap a holding below to chart it.');
-    }
-    const perfSection = `<div class="mz-drawer__section"><div style="display:flex;align-items:center;gap:.4rem;margin-block-end:.5rem"><span class="mz-cmp-metric__label">${t('dtl.perf')}</span><span class="mz-muted" style="font-size:var(--mz-text-xs)">· ${perfLabel}</span></div>${perfChart}<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${perfCaption}</p></div>`;
-    return drawerHead(t('dtl.portfolio'), { back: true, tag: compTag }) +
-      detailHero(who, headline, p.ret, stats) +
-      perfSection +
-      screeningSection(p.rows) +
-      `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${t('dtl.holdings')} <span class="mz-muted" style="font-weight:500;text-transform:none;letter-spacing:0">· ${LANG === 'ar' ? 'اضغط لعرضه في الرسم' : 'tap to chart'}</span></div>${hs.map((h) => { const w = Math.round(h.v / totalV * 100); const on = pick === h.ticker; return `<div class="mz-hold mz-hold--pick" tabindex="0" role="button" data-holding="${esc(h.ticker)}" data-active="${on}"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || '')} · ${weightsKnown && totalV > 0 ? w + '%' : '—'} ${weightLabel} · ${t('dtl.disclosed')} ${h.d ? esc(shortDate(h.d)) : '—'}</div></div>${badge(h.label)}<span style="margin-inline-start:.5rem;min-width:3.4rem;text-align:end">${retNode(priceReturn(h.ticker))}<span class="mz-cell-context">${esc(tfLabelNow())}</span></span></div>`; }).join('')}</div>` +
-      vsMineSection(p) +
-      `<details class="mz-disclosure mz-drawer__section"><summary>${t('dtl.activity')}<span>${acts.length}</span></summary>${acts.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); const evn = entryVsNow(r); return `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:700">${esc(r.ticker)}</div><div class="mz-entity__meta">${disclosedMoney(r)} · ${esc(shortDate(fDisclosed(r)))}${lag != null ? ` · ${t('dtl.filedLater', { n: lag })}` : ''}</div>${evn ? `<div class="mz-entity__meta">${evn}</div>` : ''}</div>${sideTag(r.side)}</div>`; }).join('')}</details>` +
-      `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
-      `<div class="mz-drawer__footer"><button class="mz-button mz-button--${following ? 'secondary' : 'primary'}" style="width:100%" data-follow="${esc(name)}" ${p.holdings < MIN_HOLDINGS ? 'disabled' : ''}>${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button></div>`;
+    const ar = LANG === 'ar', tab = S.drawer?.panelTab || 'overview', latest = latestFiling(p.rows);
+    const tabs = [['overview', ar ? 'نظرة عامة' : 'Overview'], ['holdings', t('dtl.holdings')], ['activity', t('dtl.activity')], ['filings', ar ? 'التقديمات' : 'Filings'], ['insights', ar ? 'رؤى' : 'Insights']];
+    const head = `<div class="mz-drawer__header mz-pf-panel-head"><span class="mz-entity__avatar">${esc(p.initials)}</span><div><h3>${esc(name)}</h3><span class="mz-entity__meta">${esc(typeLabel(p.kind))} ${ar ? 'محفظة' : 'portfolio'}</span></div>${starBtn(name)}<button class="mz-button mz-button--icon" id="drawerClose" aria-label="${ar ? 'إغلاق' : 'Close'}">${I.close}</button></div><div class="mz-pf-panel-tabs" role="tablist">${tabs.map(([k, label]) => `<button role="tab" data-panel-tab="${k}" aria-selected="${tab === k}">${label}</button>`).join('')}</div>`;
+    const insightRead = ar
+      ? `${p.ret.val == null ? 'بيانات العائد قيد الانتظار' : `العائد ${fmtPct(p.ret.val)} ${p.ret.indicative ? 'تقديري منذ الإفصاح' : `للفترة ${tfLabelNow()}`}`}، مع ${p.count} إفصاح عبر ${p.holdings} أسهم.`
+      : `${p.ret.val == null ? 'Performance data is pending' : p.ret.indicative ? `Indicative return since disclosure is ${fmtPct(p.ret.val)}` : `Disclosed holdings returned ${fmtPct(p.ret.val)} over ${S.tf === 'ALL' ? 'the full available period' : tfLabelNow()}`}, with ${p.count} ${disclosuresLbl} across ${p.holdings} stocks.`;
+    const insight = `<div class="mz-pf-insight"><span>${I.info} ${ar ? 'رؤية الذكاء الاصطناعي' : 'AI Insight'}</span><p>${esc(insightRead)}</p></div>`;
+    const activity = (all) => `<div class="mz-pf-activity">${[...p.rows].sort((a, b) => (Date.parse(b[FIELD.filedDate]) || 0) - (Date.parse(a[FIELD.filedDate]) || 0)).slice(0, all ? p.rows.length : 3).map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); return `<div class="mz-pf-event">${I.portfolios}<div><strong>${esc(r.ticker)} · ${sideTag(r.side)}</strong><span>${disclosedMoney(r)} · ${esc(shortDate(fDisclosed(r)) || '—')}${lag == null ? '' : ` · ${t('dtl.filedLater', { n: lag })}`}</span></div><time>${r[FIELD.filedDate] ? esc(shortDate(r[FIELD.filedDate])) : '—'}</time></div>`; }).join('')}</div>`;
+    const holdingsHtml = `<div class="mz-drawer__section">${Object.values(holdings).sort((a, b) => b.v - a.v).map((h) => `<div class="mz-hold mz-hold--pick" tabindex="0" role="button" data-holding="${esc(h.ticker)}" data-active="${pick === h.ticker}"><div class="mz-hold__n"><strong>${esc(h.ticker)}</strong><div class="mz-entity__meta">${esc(h.company || '')} · ${weightsKnown ? Math.round(h.v / totalV * 100) + '%' : '—'} ${weightLabel} · ${h.d ? esc(shortDate(h.d)) : '—'}</div></div>${badge(h.label)}</div>`).join('')}</div>`;
+    const methodology = `<details class="mz-pf-methodology" ${S.drawer?.methodology ? 'open' : ''}><summary>${ar ? 'عرض المنهجية' : 'View methodology'} ${I.chevronRight}</summary>${screeningSection(p.rows)}<p class="mz-muted">${t('dtl.compNote')} ${t('dtl.evNote')}</p></details>`;
+    const perfSection = `<section class="mz-drawer__section mz-pf-performance"><h3>${t('dtl.perf')} (${esc(tfLabelNow())})${pick ? ` · ${esc(pick)}` : ''}</h3>${portfolioReturn(pick ? returnOf(histOf(pick), null) : p.ret)}${pick ? `<button class="mz-linkbtn" data-holding="${esc(pick)}">↩ ${ar ? 'المحفظة' : 'Portfolio'}</button>` : ''}${chart(pick ? sliceTf(histOf(pick)) : sliceTf(portfolioIndexHist(p.rows)), { unit: pick ? 'price' : 'index', axis: true, area: true, valueAxis: !pick, color: portfolioColor(pick ? returnOf(histOf(pick), null).val : p.ret.val), empty: t('dtl.pending') })}</section>`;
+    const overview = perfSection + `<div class="mz-pf-panel-stats"><div><span>${ar ? 'الإفصاحات' : 'Disclosures'}</span><strong>${p.count}</strong><small>${ar ? 'الإجمالي' : 'Total'}</small></div><div><span>${t('dtl.holdings')}</span><strong>${p.holdings}</strong><small>${ar ? 'أسهم' : 'Stocks'}</small></div><div><span>${ar ? 'آخر تقديم' : 'Latest filing'}</span><strong>${latest ? esc(shortDate(latest)) : '—'}</strong><small>${p.fresh == null ? t('dtl.pending') : p.fresh + (ar ? 'ي مضت' : 'd ago')}</small></div></div><section class="mz-pf-status-card"><h3>${ar ? 'حالة ميزان' : 'Mizan Status'}</h3>${compliancePill(portfolioTone(p))}<p>${ar ? 'وفق منهجية الفحص الحالية.' : 'Based on current screening methodology.'}</p>${methodology}</section><section class="mz-drawer__section"><div class="mz-section-title"><h3>${ar ? 'النشاط الأخير' : 'Recent activity'}</h3><button class="mz-linkbtn" data-panel-tab="activity">${ar ? 'عرض الكل' : 'View all'} ${I.chevronRight}</button></div>${activity(false)}</section>${insight}`;
+    const filingGroups = new Map();
+    p.rows.forEach((r) => { const d = r[FIELD.filedDate]; if (d && isFinite(Date.parse(d))) { const group = filingGroups.get(d) || []; group.push(r); filingGroups.set(d, group); } });
+    const filings = `<section class="mz-drawer__section"><h3>${ar ? 'التقديمات المُفصَح عنها' : 'Disclosed filings'}</h3>${[...filingGroups].sort(([a], [b]) => Date.parse(b) - Date.parse(a)).map(([d, rows]) => `<div class="mz-pf-event">${I.portfolios}<div><strong>${esc(shortDate(d))}</strong><span>${rows.length} ${ar ? 'إفصاح' : rows.length === 1 ? 'disclosure' : 'disclosures'} · ${esc([...new Set(rows.map((r) => r.ticker))].join(', '))}</span></div><time>${daysSince(d)}${ar ? 'ي مضت' : 'd ago'}</time></div>`).join('') || `<p class="mz-muted">${t('dtl.pending')}</p>`}</section>`;
+    return head + (tab === 'overview' ? overview : tab === 'holdings' ? perfSection + holdingsHtml : tab === 'activity' ? `<section class="mz-drawer__section">${activity(true)}</section>` : tab === 'filings' ? filings : `<section class="mz-drawer__section">${insight}${vsMineSection(p)}</section>`);
+
   }
 
   /* ---------------------------------------------------------------- main render */
@@ -1168,15 +1155,16 @@
     renderChrome(); renderToolbar(); renderList(); renderDrawer();
     // deferred deep-link drawer opens
     if (S._openStock) { S.drawer = { type: 'evidence', ticker: S._openStock }; S._openStock = null; renderDrawer(); }
-    if (S._openPortfolio) { S.drawer = { type: 'detail', name: S._openPortfolio }; S._openPortfolio = null; renderDrawer(); }
+    if (S._openPortfolio) { S.drawer = { type: 'detail', name: S._openPortfolio }; S._openPortfolio = null; renderDrawer(); renderList(); }
   }
 
   /* ---------------------------------------------------------------- events (delegated) */
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-theme-pick],[data-star],[data-select],[data-holding],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#themeToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#drawerBack,#clearChips,#trayOpen,#bellBtn,#myImportBtn,#mySampleBtn,#myClearBtn');
+    const el = e.target.closest('[data-panel-tab],[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-theme-pick],[data-star],[data-select],[data-holding],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#themeToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#drawerBack,#clearChips,#trayOpen,#bellBtn,#myImportBtn,#mySampleBtn,#myClearBtn');
     if (!el) { if (S.openMenu) { S.openMenu = null; closeMenus(); } return; }
     const has = (a) => el.hasAttribute(a) || el.id === a;
 
+    if (el.dataset.panelTab) { if (S.drawer) { S.drawer.panelTab = el.dataset.panelTab; renderDrawer(); } return; }
     if (el.dataset.tab) { S.tab = el.dataset.tab; go('/' + el.dataset.tab); return; }
     if (el.dataset.nav) { e.preventDefault(); S.tab = el.dataset.nav; go('/' + el.dataset.nav); return; }
     if (el.dataset.rail !== undefined && el.dataset.rail) { e.preventDefault(); go('/' + el.dataset.rail); return; }
@@ -1213,7 +1201,12 @@
     if (e.key === 'Escape') { S.openMenu = null; closeMenus(); closeDrawer(); }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-row], [data-holding]')) { e.preventDefault(); e.target.click(); }
   });
-  document.getElementById('search').addEventListener('input', (e) => { S.query = e.target.value; renderList(); });
+  document.addEventListener('change', (e) => {
+    if (e.target.id === 'portfolioSort') { S.pMetric = e.target.value; render(); }
+    if (e.target.id === 'portfolioStatus') { S.compliance = e.target.value; render(); }
+  });
+  document.addEventListener('input', (e) => { if (e.target.id === 'portfolioSearch') { S.query = e.target.value; document.getElementById('search').value = S.query; renderList(); } });
+  document.getElementById('search').addEventListener('input', (e) => { S.query = e.target.value; const local = document.getElementById('portfolioSearch'); if (local) local.value = S.query; renderList(); });
   document.getElementById('scrim').addEventListener('click', closeDrawer);
 
   // Close a drawer and, if we're on a detail route, return to the tab's list URL.
@@ -1222,7 +1215,7 @@
     const p = location.protocol === 'file:' ? location.hash.slice(1) : location.pathname;
     if (p.startsWith('/stock/')) setPath('/stocks');
     else if (p.startsWith('/portfolio/')) setPath('/portfolios');
-    renderDrawer();
+    renderDrawer(); renderList();
   }
 
   function toggleFollow(id) {
