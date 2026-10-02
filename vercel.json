@@ -6,5 +6,8 @@
   "rewrites": [
     { "source": "/api/follower-counts", "destination": "/api/follows?counts=1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/rescreen", "schedule": "0 7 * * *" }
   ]
 }
