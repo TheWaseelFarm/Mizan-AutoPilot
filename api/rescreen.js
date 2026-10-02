@@ -15,11 +15,7 @@ const BATCH = 25;
 const GRACE_MS = 10 * 60 * 1000; // a ticker refreshed within this window counts as done for the sweep
 
 export default async function handler(req, res) {
-  // Auth: the cron secret (header or ?secret=) OR a temporary throwaway token in ?t= so the
-  // one-time screening backfill can be run from a browser link without retrieving CRON_SECRET
-  // (Vercel hides it). The token path is removed once the backfill is complete.
-  const viaToken = req.query && req.query.t === "mizan-htcheck-4Kp9Qx2vRt";
-  if (!viaToken && !requireCron(req, res)) return;
+  if (!requireCron(req, res)) return;
   try {
     const db = supabase();
 

@@ -9,37 +9,8 @@ import { isAuthConfigured } from "./_lib/auth.js";
 
 const has = (k) => !!(process.env[k] && String(process.env[k]).trim());
 
-export default async function handler(req, res) {
+export default async function handler(_req, res) {
   res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=120");
-
-  // TEMP screening field-path probe: /api/status?probe=AAPL&t=<token> returns the RAW provider
-  // response for one ticker, so the exact adapter field paths can be confirmed before finalizing
-  // the halalterminal.js / zoya.js mapping. Token-guarded; returns only public company ratios,
-  // NEVER an env secret. Folded into this existing endpoint to stay under Vercel's 12-function
-  // limit. Removed once the field paths are verified.
-  if (req.query && req.query.probe) {
-    if (req.query.t !== "mizan-htcheck-4Kp9Qx2vRt") {
-      return res.status(401).json({ error: "Unauthorized — open the exact link provided." });
-    }
-    const pkey = process.env.SCREENING_API_KEY;
-    if (!pkey) {
-      return res.status(200).json({ ok: false, error: "SCREENING_API_KEY is not set on this deployment — add it in Vercel env vars and redeploy, then retry this link." });
-    }
-    const ticker = (String(req.query.probe).toUpperCase().replace(/[^A-Z.\-]/g, "").slice(0, 8)) || "AAPL";
-    const provider = String(process.env.SCREENING_PROVIDER || "halalterminal").toLowerCase();
-    const base = process.env.SCREENING_API_BASE || (provider === "zoya" ? "https://api.zoya.finance" : "https://api.halalterminal.com");
-    const url = provider === "zoya" ? `${base}/graphql` : `${base}/api/screen/${encodeURIComponent(ticker)}`;
-    try {
-      const r = provider === "zoya"
-        ? await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-api-key": pkey }, body: JSON.stringify({ query: "query($s:String!){advancedCompliance(symbol:$s){__typename}}", variables: { s: ticker } }) })
-        : await fetch(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json", "X-API-Key": pkey }, body: "{}" });
-      const text = await r.text();
-      let json; try { json = JSON.parse(text); } catch { json = null; }
-      return res.status(200).json({ ok: r.ok, http: r.status, provider, ticker, url, raw: json != null ? json : String(text).slice(0, 4000) });
-    } catch (e) {
-      return res.status(200).json({ ok: false, provider, ticker, url, error: String(e.message || e).slice(0, 300) });
-    }
-  }
 
   const config = {
     supabase: has("SUPABASE_URL") && has("SUPABASE_SERVICE_ROLE_KEY"),
