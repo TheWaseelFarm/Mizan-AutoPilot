@@ -14,7 +14,8 @@ export default async function handler(_req, res) {
 
   const config = {
     supabase: has("SUPABASE_URL") && has("SUPABASE_SERVICE_ROLE_KEY"),
-    fmp: has("FMP_API_KEY"),                 // real disclosures (SEC/Congress) + real prices
+    fmp: has("FMP_API_KEY"),                 // real disclosures (SEC/Congress) via FMP
+    twelvedata: has("TWELVEDATA_API_KEY"),   // real prices (Twelve Data; FMP prices are paywalled)
     quiver: has("QUIVER_API_KEY"),
     screening: has("SCREENING_API_KEY"),     // real AAOIFI screening (Zoya / Halal Terminal)
     screeningProvider: process.env.SCREENING_PROVIDER || (has("SCREENING_API_KEY") ? "(configured)" : "mock"),
