@@ -746,8 +746,8 @@
   function renderChrome() {
     document.documentElement.lang = LANG; document.documentElement.dir = LANG === 'ar' ? 'rtl' : 'ltr';
     // rail
-    const rail = { following: [I.star, 'tab.following'], alerts: [I.bell, 'tab.alerts'], account: [I.user, 'tab.account'] };
-    document.querySelectorAll('.mz-rail-link[data-rail]').forEach((a) => { const k = a.dataset.rail; a.innerHTML = `<span style="width:1.4rem">${rail[k][0]}</span><span>${t(rail[k][1])}</span>`; a.setAttribute('aria-current', S.tab === k ? 'page' : 'false'); });
+    const navItems = [['portfolios', I.portfolios, 'tab.portfolios'], ['stocks', I.stocks, 'tab.stocks'], ['following', I.star, 'tab.following'], ['alerts', I.bell, 'tab.alerts'], ['account', I.user, 'tab.account']];
+    document.getElementById('railNav').innerHTML = navItems.map(([k, ic, lk]) => `<a href="/${k}" class="mz-rail-link" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
     const lang = document.getElementById('langToggle'); lang.innerHTML = `<span style="width:1.4rem">${I.globe}</span><span>${LANG === 'en' ? 'ع' : 'EN'}</span>`;
     document.getElementById('themeToggle').innerHTML = `<span style="width:1.4rem">${I.user.replace('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', '<circle cx="12" cy="12" r="8"/><path d="M12 4v16"/>')}</span><span>${LANG === 'ar' ? (THEME === 'light' ? 'داكن' : 'فاتح') : (THEME === 'light' ? 'Dark' : 'Light')}</span>`;
     document.getElementById('brandCaption').textContent = LANG === 'ar' ? 'ذكاء السوق' : 'Market intelligence';
@@ -763,8 +763,7 @@
     document.getElementById('themeToggle').setAttribute('aria-label', LANG === 'ar' ? 'تبديل المظهر' : 'Toggle appearance');
     document.getElementById('freshness').textContent = S.live ? t('live') : t('sample');
     // mobile nav
-    const nav = [['portfolios', I.portfolios, 'tab.portfolios', '/portfolios'], ['stocks', I.stocks, 'tab.stocks', '/stocks'], ['following', I.star, 'tab.following', '/following'], ['alerts', I.bell, 'tab.alerts', '/alerts'], ['account', I.user, 'tab.account', '/account']];
-    document.getElementById('mobileNav').innerHTML = nav.map(([k, ic, lk, path]) => `<a href="${path}" class="mz-mobile-nav__item" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
+    document.getElementById('mobileNav').innerHTML = navItems.map(([k, ic, lk]) => `<a href="/${k}" class="mz-mobile-nav__item" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
   }
 
   /* ---------------------------------------------------------------- toolbar */

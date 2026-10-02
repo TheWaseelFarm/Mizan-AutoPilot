@@ -59,18 +59,29 @@
   opacity: 0.45;
 }
 
+.mz-rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin-block-start: var(--mz-space-4);
+}
+
 .mz-rail-link {
   display: flex;
-  width: 4rem;
-  min-height: 3.75rem;
-  flex-direction: column;
+  min-height: 2.625rem;
   align-items: center;
-  justify-content: center;
-  gap: var(--mz-space-1);
+  gap: var(--mz-space-3);
+  padding-inline: var(--mz-space-3);
   border-radius: var(--mz-radius-sm);
   color: var(--mz-rail-ink);
-  font-size: 0.625rem;
+  font-size: var(--mz-text-sm);
   font-weight: 600;
+  text-align: start;
+}
+
+/* Primary nav now lives in the sidebar (spec §7/§12); the topbar is context only (§13). */
+.mz-product-tabs {
+  display: none;
 }
 
 .mz-rail-link:hover,

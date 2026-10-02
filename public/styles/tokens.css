@@ -114,7 +114,7 @@
   --mz-focus-ring: 0 0 0 3px rgb(21 53 83 / 0.16);
 
   /* Layout */
-  --mz-utility-rail: 5.5rem;
+  --mz-utility-rail: 15rem;
   --mz-header-height: 5rem;
   --mz-mobile-nav-height: 4.75rem;
   --mz-drawer-width: 29rem;
