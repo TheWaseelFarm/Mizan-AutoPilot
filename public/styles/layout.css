@@ -134,3 +134,25 @@
   direction: rtl;
 }
 
+
+/* Portfolios: compact terminal chrome and a contextual panel beside the whole view. */
+.mz-portfolios-page { --mz-utility-rail: 11.25rem; --mz-header-height: 3.75rem; --mz-drawer-width: 25rem; }
+.mz-portfolios-page .mz-utility-rail { padding: 1.25rem 0.625rem; }
+.mz-portfolios-page .mz-utility-rail__brand { display: block; width: auto; height: auto; margin: 0 0.5rem 1.75rem; color: var(--mz-on-accent); font-size: 1.65rem; font-weight: 800; letter-spacing: -0.06em; }
+.mz-portfolios-page .mz-utility-rail__brand small { display: block; margin-block-start: 0.1rem; color: var(--mz-rail-ink); font-size: 0.625rem; font-weight: 500; letter-spacing: 0; }
+.mz-portfolios-page .mz-topbar { padding-inline: 1.5rem; }
+.mz-portfolios-page .mz-topbar > .mz-wordmark, .mz-portfolios-page #topTabs { display: none; }
+.mz-portfolios-page .mz-topbar > .mz-search { flex: 0 1 29rem; }
+.mz-portfolios-page .mz-main { max-width: none; padding: 1rem 1.5rem; }
+.mz-portfolios-page .mz-page-heading { margin-block-end: 1.15rem; }
+.mz-portfolios-page #headingEnd, .mz-portfolios-page #subtabs, .mz-portfolios-page #whyBtn { display: none; }
+.mz-portfolios-page #timeRow { float: inline-start; margin: 0 1rem 1.6rem 0 !important; }
+.mz-portfolios-page #controlRow { min-height: 2.75rem; margin-block-end: 1.6rem; }
+.mz-portfolios-page #controlRow > .mz-pos, .mz-portfolios-page #controlRow > .mz-toolbar__end { display: none; }
+.mz-portfolios-page #chips { clear: both; }
+.mz-portfolios-page #resultMeta { margin: 0 !important; }
+.mz-portfolios-page .mz-content-grid--drawer-open { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 75rem) {
+  .mz-portfolios-page.mz-pf-panel-open .mz-main { padding-inline-end: calc(var(--mz-drawer-width) + 1.5rem); }
+  .mz-portfolios-page.mz-pf-panel-open #drawer { position: fixed; inset-block: var(--mz-header-height) 0; inset-inline-end: 0; width: var(--mz-drawer-width); max-height: none; border: 0; border-inline-start: var(--mz-border); border-radius: 0; box-shadow: -4px 0 12px rgb(16 24 40 / 0.03); }
+}
