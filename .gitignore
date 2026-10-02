@@ -3,3 +3,6 @@ node_modules/
 .env.local
 .vercel
 .DS_Store
+
+# Claude<->Codex orchestrator scratch
+.ai-orchestrator/
