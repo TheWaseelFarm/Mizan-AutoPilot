@@ -1,13 +1,15 @@
 // GET /api/refresh-prices?secret=CRON_SECRET
-// Refreshes cached FMP quotes + daily history for the distinct tickers in `disclosures`,
-// OLDEST updated_at first. Batched to respect the FMP free tier (250 calls/day):
-// each ticker costs ~2 FMP calls (quote + history), so MAX_TICKERS keeps a run well under cap.
-// Idempotent; returns { done, failed, remaining } so cron-job.org can call it repeatedly.
+// Refreshes cached quotes + daily history (via Twelve Data) for the distinct tickers in
+// `disclosures`, OLDEST updated_at first. One API call per ticker; MAX_TICKERS keeps a run
+// under Twelve Data's free per-minute cap (8/min).
+// Idempotent; returns { done, failed, remaining } so the daily routine can call it repeatedly.
 import { requireCron } from "./_lib/cron.js";
 import { supabase } from "./_lib/supabase.js";
-import { fetchPrice } from "./_lib/prices/fmp.js";
+import { fetchPrice } from "./_lib/prices/twelvedata.js";
 
-const MAX_TICKERS = 40; // ~80 FMP calls/run; 2–3 runs/day stays under 250.
+const MAX_TICKERS = 8; // Twelve Data free tier: 8 requests/min. One run (1 call/ticker) stays
+                       // under the per-minute cap; the daily routine calls this several times
+                       // (oldest-first) to cycle every ticker.
 
 export default async function handler(req, res) {
   if (!requireCron(req, res)) return;
@@ -64,9 +66,9 @@ export default async function handler(req, res) {
       remaining: Math.max(0, ordered.length - batch.length),
       sampleErrors, // first few real FMP messages, for diagnosis
       ...(rateLimited && {
-        hint: "FMP daily quota (250/day free tier) is spent. Wait for reset (~00:00 UTC), " +
-              "then retry. Prices now use 1 call/ticker; also reduce the poll-disclosures cron " +
-              "frequency (every 5 min = 576 calls/day, over the cap — hourly or less is safer).",
+        hint: "Twelve Data rate limit hit (free tier: 8/min, 800/day). The run stops and the " +
+              "remaining tickers are picked up on the next call — the daily routine calls this a " +
+              "few times with gaps so every ticker cycles through.",
       }),
     });
   } catch (e) {
