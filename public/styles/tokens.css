@@ -167,6 +167,9 @@
   --mz-info-700: #9bc2e8;
   --mz-info-50: #1c3350;
   --mz-on-accent: #ffffff;
+  /* Lift the navy brand in dark mode so navy-filled chrome (primary buttons) keeps contrast. */
+  --mz-navy-850: #27507f;
+  --mz-navy-800: #2e5b8f;
   --mz-rail-bg: #0b1320;
   --mz-shadow-sm: 0 4px 20px rgb(0 0 0 / 0.08);
   --mz-shadow-drawer: 0 16px 56px rgb(0 0 0 / 0.28);

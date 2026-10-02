@@ -29,18 +29,18 @@
 }
 
 .mz-button--primary {
-  background: var(--mz-cobalt-600);
-  color: var(--mz-on-accent);
+  background: var(--mz-navy-850);
+  color: #ffffff;
 }
 
 .mz-button--primary:hover {
-  background: var(--mz-cobalt-700);
+  background: var(--mz-navy-800);
 }
 
 .mz-button--secondary {
-  border-color: var(--mz-cobalt-600);
+  border-color: var(--mz-ink-300);
   background: var(--mz-surface);
-  color: var(--mz-cobalt-700);
+  color: var(--mz-ink-800);
 }
 
 .mz-button--ghost {
@@ -109,6 +109,12 @@
   border: var(--mz-border);
   border-radius: var(--mz-radius-sm);
   background: var(--mz-surface);
+}
+
+.mz-search input:focus {
+  outline: none;
+  border-color: var(--mz-navy-800);
+  box-shadow: var(--mz-focus-ring);
 }
 
 .mz-search__icon {
