@@ -38,10 +38,14 @@ export default async function handler(req, res) {
     });
     const batch = ordered.slice(0, BATCH);
 
-    let done = 0, failed = 0;
+    let done = 0, failed = 0, skipped = 0;
     for (const ticker of batch) {
       try {
         const payload = await screenOnce(ticker);          // force fresh (bypass cache)
+        // GUARD: never overwrite existing (possibly real) screening with a no-data/mock payload
+        // when the provider is down — that silently degrades good names to "unscreened" and
+        // empties the feed. Leave the stored screening untouched and move on.
+        if (!payload || /^No screening data/i.test(payload.reasoning || "")) { skipped++; continue; }
         const label = classifyAAOIFI(payload);             // engine decides — never the vendor
         try {
           await db.from("screenings").upsert(
@@ -63,7 +67,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      done, failed,
+      done, failed, skipped,
       remaining: Math.max(0, ordered.length - batch.length),
       live: usingLiveScreener(),
     });

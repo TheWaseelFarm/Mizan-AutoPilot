@@ -24,14 +24,25 @@ const num = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Nu
 const round2 = (n) => Math.round(n * 100) / 100;
 // Halal Terminal ratios are fractions (0.0176 = 1.76%); the AAOIFI engine compares percentages.
 const asPct = (v) => { const n = num(v); return n == null ? null : round2(n * 100); };
+// Halal Terminal v1 returns ratios ALREADY IN PERCENT (nonCompliantRevenuePercent: 1.4 = 1.4%).
+// Take the percent field as-is; fall back to an older fraction-named field (×100) for resilience.
+const pctField = (percentVal, fractionVal) => {
+  const p = num(percentVal);
+  if (p != null) return round2(p);
+  return asPct(fractionVal);
+};
 
 // Business-ACTIVITY screen ONLY -> pass/watch/fail (never the vendor's financial/overall verdict).
 function businessStatusOf(root) {
+  const b = root.business || {};
+  const s = String(b.status || root.business_screen_status || root.shariah_compliance_status || "")
+    .toUpperCase().replace(/[\s-]+/g, "_");
+  if (["NON_COMPLIANT", "NONCOMPLIANT", "FAIL", "IMPERMISSIBLE", "HARAM", "PROHIBITED"].includes(s)) return "fail";
+  if (["QUESTIONABLE", "WATCH", "DOUBTFUL", "REVIEW", "MONITOR"].includes(s)) return "watch";
+  if (["PASS", "COMPLIANT", "PERMISSIBLE", "HALAL"].includes(s)) return "pass";
+  // Boolean-shaped fallback (older response form).
   if (root.business_screen_pass === false) return "fail";
   if (root.questionable_business === true) return "watch";
-  // String fallback if a future response uses a status string instead of the boolean.
-  const s = String(root.business_screen_status || root.shariah_compliance_status || "").toUpperCase().replace(/[\s-]+/g, "_");
-  if (["NON_COMPLIANT", "NONCOMPLIANT", "FAIL", "IMPERMISSIBLE", "HARAM", "PROHIBITED"].includes(s)) return "fail";
   return "pass";
 }
 
@@ -57,14 +68,27 @@ function reasoningFor(businessStatus, impurePct, debtRatio, cashPct) {
 export function mapResponse(resp) {
   if (!resp || resp.notFound) return null;
   const root = resp.data ?? resp.result ?? resp;
+  const ratios = root.ratios || {};
 
-  const debtFrac = root?.by_methodology?.AAOIFI?.mc_trailing_basis?.debt_ratio ?? root.debt_to_market_cap_ratio;
-  const debtRatio = asPct(debtFrac); // interest-bearing debt / market cap (%)
-  const cashPct = asPct(root.liquidity_to_market_cap_ratio ?? root.cash_to_market_cap_ratio); // cash+interest securities / mcap (%)
-  const impurePct = asPct(root?.business_income?.combined_impure_ratio ?? root.interest_income_to_revenue_ratio); // non-permissible income / revenue (%)
+  // interest-bearing debt / market cap (%)
+  const debtRatio = pctField(
+    ratios.interestBearingDebtToMarketCapPercent,
+    root?.by_methodology?.AAOIFI?.mc_trailing_basis?.debt_ratio ?? root.debt_to_market_cap_ratio,
+  );
+  // cash + interest-bearing securities / market cap (%)
+  const cashPct = pctField(
+    ratios.cashAndInterestSecuritiesToMarketCapPercent,
+    root.liquidity_to_market_cap_ratio ?? root.cash_to_market_cap_ratio,
+  );
+  // non-permissible income / revenue (%)
+  const impurePct = pctField(
+    ratios.nonCompliantRevenuePercent,
+    root?.business_income?.combined_impure_ratio ?? root.interest_income_to_revenue_ratio,
+  );
 
+  const hasActivity = (root.business && root.business.status != null) || root.business_screen_pass != null;
   // No raw ratios AND no activity screen -> stop loudly rather than fabricate (per spec).
-  if (debtRatio == null && cashPct == null && impurePct == null && root.business_screen_pass == null) {
+  if (debtRatio == null && cashPct == null && impurePct == null && !hasActivity) {
     throw new Error(
       "NO_RAW_INPUTS: Halal Terminal response exposed no raw debt/cash/impure ratios or activity screen — the adapter mapping needs review before enabling.",
     );
@@ -77,7 +101,7 @@ export function mapResponse(resp) {
 
   return {
     screened: true,
-    business: root.industry || root.sector || root.name || "Screened (Halal Terminal)",
+    business: (root.business && root.business.description) || root.industry || root.sector || root.name || "Screened (Halal Terminal)",
     businessStatus, // from ACTIVITY only, never the vendor verdict
     impurePct: impure,
     debtRatio: debt, // interest-bearing debt / market cap (%)
