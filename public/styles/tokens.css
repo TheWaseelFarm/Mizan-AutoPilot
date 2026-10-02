@@ -1,61 +1,77 @@
 :root {
   color-scheme: light;
 
-  /* Brand and semantic color */
-  --mz-ink-950: #142237;
-  --mz-ink-800: #243349;
-  --mz-ink-700: #3a485b;
-  --mz-ink-600: #526075;
-  --mz-ink-500: #657187;
-  --mz-ink-400: #69768b;
-  --mz-ink-300: #c8ced7;
-  --mz-ink-200: #e1e5eb;
-  --mz-ink-100: #eef1f5;
-  --mz-ink-50: #f7f8fa;
+  /* ------------------------------------------------------------------ brand navy
+     Institutional navy (spec §9/§12/§23): sidebar, nav, primary actions.
+     Reserved for brand/chrome — NOT for performance (cobalt/ink) or verdicts. */
+  --mz-navy-950: #071525;
+  --mz-navy-900: #0b1e33;
+  --mz-navy-850: #0f2742;
+  --mz-navy-800: #153553;
 
-  --mz-canvas: #f2f3f5;
+  /* ------------------------------------------------------------------ neutrals
+     Role-based ink ramp, anchored to the spec's exact text/border values:
+     text-primary #17212B · text-secondary #65717E · text-muted #8A96A3 ·
+     border #E3E8EE · border-strong #D3DAE3 · subtle surface #F9FAFB. */
+  --mz-ink-950: #17212b;  /* text primary */
+  --mz-ink-900: #1f2a36;
+  --mz-ink-800: #2b3845;
+  --mz-ink-700: #3d4a58;  /* strong secondary / headings */
+  --mz-ink-600: #65717e;  /* text secondary */
+  --mz-ink-500: #76818d;
+  --mz-ink-400: #8a96a3;  /* text muted */
+  --mz-ink-300: #d3dae3;  /* border strong */
+  --mz-ink-200: #e3e8ee;  /* border */
+  --mz-ink-100: #edf0f4;
+  --mz-ink-50: #f9fafb;   /* subtle surface */
+
+  --mz-canvas: #f5f7fa;
   --mz-surface: #ffffff;
   --mz-surface-raised: #ffffff;
-  --mz-surface-selected: #edf2ff;
+  --mz-surface-selected: #ebf3fa;
 
+  /* ------------------------------------------------------------------ performance
+     Cobalt/ink ONLY (CLAUDE.md): returns, prices, charts. Never a verdict hue. */
   --mz-cobalt-700: #234db1;
   --mz-cobalt-600: #315ed4;
   --mz-cobalt-500: #4874e3;
   --mz-cobalt-100: #dfe8ff;
   --mz-cobalt-50: #f0f4ff;
 
-  --mz-compliant-700: #08644f;
-  --mz-compliant-600: #14866d;
-  --mz-compliant-100: #d7f3eb;
-  --mz-compliant-50: #eefaf6;
+  /* ------------------------------------------------------------------ verdict
+     RESERVED for the Sharia verdict only. Tuned to the spec's institutional
+     semantic tones: positive #23825E · warning #A97819 · negative #BC4646. */
+  --mz-compliant-700: #1b6a4c;
+  --mz-compliant-600: #23825e;
+  --mz-compliant-100: #cdebdd;
+  --mz-compliant-50: #eaf6f0;
 
-  --mz-purify-700: #946200;
-  --mz-purify-600: #c88719;
-  --mz-purify-100: #f8e7bd;
-  --mz-purify-50: #fff8e8;
+  --mz-purify-700: #8a6212;
+  --mz-purify-600: #a97819;
+  --mz-purify-100: #f2e3c0;
+  --mz-purify-50: #fbf4e4;
 
-  --mz-noncompliant-700: #a62f3a;
-  --mz-noncompliant-600: #d94b55;
-  --mz-noncompliant-100: #ffd9dc;
-  --mz-noncompliant-50: #fff2f3;
+  --mz-noncompliant-700: #9c3a3a;
+  --mz-noncompliant-600: #bc4646;
+  --mz-noncompliant-100: #f3d2d2;
+  --mz-noncompliant-50: #fbecec;
 
   --mz-review-700: #526075;
+  --mz-review-600: #69768b;
   --mz-review-100: #e1e5eb;
   --mz-review-50: #f7f8fa;
 
-  --mz-info-700: var(--mz-cobalt-700);
-  --mz-info-50: var(--mz-cobalt-50);
+  --mz-info-700: #326da8;
+  --mz-info-50: #ebf3fa;
   --mz-warning-700: var(--mz-ink-700);
   --mz-warning-50: var(--mz-ink-50);
   --mz-danger-700: var(--mz-ink-700);
   --mz-danger-50: var(--mz-ink-50);
 
   --mz-on-accent: #ffffff;
-  --mz-rail-bg: #18283f;
-  --mz-rail-ink: #b4c2d7;
+  --mz-rail-bg: var(--mz-navy-950);
+  --mz-rail-ink: #a9b6c6;
   --mz-rail-active: #ffffff;
-  --mz-ink-900: #18283f;
-  --mz-review-600: #69768b;
 
   /* Typography — installed system faces keep the terminal fully offline. */
   --mz-font-sans: "Avenir Next", Avenir, "Segoe UI", "Geeza Pro", "IBM Plex Sans Arabic",
@@ -74,7 +90,7 @@
   --mz-leading-normal: 1.5;
   --mz-leading-relaxed: 1.65;
 
-  /* Spacing */
+  /* Spacing — 8px rhythm (spec §8). */
   --mz-space-1: 0.25rem;
   --mz-space-2: 0.5rem;
   --mz-space-3: 0.75rem;
@@ -85,17 +101,17 @@
   --mz-space-10: 2.5rem;
   --mz-space-12: 3rem;
 
-  /* Shape */
+  /* Shape — spec radii (sm 6 · md 10 · lg 14). */
   --mz-radius-sm: 0.375rem;
   --mz-radius-md: 0.625rem;
-  --mz-radius-lg: 1rem;
+  --mz-radius-lg: 0.875rem;
   --mz-radius-pill: 999px;
 
-  /* Borders and elevation */
+  /* Borders and elevation — restrained institutional shadows (spec §10). */
   --mz-border: 1px solid var(--mz-ink-200);
-  --mz-shadow-sm: 0 2px 8px rgb(20 34 55 / 0.025), 0 12px 28px rgb(20 34 55 / 0.025);
+  --mz-shadow-sm: 0 1px 2px rgb(16 24 40 / 0.03), 0 2px 8px rgb(16 24 40 / 0.05);
   --mz-shadow-drawer: 0 12px 48px rgb(20 34 55 / 0.12);
-  --mz-focus-ring: 0 0 0 3px rgb(36 87 214 / 0.22);
+  --mz-focus-ring: 0 0 0 3px rgb(21 53 83 / 0.16);
 
   /* Layout */
   --mz-utility-rail: 5.5rem;
@@ -126,6 +142,7 @@
   --mz-ink-200: #2d3c51;
   --mz-ink-100: #233247;
   --mz-ink-50: #1b293b;
+  --mz-ink-900: #c0cde0;
   --mz-cobalt-700: #9ab9ff;
   --mz-cobalt-600: #729dff;
   --mz-cobalt-500: #87adff;
@@ -147,7 +164,9 @@
   --mz-review-600: var(--mz-ink-400);
   --mz-review-100: var(--mz-ink-200);
   --mz-review-50: var(--mz-ink-50);
-  --mz-on-accent: #10213d;
+  --mz-info-700: #9bc2e8;
+  --mz-info-50: #1c3350;
+  --mz-on-accent: #ffffff;
   --mz-rail-bg: #0b1320;
   --mz-shadow-sm: 0 4px 20px rgb(0 0 0 / 0.08);
   --mz-shadow-drawer: 0 16px 56px rgb(0 0 0 / 0.28);
