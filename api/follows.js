@@ -4,6 +4,7 @@
 // Per-user via `user_id` = the authed username (single-admin today; real accounts later,
 // spec §7). Auth-gated like /api/watchlist. Tolerates the `follows` table being absent so
 // the app degrades to local follow state before the migration is run.
+import { parseBody } from "./_lib/http.js";
 import { supabase } from "./_lib/supabase.js";
 import { requireAuth } from "./_lib/auth.js";
 import { aggregateFollowerCounts } from "./_lib/followers.js";
@@ -25,10 +26,15 @@ export default async function handler(req, res) {
 
   const user = requireAuth(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
-  const db = supabase();
+  const body = req.method === "POST" ? parseBody(req) : null;
+  if (req.method === "POST" && !body) return res.status(400).json({ error: "Invalid request body" });
+  if (req.method === "POST" && !String(body.portfolio || "").trim()) {
+    return res.status(400).json({ error: "portfolio required" });
+  }
   const userId = user.username;
 
   try {
+    const db = supabase();
     if (req.method === "GET") {
       const { data, error } = await db
         .from("follows").select("portfolio,created_at")
@@ -38,10 +44,8 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
       const portfolio = String(body.portfolio || "").trim();
       const on = body.on !== false; // default: follow
-      if (!portfolio) return res.status(400).json({ error: "portfolio required" });
 
       if (on) {
         const { error } = await db

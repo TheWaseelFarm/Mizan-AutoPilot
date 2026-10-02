@@ -51,10 +51,25 @@ AUTH_SALT=<your-salt> node scripts/hash.js "<your-password>"
 ```
 Copy the printed hash.
 
-**4. Import the repo into Vercel** and set Environment Variables (see `.env.example`):
+**4. Import the repo into Vercel** and set Environment Variables (see `env.example`):
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`,
 `AUTH_SALT` (same salt as step 3), `AUTH_SECRET`, `CRON_SECRET`. Leave `QUIVER_API_KEY`
 and `SCREENING_API_KEY` blank for now. Deploy.
+
+**Before rolling out to an existing deployment**, set both `AUTH_SECRET` and
+`CRON_SECRET` in Vercel. Use independent random secrets of at least 16 characters
+(generate each with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`).
+`AUTH_SECRET` must have at least 16 non-padding characters and must not be
+`change-me-random`. An unset or invalid value makes login return 500 and protected
+routes return 401. An unset or blank `CRON_SECRET` makes all cron endpoints return
+503. Changing `AUTH_SECRET` invalidates existing sessions; sign in again.
+Keep `AUTH_SALT` identical to the salt used to generate `ADMIN_PASSWORD_HASH`.
+
+Login throttling is best effort per warm serverless instance, not a deployment-wide
+limit. It relies on the hosting proxy overwriting `x-forwarded-for`; a successful
+login resets that IP's counter. Shared rate-limit storage and migration from the
+legacy SHA-256 + global salt password hash to scrypt/PBKDF2 remain follow-up work
+(the password hash format is preserved for existing deployments).
 
 **5. Open your Vercel URL** (https://mizan-auto-pilot.vercel.app). The feed loads from
 Supabase (the seed). Done — it's live.
@@ -81,7 +96,7 @@ booleans only, never secret values). It tells you at a glance whether the app is
 **real** data or the embedded **sample** fallback, and what's missing:
 
 - `config` — which integrations are configured: `supabase`, `fmp` (disclosures **and** prices),
-  `screening`, `cronSecret`.
+  `screening`, `cronSecret`, `authSecret` (`true` only when the signing secret is valid).
 - `data` — row counts + freshness for `disclosures` (with verdict breakdown), `prices`,
   `screenings`, `follows`.
 - `ready` / `servingSample` + `notes` — e.g. *"No disclosures cached — run

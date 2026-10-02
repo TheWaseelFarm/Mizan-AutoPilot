@@ -5,6 +5,7 @@
 //
 // Hit it on your phone: https://<app>.vercel.app/api/status
 import { supabase } from "./_lib/supabase.js";
+import { isAuthConfigured } from "./_lib/auth.js";
 
 const has = (k) => !!(process.env[k] && String(process.env[k]).trim());
 
@@ -18,6 +19,7 @@ export default async function handler(_req, res) {
     screening: has("SCREENING_API_KEY"),     // real AAOIFI screening (Zoya / Halal Terminal)
     screeningProvider: process.env.SCREENING_PROVIDER || (has("SCREENING_API_KEY") ? "(configured)" : "mock"),
     cronSecret: has("CRON_SECRET"),
+    authSecret: isAuthConfigured(),
   };
   const out = { ok: true, time: new Date().toISOString(), config };
 

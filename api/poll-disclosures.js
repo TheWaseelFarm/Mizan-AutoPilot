@@ -1,6 +1,7 @@
 // GET /api/poll-disclosures?secret=CRON_SECRET
 // Triggered by cron-job.org (e.g. every 5 min). Ingest -> screen -> classify -> store.
 // De-dupes on a unique key so re-runs are idempotent.
+import { requireCron } from "./_lib/cron.js";
 import { supabase } from "./_lib/supabase.js";
 import { classifyAAOIFI } from "./_lib/aaoifi.js";
  import { fetchNewDisclosures } from "./_lib/sources/fmp.js";  // -> ./sources/quiver.js later
@@ -46,8 +47,7 @@ function toRow(r) {
 }
 
 export default async function handler(req, res) {
-  const secret = req.query.secret || req.headers["x-cron-secret"];
-  if (secret !== process.env.CRON_SECRET) return res.status(401).json({ error: "Unauthorized" });
+  if (!requireCron(req, res)) return;
   try {
     const db = supabase();
 
