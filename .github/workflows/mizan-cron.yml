@@ -1,11 +1,11 @@
 name: Mizān cron
 
-# Scheduled jobs for Mizān, run from GitHub Actions (replaces the external cron-job.org
-# jobs — more reliable and visible here). Each step calls a Vercel API endpoint and
-# authenticates with the CRON_SECRET repository secret via an Authorization: Bearer header,
+# Scheduled jobs for Mizān, run from GitHub Actions. Each step calls a Vercel API endpoint
+# and authenticates with the CRON_SECRET repository secret via an Authorization: Bearer header,
 # which api/_lib/cron.js (requireCron) accepts. Set the secret under:
 #   Settings → Secrets and variables → Actions → New repository secret → name: CRON_SECRET
-# You can also run any job on demand from the Actions tab (Run workflow).
+# (its value MUST equal the CRON_SECRET env var in Vercel).
+# Run any job on demand from the Actions tab (Run workflow).
 
 on:
   schedule:
@@ -22,28 +22,23 @@ env:
 
 jobs:
   ingest:
-    # the 30-min schedule, or any manual run
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '*/30 * * * *' }}
     runs-on: ubuntu-latest
     steps:
       - name: Poll disclosures
         run: |
-          curl -fsS --max-time 60 \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "$BASE/api/poll-disclosures" | head -c 800; echo
+          resp=$(curl -fsS --max-time 60 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/poll-disclosures")
+          echo "poll-disclosures -> $resp"
       - name: Refresh prices
         run: |
-          curl -fsS --max-time 60 \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "$BASE/api/refresh-prices" | head -c 800; echo
+          resp=$(curl -fsS --max-time 60 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/refresh-prices")
+          echo "refresh-prices -> $resp"
 
   rescreen:
-    # the daily schedule, or any manual run
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 7 * * *' }}
     runs-on: ubuntu-latest
     steps:
       - name: Rescreen tickers (Sharia screening)
         run: |
-          curl -fsS --max-time 120 \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "$BASE/api/rescreen" | head -c 800; echo
+          resp=$(curl -fsS --max-time 120 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/rescreen")
+          echo "rescreen -> $resp"
