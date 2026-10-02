@@ -1,16 +1,21 @@
-// GET /api/screen-debug?secret=CRON_SECRET&ticker=AAPL
+// GET /api/screen-debug?t=<token>&ticker=AAPL
 // TEMPORARY diagnostic (remove once the adapter field paths are verified).
 // Returns the RAW screening-provider response for ONE ticker so the exact JSON field paths
-// (debt %, cash %, impure %, business-activity status) can be confirmed before finalizing
-// the halalterminal.js / zoya.js field mapping. Secret-protected; NEVER echoes an env secret.
-import { requireCron } from "./_lib/cron.js";
+// (debt %, cash %, impure %, business-activity status) can be confirmed before finalizing the
+// halalterminal.js / zoya.js field mapping.
+//
+// Guarded by a fixed throwaway token (NOT CRON_SECRET — so the owner can open the link without
+// having to retrieve a hidden secret). It only ever returns PUBLIC company financial-ratio data
+// and NEVER an env secret, and it is short-lived (deleted once the paths are confirmed).
+const TOKEN = "mizan-htcheck-4Kp9Qx2vRt";
 
 export default async function handler(req, res) {
-  if (!requireCron(req, res)) return;
-
+  if (req.query.t !== TOKEN) {
+    return res.status(401).json({ error: "Unauthorized — open the exact link provided." });
+  }
   const key = process.env.SCREENING_API_KEY;
   if (!key) {
-    return res.status(200).json({ ok: false, error: "SCREENING_API_KEY is not set on this deployment — add it in Vercel env vars and redeploy." });
+    return res.status(200).json({ ok: false, error: "SCREENING_API_KEY is not set on this deployment — add it in Vercel env vars and redeploy, then retry this link." });
   }
   const ticker = (String(req.query.ticker || "AAPL").toUpperCase().replace(/[^A-Z.\-]/g, "").slice(0, 8)) || "AAPL";
   const provider = String(process.env.SCREENING_PROVIDER || "halalterminal").toLowerCase();
