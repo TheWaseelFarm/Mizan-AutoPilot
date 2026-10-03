@@ -1,8 +1,9 @@
-@import "./tokens.css";
-@import "./foundations.css";
-@import "./layout.css";
-@import "./components.css";
-@import "./responsive.css";
-
-
-@import "./portfolio-intelligence.css";
+/* Mizan redesign v1 — package CSS (verbatim from mizan-redesign-v1/css), then app-only additions. */
+@import "tokens.css";
+@import "foundations.css";
+@import "layout.css";
+@import "components.css";
+@import "home.css";
+@import "detail.css";
+@import "responsive.css";
+@import "app.css";
