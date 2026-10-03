@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic RESTATEMENT information table (namespace-prefixed, like some filing agents emit).
+     Covers: one security split over two rows (aggregated), put + call option rows (skipped),
+     a principal-amount note (skipped), an unmappable CUSIP and a closed-end fund (both skipped). -->
+<ns1:informationTable xmlns:ns1="http://www.sec.gov/edgar/document/thirteenf/informationtable">
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>MICROSOFT CORP</ns1:nameOfIssuer><ns1:titleOfClass>COM</ns1:titleOfClass>
+    <ns1:cusip>594918104</ns1:cusip><ns1:value>3000000</ns1:value>
+    <ns1:shrsOrPrnAmt><ns1:sshPrnamt>8000</ns1:sshPrnamt><ns1:sshPrnamtType>SH</ns1:sshPrnamtType></ns1:shrsOrPrnAmt>
+    <ns1:investmentDiscretion>SOLE</ns1:investmentDiscretion>
+  </ns1:infoTable>
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>MICROSOFT CORP</ns1:nameOfIssuer><ns1:titleOfClass>COM</ns1:titleOfClass>
+    <ns1:cusip>594918104</ns1:cusip><ns1:value>1000000</ns1:value>
+    <ns1:shrsOrPrnAmt><ns1:sshPrnamt>2000</ns1:sshPrnamt><ns1:sshPrnamtType>SH</ns1:sshPrnamtType></ns1:shrsOrPrnAmt>
+    <ns1:investmentDiscretion>DFND</ns1:investmentDiscretion>
+  </ns1:infoTable>
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>MICROSOFT CORP</ns1:nameOfIssuer><ns1:titleOfClass>CALL</ns1:titleOfClass>
+    <ns1:cusip>594918104</ns1:cusip><ns1:value>9000000</ns1:value>
+    <ns1:shrsOrPrnAmt><ns1:sshPrnamt>20000</ns1:sshPrnamt><ns1:sshPrnamtType>SH</ns1:sshPrnamtType></ns1:shrsOrPrnAmt>
+    <ns1:putCall>Call</ns1:putCall>
+    <ns1:investmentDiscretion>SOLE</ns1:investmentDiscretion>
+  </ns1:infoTable>
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>AMAZON COM INC</ns1:nameOfIssuer><ns1:titleOfClass>PUT</ns1:titleOfClass>
+    <ns1:cusip>023135106</ns1:cusip><ns1:value>8000000</ns1:value>
+    <ns1:shrsOrPrnAmt><ns1:sshPrnamt>30000</ns1:sshPrnamt><ns1:sshPrnamtType>SH</ns1:sshPrnamtType></ns1:shrsOrPrnAmt>
+    <ns1:putCall>Put</ns1:putCall>
+    <ns1:investmentDiscretion>SOLE</ns1:investmentDiscretion>
+  </ns1:infoTable>
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>S&amp;P GLOBAL INC</ns1:nameOfIssuer><ns1:titleOfClass>COM</ns1:titleOfClass>
+    <ns1:cusip>78409V104</ns1:cusip><ns1:value>2500000</ns1:value>
+    <ns1:shrsOrPrnAmt><ns1:sshPrnamt>5000</ns1:sshPrnamt><ns1:sshPrnamtType>SH</ns1:sshPrnamtType></ns1:shrsOrPrnAmt>
+    <ns1:investmentDiscretion>SOLE</ns1:investmentDiscretion>
+  </ns1:infoTable>
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>UBER TECHNOLOGIES INC</ns1:nameOfIssuer><ns1:titleOfClass>NOTE 0.875% 12/1</ns1:titleOfClass>
+    <ns1:cusip>90353TAJ9</ns1:cusip><ns1:value>7000000</ns1:value>
+    <ns1:shrsOrPrnAmt><ns1:sshPrnamt>7000000</ns1:sshPrnamt><ns1:sshPrnamtType>PRN</ns1:sshPrnamtType></ns1:shrsOrPrnAmt>
+    <ns1:investmentDiscretion>SOLE</ns1:investmentDiscretion>
+  </ns1:infoTable>
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>UNKNOWN PRIVATE CO</ns1:nameOfIssuer><ns1:titleOfClass>COM</ns1:titleOfClass>
+    <ns1:cusip>000000000</ns1:cusip><ns1:value>6000000</ns1:value>
+    <ns1:shrsOrPrnAmt><ns1:sshPrnamt>1000</ns1:sshPrnamt><ns1:sshPrnamtType>SH</ns1:sshPrnamtType></ns1:shrsOrPrnAmt>
+    <ns1:investmentDiscretion>SOLE</ns1:investmentDiscretion>
+  </ns1:infoTable>
+  <ns1:infoTable>
+    <ns1:nameOfIssuer>PERSHING SQUARE USA LTD</ns1:nameOfIssuer><ns1:titleOfClass>SHS</ns1:titleOfClass>
+    <ns1:cusip>71531T105</ns1:cusip><ns1:value>5000000</ns1:value>
+    <ns1:shrsOrPrnAmt><ns1:sshPrnamt>100000</ns1:sshPrnamt><ns1:sshPrnamtType>SH</ns1:sshPrnamtType></ns1:shrsOrPrnAmt>
+    <ns1:investmentDiscretion>SOLE</ns1:investmentDiscretion>
+  </ns1:infoTable>
+</ns1:informationTable>

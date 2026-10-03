@@ -1,0 +1,13 @@
+{
+ "cik": "0009999999",
+ "name": "TEST CAPITAL LLC",
+ "filings": {
+  "recent": {
+   "accessionNumber": ["0009999999-26-000005", "0009999999-26-000004", "0009999999-26-000003", "0009999999-26-000002", "0009999999-26-000001"],
+   "filingDate":      ["2026-09-20",           "2026-09-10",           "2026-08-30",           "2026-08-14",           "2026-05-15"],
+   "reportDate":      ["2026-06-30",           "2026-06-30",           "2026-06-30",           "2026-06-30",           "2026-03-31"],
+   "form":            ["4",                    "13F-HR/A",             "13F-HR/A",             "13F-HR",               "13F-HR"],
+   "primaryDocument": ["form4.xml",            "xslForm13F_X02/primary_doc.xml", "xslForm13F_X02/primary_doc.xml", "xslForm13F_X02/primary_doc.xml", "xslForm13F_X02/primary_doc.xml"]
+  }
+ }
+}
