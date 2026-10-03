@@ -1,0 +1,99 @@
+/* App-only additions. The redesign package CSS stays verbatim; this file only covers what the
+   package does not: live charts, real-portrait avatars, interactive states, RTL, mobile nav. */
+
+/* ---- Investor portraits: real photo when available, initials on the package gradient otherwise. */
+.avatar{position:relative;display:grid;place-items:center;flex:0 0 auto;width:44px;height:44px;border-radius:50%;overflow:hidden;color:#fff;font:700 13px var(--mono);letter-spacing:.02em;background:linear-gradient(135deg,var(--av,#3c6f96),#dfe7e1)}
+.avatar[data-tone="included"]{--av:#2f7a58}.avatar[data-tone="watch"]{--av:#a86f18}.avatar[data-tone="excluded"]{--av:#b5524d}.avatar[data-tone="pending"]{--av:#7c8580}
+.avatar img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:50% 20%;background:#fff}
+.avatar.portrait{position:absolute;width:82px;height:82px;font-size:20px}
+.panel-head .avatar{width:72px;height:72px;font-size:18px}
+.detail-hero .avatar{width:112px;height:112px;font-size:28px}
+.credit{font-size:10px;color:var(--muted)}
+
+/* ---- Navigation: icons only where the package hides labels (tablet); mobile chip nav. */
+.nav a,.sidefoot a{display:flex;align-items:center;gap:10px}
+.nav .ico,.sidefoot .ico{display:none;width:18px;height:18px}.nav .ico svg,.sidefoot .ico svg{width:18px;height:18px}
+.sidefoot a{padding:9px 12px;border-radius:10px;color:#9fb0a4;font-size:13px}.sidefoot a:hover{color:#fff;background:var(--nav-2)}
+.mobile-nav{display:none}
+@media(max-width:1100px){.nav .ico,.sidefoot .ico{display:inline-flex}.nav a,.sidefoot a{justify-content:center}}
+@media(max-width:720px){.mobile-nav{display:flex;gap:8px;overflow-x:auto;padding:10px 14px;background:#fff;border-bottom:1px solid var(--line);scrollbar-width:none}.mobile-nav .chip{white-space:nowrap}}
+
+/* ---- Interactive states for package components. */
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button.chip{cursor:pointer;color:var(--ink)}.chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.table tr[data-select]{cursor:pointer}.table tr[data-select]:hover td{background:#fafbf9}.table tr[aria-selected="true"] td{background:var(--surface-2)}
+.table td small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.person:hover strong{text-decoration:underline}
+.star{border:0;background:none;padding:4px;font-size:17px;line-height:1;color:var(--ink);cursor:pointer}
+.investor-card,.signal-card[data-open-stock]{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.investor-card:hover,.signal-card[data-open-stock]:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.metric small{display:block;margin-top:3px;color:var(--muted);font-size:10px}
+.footnote{margin:18px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
+.empty{padding:34px 18px;text-align:center;color:var(--muted)}.empty h3{color:var(--ink);margin:0 0 6px}
+.field{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;color:var(--ink);font:inherit}
+.timeline .row .person img,.timeline .row .person .avatar{width:44px;height:44px}
+.holding .status{padding:4px 8px;font-size:10px}
+.event small{display:block;margin-top:2px}
+.alerts .timeline .row{grid-template-columns:104px 1fr auto;align-items:center}
+.holding > span:first-child{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* Return: neutral blue/ink only (verdict hues stay reserved for Mizan Status). */
+.return.up{color:var(--blue)}.return.down{color:var(--ink)}.return.muted{color:var(--muted);font-weight:400}
+.ctx{display:block;margin-top:2px;color:var(--muted);font:500 10px var(--mono)}
+.detail-stat b{color:var(--ink)}
+.seg button{cursor:pointer}
+
+/* ---- Shared interactive chart (chart() in app.js) inside the package chart frame. */
+.chart-live{height:auto;min-height:0;padding:14px;margin-top:4px}.chart-live:before{display:none}
+.mz-chart{position:relative;width:100%;display:block;direction:ltr;touch-action:pan-y;cursor:crosshair}
+.mz-chart svg{width:100%;height:100%;display:block;overflow:visible}
+.mz-chart--spark{width:96px;height:28px;flex:0 0 auto}.mz-chart--card{height:40px}.mz-chart--full{height:230px}
+.mz-chart--lw{height:260px}
+.mz-chart__cx{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:0;pointer-events:none}
+.mz-chart__dot{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 2px #fff;transform:translate(-3.5px,-3.5px);opacity:0;pointer-events:none}
+.mz-chart.is-active .mz-chart__cx,.mz-chart.is-active .mz-chart__dot{opacity:1}
+.mz-chart__mk{position:absolute;width:9px;height:9px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px #fff}
+.mz-chart__mk[data-side="buy"]{background:var(--blue)}.mz-chart__mk[data-side="sell"]{background:#fff;border:1.6px solid var(--ink)}
+.mz-chart__today{position:absolute;width:9px;height:9px;transform:translate(-50%,-50%);border-radius:50%;background:var(--blue);pointer-events:none}
+.mz-chart__todaylab{position:absolute;top:4px;right:6px;padding:1px 6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font:500 10px var(--mono);pointer-events:none}
+.mz-chart__ax{position:absolute;bottom:1px;padding:0 3px;color:var(--muted);font:500 10px var(--mono);pointer-events:none}
+.mz-chart__ax--start{left:1px}.mz-chart__ax--end{right:1px}
+.mz-chart__empty{display:grid;place-items:center;border:1px dashed var(--line);border-radius:10px;background:var(--surface-2);color:var(--muted);font:600 12px var(--font);cursor:default}
+.mz-chart-tip{position:fixed;z-index:90;pointer-events:none;transform:translate(-50%,calc(-100% - 10px));max-width:calc(100vw - 1rem);padding:7px 10px;border-radius:8px;background:var(--ink);color:#fff;font:600 11px var(--mono);white-space:nowrap;box-shadow:var(--shadow);opacity:0;transition:opacity .08s ease}
+.mz-chart-tip.is-on{opacity:1}
+.chart-legend{display:flex;gap:14px;margin-top:10px;color:var(--muted);font-size:11px}
+.chart-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-inline-end:5px;vertical-align:middle}
+
+/* ---- Arabic (RTL): mirror the package's physical left/right layout. */
+[dir="rtl"] .sidebar{inset:0 0 0 auto}
+[dir="rtl"] .shell{margin-left:0;margin-right:var(--sidebar)}
+[dir="rtl"] .topactions{margin-left:0;margin-right:auto}
+[dir="rtl"] .nav a.active{box-shadow:inset -3px 0 var(--brand)}
+[dir="rtl"] .avatar.portrait{left:auto;right:18px}
+[dir="rtl"] .table th{text-align:right}
+[dir="rtl"] .detail-stat{text-align:left}
+@media(max-width:1100px){[dir="rtl"] .shell{margin-right:88px}}
+@media(max-width:720px){[dir="rtl"] .shell{margin-right:0}}
+
+/* ---- Pre-merge review fixes. */
+/* Charts never force their column wider (Lightweight Charts sizes from its parent). */
+.mz-chart--lw{contain:size}
+.detail-grid > *,.detail-grid .grid > *,.grid.two > *{min-width:0}
+/* Tables scroll inside their card at every width instead of clipping Status / Follow. */
+.table-card{overflow-x:auto}
+.table{min-width:760px}
+/* Link buttons size like buttons (no overlap with neighbouring text). */
+a.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+/* Timeline badges keep their pill shape; alert rows show freshness chip + verdict together. */
+.timeline .row{align-items:start}
+.alert-tags{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.alert-tags .chip{padding:3px 8px;font:700 10px var(--mono)}
+.alerts .timeline .row{grid-template-columns:112px 1fr auto}
+@media(max-width:720px){
+  .detail-hero .avatar{width:68px;height:68px;font-size:18px}
+  .alerts .timeline .row{grid-template-columns:1fr;gap:8px}
+  .alert-tags{flex-direction:row}
+  [dir="rtl"] .detail-stat{text-align:right}
+}
+/* RTL: metric-strip separators sit on the inline-end edge. */
+[dir="rtl"] .metric{border-right:0;border-left:1px solid var(--line)}
+[dir="rtl"] .metric:last-child{border-left:0}

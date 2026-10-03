@@ -5,88 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Mizān — Sharia market intelligence</title>
 <meta name="description" content="Mizān — a Sharia-aware market-intelligence terminal. Disclosed portfolios and stocks with AAOIFI Standard No. 21 screening." />
-<meta name="theme-color" content="#2457d6" />
+<meta name="theme-color" content="#101812" />
 <script>if (location.protocol !== "file:") document.write('<base href="/">');</script>
 <link rel="stylesheet" href="./styles/index.css" />
-
 </head>
 <body>
-<div class="mz-app">
-  <nav class="mz-utility-rail" aria-label="Utility">
-    <span class="mz-utility-rail__brand mz-app__brandmark" title="Mizān">m<span class="mz-brand-balance" aria-hidden="true"></span></span>
-    <div id="railNav" class="mz-rail-nav"></div>
-    <span class="mz-utility-rail__spacer"></span>
-    <button class="mz-rail-link" id="themeToggle" type="button"></button>
-    <button class="mz-rail-link" id="langToggle" type="button"></button>
-  </nav>
-
-  <div class="mz-shell">
-    <a class="mz-skip" href="#main">Skip to content / انتقل للمحتوى</a>
-    <header class="mz-topbar">
-      <span class="mz-wordmark">mizān<span id="brandCaption"></span></span>
-      <div class="mz-product-tabs" role="tablist" id="topTabs">
-        <button class="mz-product-tab" role="tab" data-tab="portfolios" type="button"></button>
-        <button class="mz-product-tab" role="tab" data-tab="stocks" type="button"></button>
-      </div>
-      <div class="mz-search">
-        <span class="mz-search__icon" id="searchIcon"></span>
-        <input id="search" type="search" autocomplete="off" />
-      </div>
-      <div class="mz-topbar__actions">
-        <span class="mz-muted" id="freshness" style="font-size:var(--mz-text-xs);font-weight:600"></span>
-        <button class="mz-button mz-button--icon" id="bellBtn" type="button" aria-label="Alerts"></button>
-        <span class="mz-avatar" aria-hidden="true">MA</span>
+<div class="app">
+  <aside class="sidebar" aria-label="Primary">
+    <a class="brand" href="/" data-nav="discover"><div class="brandmark">M</div><div><strong id="brandName">Mizan</strong><small id="brandSub">Financial Intelligence</small></div></a>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidefoot" id="sidefoot"></div>
+  </aside>
+  <div class="shell">
+    <header class="topbar">
+      <input class="search" id="search" type="search" autocomplete="off" />
+      <div class="topactions">
+        <span class="chip" id="dataChip"></span>
+        <button class="btn btn-secondary" id="kbdBtn" type="button" title="Search">⌘ K</button>
+        <button class="btn btn-primary" id="topFollow" type="button"></button>
       </div>
     </header>
-
-    <main class="mz-main" id="main">
-      <div class="mz-page-heading">
-        <div>
-          <h1 id="pageTitle"></h1>
-          <p class="mz-muted" id="pageSub" style="max-width:44rem"></p>
-        </div>
-        <div id="headingEnd"></div>
-      </div>
-
-      <section class="mz-brief" id="marketBrief"></section>
-
-      <div class="mz-subtabs" role="tablist" id="subtabs"></div>
-
-      <div class="mz-toolbar" id="timeRow" style="margin-block-start:var(--mz-space-4)">
-        <div class="mz-segmented" id="timebar" role="group" aria-label="Time period"></div>
-      </div>
-      <div class="mz-toolbar" id="controlRow">
-        <div class="mz-pos"><button class="mz-chip" id="sortBtn" type="button"></button><div id="sortMenu"></div></div>
-        <button class="mz-linkbtn" id="whyBtn" type="button"></button>
-        <div class="mz-toolbar__end">
-          <div class="mz-pos"><button class="mz-chip" id="filterBtn" type="button"></button><div id="filterMenu"></div></div>
-          <button class="mz-chip" id="compareBtn" type="button"></button>
-        </div>
-      </div>
-
-      <div id="chips" style="margin-block-end:var(--mz-space-3)"></div>
-      <div class="mz-muted" id="resultMeta" style="font-size:var(--mz-text-xs);margin-block-end:var(--mz-space-3)"></div>
-
-      <div class="mz-content-grid" id="contentGrid">
-        <div>
-          <div class="mz-table-wrap" id="tableWrap">
-            <div class="mz-table-scroll">
-              <table class="mz-table" id="table"><thead id="thead"></thead><tbody id="tbody"></tbody></table>
-            </div>
-          </div>
-          <div class="mz-card-list" id="cards"></div>
-          <div class="mz-legend" id="legend"></div>
-          <p class="mz-guardrail" id="guardrail"></p>
-        </div>
-        <aside class="mz-drawer" id="drawer" hidden></aside>
-      </div>
-    </main>
-
-    <nav class="mz-mobile-nav" id="mobileNav" aria-label="Primary"></nav>
-    <div class="mz-mobile-tray" id="mobileTray" hidden></div>
+    <nav class="mobile-nav" id="mobileNav" aria-label="Primary"></nav>
+    <main class="main" id="main"></main>
   </div>
-  <div class="mz-scrim" id="scrim" hidden></div>
 </div>
+<!-- TradingView Lightweight Charts (open source), pinned by SRI and loaded async: the shared chart()
+     renders its SVG immediately and app.js upgrades detail charts when this arrives. Cached prices only. -->
+<script id="lwjs" async src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" integrity="sha384-stKllnUqA9AD0gsKCuUtf5XlqAW7PwIgDagoNsTWkjkBmJ/GZ/uHTgEBxdLV2VSK" crossorigin="anonymous"></script>
 <script src="./app.js"></script>
 </body>
 </html>
