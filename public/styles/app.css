@@ -97,3 +97,13 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 /* RTL: metric-strip separators sit on the inline-end edge. */
 [dir="rtl"] .metric{border-right:0;border-left:1px solid var(--line)}
 [dir="rtl"] .metric:last-child{border-left:0}
+
+/* ---- Portfolio compliance share. A portfolio holding ANY excluded name is "mixed": neutral ink
+   pill / cover / portrait (never amber, which means "passes with purification"), plus an exact
+   mini-bar of its names by verdict. Verdict hues stay on the bar segments and on per-name pills. */
+.status.mixed{background:#eef1f3;color:var(--ink)}.status.mixed:before{background:var(--ink)}
+.status .mixbar{display:inline-flex;width:46px;height:6px;margin-inline-start:4px;border-radius:3px;overflow:hidden;background:var(--line)}
+.status .mixbar i{display:block;height:100%}
+.mixbar .included{background:var(--green)}.mixbar .watch{background:var(--amber)}.mixbar .excluded{background:var(--red)}.mixbar .pending{background:var(--grey)}
+.investor-card .cover.mixed{background:linear-gradient(135deg,#1f2a33,#7d8d99)}
+.avatar[data-tone="mixed"]{--av:#4b5b67}
