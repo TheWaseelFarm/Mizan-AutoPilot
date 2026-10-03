@@ -1,4 +1,4 @@
-/* Mizān web terminal — vanilla JS front-end rendering the investment-desk design system (styles/*.css).
+/* Mizān web terminal — vanilla JS front-end rendering the page-scoped design systems (styles/*.css).
  * Fetches the same /api/feed backend the native app uses; falls back to embedded sample data.
  * Desktop: utility rail + top bar + data tables + side drawers. Mobile: cards + bottom nav.
  * The Sharia verdict is computed here by the same AAOIFI logic as api/_lib/aaoifi.js. */
@@ -603,7 +603,7 @@
   const portfolioColor = (val) => val == null ? 'var(--mz-ink-400)' : val >= 0 ? 'var(--mz-cobalt-700)' : 'var(--mz-ink-600)';
   const portfolioTone = (p) => p.mix.unscreened > 0 && portfolioFlag(p).tone === 'clean' ? 'purify' : portfolioFlag(p).tone;
   const latestFiling = (rows) => rows.map((r) => r[FIELD.filedDate]).filter((d) => d && isFinite(Date.parse(d))).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
-  const portfolioReturn = (ret) => `<span class="mz-pf-return" style="color:${portfolioColor(ret.val)}">${ret.val == null ? '—' : fmtPct(ret.val)}</span>${ret.indicative ? `<span class="mz-cell-context">${LANG === 'ar' ? 'تقديري · منذ الإفصاح' : 'indicative · since disclosed'}</span>` : ''}`;
+  const portfolioReturn = (ret) => `<span class="mz-pf-return" style="color:${S.tab === 'portfolios' && ret.val != null ? (ret.val >= 0 ? '#21835b' : '#b94747') : portfolioColor(ret.val)}">${ret.val == null ? '—' : fmtPct(ret.val)}</span>${ret.indicative ? `<span class="mz-cell-context">${LANG === 'ar' ? 'تقديري · منذ الإفصاح' : 'indicative · since disclosed'}</span>` : ''}`;
 
   const starBtn = (id) => `<button class="mz-star" data-star="${esc(id)}" data-on="${S.follows.has(id)}" aria-label="${t('common.follow')}" aria-pressed="${S.follows.has(id)}">${S.follows.has(id) ? I.starOn : I.star}</button>`;
   // Trade direction — NEUTRAL (cobalt buy / ink sell). Verdict hues (green/amber/red) are reserved
@@ -779,11 +779,26 @@
   function renderChrome() {
     document.documentElement.lang = LANG; document.documentElement.dir = LANG === 'ar' ? 'rtl' : 'ltr';
     document.body.classList.toggle('mz-portfolios-page', S.tab === 'portfolios');
+    // Recompose existing nodes for the approved Portfolio frame; restore other routes.
+    const grid = document.getElementById('contentGrid'), main = document.getElementById('main');
+    const listColumn = grid.firstElementChild;
+    let filters = document.getElementById('portfolioFilterBar');
+    if (S.tab === 'portfolios') {
+      if (!filters) { filters = document.createElement('div'); filters.id = 'portfolioFilterBar'; listColumn.prepend(filters); }
+      listColumn.prepend(document.getElementById('marketBrief'));
+      ['timeRow', 'controlRow'].forEach((id) => filters.append(document.getElementById(id)));
+      filters.after(document.getElementById('chips'));
+      document.getElementById('tableWrap').append(document.getElementById('resultMeta'));
+    } else {
+      ['marketBrief', 'subtabs', 'timeRow', 'controlRow', 'chips', 'resultMeta'].forEach((id) => main.insertBefore(document.getElementById(id), grid));
+      filters?.remove();
+    }
     const brand = document.querySelector('.mz-utility-rail__brand');
     brand.innerHTML = `<span class="mz-brand-glyph" aria-hidden="true">m.</span><span class="mz-brand-name">mizān<small>${LANG === 'ar' ? 'ذكاء مالي على الطيار الآلي' : 'Financial Intelligence on Autopilot'}</small></span>`;
+    if (S.tab === 'portfolios') brand.innerHTML = `<span class="mz-brand-glyph" aria-hidden="true">م</span><span class="mz-brand-name">${LANG === 'ar' ? 'ميزان' : 'Mizān'}<small>FINANCIAL INTELLIGENCE</small></span>`;
     // rail
     const navItems = [['portfolios', I.portfolios, 'tab.portfolios'], ['stocks', I.stocks, 'tab.stocks'], ['following', I.star, 'tab.following'], ['alerts', I.bell, 'tab.alerts'], ['account', I.user, 'tab.account']];
-    document.getElementById('railNav').innerHTML = navItems.map(([k, ic, lk]) => `<a href="/${k}" class="mz-rail-link" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
+    document.getElementById('railNav').innerHTML = (S.tab === 'portfolios' ? `<a href="/portfolios" class="mz-rail-link" data-nav="portfolios">${LANG === 'ar' ? 'نظرة عامة' : 'Overview'}</a>` : '') + navItems.map(([k, ic, lk]) => `<a href="/${k}" class="mz-rail-link" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
     const lang = document.getElementById('langToggle'); lang.innerHTML = `<span style="width:1.4rem">${I.globe}</span><span>${LANG === 'en' ? 'ع' : 'EN'}</span>`;
     document.getElementById('themeToggle').innerHTML = `<span style="width:1.4rem">${I.user.replace('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', '<circle cx="12" cy="12" r="8"/><path d="M12 4v16"/>')}</span><span>${LANG === 'ar' ? (THEME === 'light' ? 'داكن' : 'فاتح') : (THEME === 'light' ? 'Dark' : 'Light')}</span>`;
     document.getElementById('brandCaption').textContent = LANG === 'ar' ? 'اكتشف · قيّم · راقب' : 'Discover · Evaluate · Monitor';
@@ -801,6 +816,7 @@
     document.getElementById('langToggle').setAttribute('aria-label', t('acct.lang'));
     document.getElementById('themeToggle').setAttribute('aria-label', LANG === 'ar' ? 'تبديل المظهر' : 'Toggle appearance');
     document.getElementById('freshness').innerHTML = `${I.clock}<span>${S.loading ? (LANG === 'ar' ? 'جارٍ قراءة الإفصاحات' : 'Reading disclosures') : esc(S.live ? t('live') : t('sample') + ' · ' + t('live'))}</span>`;
+    if (S.tab === 'portfolios') document.getElementById('freshness').textContent = S.loading ? t('dtl.pending') : `${S.live ? '' : t('sample') + ' · '}${LANG === 'ar' ? 'بيانات متأخرة' : 'Delayed data'}`;
     // mobile nav
     document.getElementById('mobileNav').innerHTML = navItems.map(([k, ic, lk]) => `<a href="/${k}" class="mz-mobile-nav__item" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
   }
@@ -810,6 +826,9 @@
     const isP = S.tab === 'portfolios';
     document.getElementById('pageTitle').textContent = t(isP ? 'p.title' : 's.title');
     document.getElementById('pageSub').textContent = t(isP ? 'p.sub' : 's.sub');
+    const compareButton = document.getElementById('compareBtn'), whyButton = document.getElementById('whyBtn');
+    document.getElementById('controlRow').insertBefore(whyButton, document.querySelector('#controlRow > .mz-toolbar__end'));
+    document.querySelector('#controlRow > .mz-toolbar__end').append(compareButton);
     document.getElementById('headingEnd').innerHTML = `<span class="mz-edition">${LANG === 'ar' ? 'من الإفصاح إلى الرؤية' : 'Disclosure. Perspective.'}</span>`;
     // subtabs
     const subs = isP ? P_SUB : S_SUB.map((x) => [x[0], x[1]]);
@@ -832,6 +851,12 @@
     document.getElementById('portfolioControls')?.remove();
     if (isP) {
       document.getElementById('controlRow').insertAdjacentHTML('afterbegin', `<div id="portfolioControls" class="mz-pf-controls"><label>${LANG === 'ar' ? 'ترتيب حسب' : 'Sort by'}<select id="portfolioSort">${P_SUB.map(([k]) => `<option value="${k}" ${k === S.pMetric ? 'selected' : ''}>${t(P_SORT[k])}</option>`).join('')}</select></label><label>${t('h.status')}<select id="portfolioStatus">${[['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('v.compliant')], ['watch', t('v.purify')], ['excluded', t('v.noncompliant')], ...(S.compliance === 'exclude' ? [['exclude', t('f.exclude')]] : [])].map(([k, label]) => `<option value="${k}" ${S.compliance === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label><div class="mz-search mz-pf-search"><span class="mz-search__icon">${I.search}</span><input id="portfolioSearch" type="search" aria-label="${LANG === 'ar' ? 'بحث المحافظ' : 'Search portfolios'}" placeholder="${LANG === 'ar' ? 'بحث المحافظ…' : 'Search portfolios...'}" value="${esc(S.query)}"></div></div>`);
+    }
+    if (isP) {
+      document.getElementById('headingEnd').innerHTML = `<button class="mz-button mz-button--primary mz-pi-add" data-nav="account">${LANG === 'ar' ? 'إضافة محفظة' : 'Add portfolio'}</button><span class="mz-pi-data-badge">${S.live ? (LANG === 'ar' ? 'بيانات متأخرة' : 'DELAYED DATA') : t('sample')}</span>`;
+      document.getElementById('headingEnd').append(whyButton, compareButton);
+      document.getElementById('pageTitle').textContent = LANG === 'ar' ? 'ذكاء المحافظ' : 'Portfolio Intelligence';
+      document.getElementById('pageSub').innerHTML = `${esc(t('p.sub'))}<small class="mz-pi-data-note">${LANG === 'ar' ? 'بيانات إفصاحية · الأسعار قد تكون متأخرة' : 'DISCLOSED DATA · PRICES MAY BE DELAYED'}</small>`;
     }
     // applied chips
     const chips = [];
@@ -858,7 +883,7 @@
       const item = (label, value, sub, icon, color) => `<div class="mz-pfsum__item"><span class="mz-pfsum__label">${label}</span><strong class="mz-pfsum__val"${color ? ` style="color:${color}"` : ''}>${value}</strong><span class="mz-pfsum__sub">${sub}</span><span class="mz-pfsum__icon">${icon}</span></div>`;
       el.innerHTML =
         item(ar ? 'محافظ متابَعة' : 'Portfolios tracked', list.length, ar ? 'في هذا العرض' : 'In this view', I.briefcase) +
-        item(ar ? `متوسط العائد (${tfLabelNow()})` : `Average return (${tfLabelNow()})`, avg == null ? '—' : fmtPct(avg), indicative ? (ar ? 'تقديري · منذ الإفصاح' : 'Indicative · since disclosed') : (ar ? 'للفترة المحددة' : 'Selected period'), I.stocks, portfolioColor(avg)) +
+        item(ar ? `متوسط العائد (${tfLabelNow()})` : `Average return (${tfLabelNow()})`, avg == null ? '—' : fmtPct(avg), indicative ? (ar ? 'تقديري · منذ الإفصاح' : 'Indicative · since disclosed') : (ar ? 'للفترة المحددة' : 'Selected period'), I.stocks, avg == null ? 'var(--mz-ink-400)' : avg >= 0 ? '#21835b' : '#b94747') +
         item(ar ? 'إجمالي الإفصاحات' : 'Total disclosures', rows.length, ar ? 'المحافظ المعروضة' : 'Displayed portfolios', I.portfolios) +
         item(ar ? 'أحدث تاريخ تقديم' : 'Latest filing date', latest ? esc(shortDate(latest)) : '—', latest ? `${daysSince(latest)}${ar ? 'ي مضت' : 'd ago'}` : t('dtl.pending'), I.clock) +
         item(ar ? 'تحتاج انتباهًا' : 'Requiring attention', attn, ar ? 'مراقبة أو مستبعدة' : 'Watch or excluded', I.info, 'var(--mz-purify-600)');
@@ -919,13 +944,13 @@
     document.getElementById('guardrail').textContent = isP ? (LANG === 'ar' ? 'العوائد من البيانات المُفصَح عنها للفترة المحددة. معلومات فقط، وليست نصيحة استثمارية.' : 'Returns reflect disclosed data for the selected period. Informational only — not investment advice.') : t('g.disclaimer');
 
     if (isP) {
-      thead.innerHTML = `<tr><th>#</th><th>${t('h.portfolio')}</th><th>${t('h.return')} (${esc(tfLabelNow())})</th><th>${t('h.activity')}</th><th>${t('dtl.holdings')}</th><th>${LANG === 'ar' ? 'آخر تقديم' : 'Last filing'}</th><th>${LANG === 'ar' ? 'حالة ميزان' : 'Mizan Status'}</th><th>${t('common.follow')}</th></tr>`;
+      thead.innerHTML = `<tr>${S.compareMode ? '<th></th>' : ''}<th>${t('h.portfolio')}</th><th>${t('h.return')} (${esc(tfLabelNow())})</th><th>${t('h.activity')}</th><th>${LANG === 'ar' ? 'الحداثة' : 'Freshness'}</th><th>${LANG === 'ar' ? 'حالة ميزان' : 'Mizan Status'}</th><th><span class="mz-sr-only">${t('common.follow')}</span></th></tr>`;
       tbody.innerHTML = list.map((p, i) => {
-        const sel = S.compareMode ? S.selected.includes(p.name) : S.drawer?.type === 'detail' && S.drawer.name === p.name;
-        const first = S.compareMode ? `<button class="mz-check-btn" data-select="${esc(p.name)}" data-on="${sel}" aria-label="${LANG === 'ar' ? 'اختر للمقارنة' : 'Select for comparison'}">${sel ? I.check : ''}</button>` : `<span class="mz-rank">${i + 1}</span>`;
+        const sel = S.compareMode ? S.selected.includes(p.name) : S.drawer?.type === 'detail' ? S.drawer.name === p.name : i === 0;
+        const first = S.compareMode ? `<td><button class="mz-check-btn" data-select="${esc(p.name)}" data-on="${sel}" aria-label="${LANG === 'ar' ? 'اختر للمقارنة' : 'Select for comparison'}">${sel ? I.check : ''}</button></td>` : '';
         const date = latestFiling(p.rows);
-        return `<tr tabindex="0" role="button" data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(esc(p.initials), p.name, esc(typeLabel(p.kind)))}</td><td><div class="mz-perf-cell">${portfolioReturn(p.ret)}${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--spark', unit: 'index', color: portfolioColor(p.ret.val) })}</div></td><td class="mz-cell-num">${p.count}<span class="mz-cell-context">${LANG === 'ar' ? 'إفصاح' : p.count === 1 ? 'Disclosure' : 'Disclosures'}</span></td><td class="mz-cell-num">${p.holdings}<span class="mz-cell-context">${LANG === 'ar' ? 'أسهم' : p.holdings === 1 ? 'Stock' : 'Stocks'}</span></td><td>${date ? esc(shortDate(date)) : '—'}<span class="mz-cell-context">${p.fresh == null ? t('dtl.pending') : `${p.fresh}${LANG === 'ar' ? 'ي مضت' : 'd ago'}`}</span></td><td>${compliancePill(portfolioTone(p))}</td><td>${starBtn(p.name)}</td></tr>`;
-      }).join('') || emptyRow(8);
+        return `<tr tabindex="0" role="button" data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}">${first}<td><div class="mz-entity__name">${esc(p.name)}</div><div class="mz-entity__meta">${esc(typeLabel(p.kind))} · ${p.holdings} ${LANG === 'ar' ? 'أسهم' : p.holdings === 1 ? 'holding' : 'holdings'}</div></td><td>${portfolioReturn(p.ret)}</td><td class="mz-cell-num">${p.count}<span class="mz-cell-context">${LANG === 'ar' ? 'إفصاح' : p.count === 1 ? 'Disclosure' : 'Disclosures'}</span></td><td>${p.fresh == null ? t('dtl.pending') : `${p.fresh}${LANG === 'ar' ? 'ي مضت' : 'd ago'}`}<span class="mz-cell-context">${date ? esc(shortDate(date)) : '—'}</span></td><td>${compliancePill(portfolioTone(p))}</td><td>${starBtn(p.name)}</td></tr>`;
+      }).join('') || emptyRow(S.compareMode ? 7 : 6);
       cards.innerHTML = list.map((p, i) => portfolioCard(p, i)).join('');
     } else if (S.sMetric === 'flow') {
       renderFlowBoard(list, thead, tbody, cards);
@@ -1065,6 +1090,11 @@
     }
     document.body.classList.toggle('mz-pf-panel-open', S.tab === 'portfolios' && S.drawer?.type === 'detail');
     const scrim = document.getElementById('scrim');
+    if (!S.drawer && S.tab === 'portfolios' && window.matchMedia('(min-width: 75rem)').matches) {
+      grid.classList.add('mz-content-grid--drawer-open'); d.hidden = false;
+      d.innerHTML = portfolioContext(S.loading ? null : currentList()[0]);
+      scrim.hidden = true; lockBodyScroll(false); return;
+    }
     if (!S.drawer) { grid.classList.remove('mz-content-grid--drawer-open'); d.hidden = true; d.innerHTML = ''; scrim.hidden = true; lockBodyScroll(false); return; }
     grid.classList.add('mz-content-grid--drawer-open'); d.hidden = false;
     // Scrim only under the sheet/side-panel on tablet & mobile (desktop drawer is in-grid).
@@ -1084,7 +1114,7 @@
     else if (!on && locked) { b.classList.remove('mz-locked'); b.style.top = ''; window.scrollTo(0, _lockedY); }
   }
   // Rotating / resizing across the desktop breakpoint must re-evaluate the lock (in-grid vs sheet).
-  window.addEventListener('resize', () => { if (S.drawer) renderDrawer(); else lockBodyScroll(false); });
+  window.addEventListener('resize', () => { if (S.drawer || S.tab === 'portfolios') renderDrawer(); else lockBodyScroll(false); });
   function drawerHead(title, opts) {
     opts = opts || {};
     const backIcon = LANG === 'ar' ? I.chevronRight : I.chevronLeft;
@@ -1159,8 +1189,30 @@
       `<p class="mz-drawer__section mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;padding-block:0">${t('dtl.compNote')} ${t('dtl.evNote')}</p>` +
       `<div class="mz-drawer__footer" style="display:grid;grid-template-columns:1fr auto;gap:.5rem"><button class="mz-button mz-button--${following ? 'secondary' : 'primary'}" data-follow="${esc(ticker)}">${following ? I.starOn : I.star}${following ? t('common.following') : t('common.follow')}</button><button class="mz-button mz-button--ghost" data-nav="alerts">${I.bell}${t('common.watch')}</button></div>`;
   }
+  // Figma 3:2 context panel. Every figure still comes from existing derivations.
+  function portfolioContext(p) {
+    const ar = LANG === 'ar';
+    const label = ar ? 'المحفظة المحددة' : 'Selected portfolio';
+    if (!p) return `<section class="mz-pi-context"><div class="mz-pi-context-head"><span>${label}</span><h3>${t('dtl.pending')}</h3></div><div class="mz-state"><p>${t('dtl.pending')}</p></div></section>`;
+    const read = ar ? `${p.count} إفصاح عبر ${p.holdings} أسهم، للفترة المحددة.` : `${p.count} ${p.count === 1 ? 'disclosure' : 'disclosures'} across ${p.holdings} holdings for the selected period.`;
+    const events = [...p.rows].sort((a, b) => (Date.parse(b[FIELD.filedDate]) || 0) - (Date.parse(a[FIELD.filedDate]) || 0)).slice(0, 3);
+    // Signal bar = this portfolio's period return relative to the highest return in view
+    // (top performer fills the bar). Pure derivation from existing returns — no fabricated value.
+    const peerVals = currentList().map((x) => x.ret && x.ret.val).filter((v) => v != null && isFinite(v));
+    const hi = peerVals.length ? Math.max(...peerVals) : null, lo = peerVals.length ? Math.min(...peerVals) : null;
+    const sig = (p.ret.val != null && isFinite(p.ret.val) && hi != null)
+      ? (hi === lo ? 100 : Math.max(0, Math.min(100, Math.round(((p.ret.val - lo) / (hi - lo)) * 100))))
+      : null;
+    const sigHtml = `<div class="mz-pi-signal"><span>${ar ? 'العائد مقابل الأعلى' : 'RETURN VS TOP'}</span><span class="mz-pi-signal-track">${sig == null ? '' : `<i style="width:${sig}%"></i>`}</span><b>${p.ret.val == null ? '—' : fmtPct(p.ret.val)}</b></div>`;
+    return `<section class="mz-pi-context"><header class="mz-pi-context-head"><button class="mz-button mz-button--icon mz-pi-close" id="drawerClose" aria-label="${ar ? 'إغلاق' : 'Close'}">${I.close}</button><span>${label}</span><div><h3>${esc(p.name)}</h3>${compliancePill(portfolioTone(p))}</div></header>
+      <div class="mz-pi-context-performance"><span class="mz-pi-mono-label">${ar ? 'عائد الفترة' : 'PERIOD RETURN'} · ${esc(tfLabelNow())}</span>${portfolioReturn(p.ret)}<p>${esc(read)}</p>${sigHtml}<div class="mz-pi-chart"><span>${ar ? 'الأداء المُفصَح' : 'DISCLOSED PERFORMANCE'}</span>${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--full', unit: 'index', empty: t('dtl.pending') })}</div></div>
+      <section class="mz-pi-context-activity"><h4>${ar ? 'آخر النشاط' : 'Recent activity'}</h4>${events.map((r) => { const lag = daysBetween(r[FIELD.disclosedDate], r[FIELD.filedDate]); return `<div class="mz-pi-event"><i></i><div><strong>${esc(r.ticker)} · ${sideTag(r.side)}</strong><small>${disclosedMoney(r)} · ${esc(fDisclosed(r) ? shortDate(fDisclosed(r)) : '—')}${lag == null ? '' : ` · ${t('dtl.filedLater', { n: lag })}`}</small></div><time>${r[FIELD.filedDate] ? esc(shortDate(r[FIELD.filedDate])) : '—'}</time></div>`; }).join('') || `<p>${t('dtl.pending')}</p>`}</section>
+      <section class="mz-pi-context-note"><h4>${ar ? 'ملاحظة ذكية' : 'Intelligence note'}</h4><p>${ar ? 'العوائد من الحيازات المُفصَح عنها. راجع حداثة الإفصاحات والتركيز قبل اتخاذ قرار. معلومات فقط، وليست نصيحة استثمارية.' : 'Returns reflect disclosed holdings. Review filing freshness and concentration before making a decision. Informational only — not investment advice.'}</p></section>
+      <footer><button class="mz-button mz-button--secondary" data-context-detail="${esc(p.name)}">${ar ? 'فتح التفاصيل' : 'Open details'}</button><button class="mz-button mz-button--primary" data-follow="${esc(p.name)}">${S.follows.has(p.name) ? t('common.following') : ar ? 'متابعة المحفظة' : 'Follow portfolio'}</button></footer></section>`;
+  }
   function portfolioDrawer(name) {
     const p = derivePortfolios(S.rows).find((x) => x.name === name); if (!p) return drawerHead(esc(name), { back: true });
+    if (S.tab === 'portfolios' && (!S.drawer?.panelTab || S.drawer.panelTab === 'overview')) return portfolioContext(p);
     const disclosuresLbl = LANG === 'ar' ? 'إفصاح' : (p.count === 1 ? 'disclosure' : 'disclosures');
     // Preserve the existing disclosed-value weights and holding drill-down.
     const holdings = {};
@@ -1203,10 +1255,11 @@
 
   /* ---------------------------------------------------------------- events (delegated) */
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-panel-tab],[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-theme-pick],[data-star],[data-select],[data-holding],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#themeToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#drawerBack,#clearChips,#trayOpen,#bellBtn,#myImportBtn,#mySampleBtn,#myClearBtn');
+    const el = e.target.closest('[data-context-detail],[data-panel-tab],[data-tab],[data-sub],[data-tf],[data-rail],[data-nav],[data-lang],[data-theme-pick],[data-star],[data-select],[data-holding],[data-row],[data-chip],[data-open-stock],[data-follow],#langToggle,#themeToggle,#sortBtn,#filterBtn,#compareBtn,#whyBtn,#drawerClose,#drawerBack,#clearChips,#trayOpen,#bellBtn,#myImportBtn,#mySampleBtn,#myClearBtn');
     if (!el) { if (S.openMenu) { S.openMenu = null; closeMenus(); } return; }
     const has = (a) => el.hasAttribute(a) || el.id === a;
 
+    if (el.dataset.contextDetail) { S.drawer = { type: 'detail', name: el.dataset.contextDetail, panelTab: 'holdings' }; setPath('/portfolio/' + encodeURIComponent(el.dataset.contextDetail)); renderDrawer(); renderList(); return; }
     if (el.dataset.panelTab) { if (S.drawer) { S.drawer.panelTab = el.dataset.panelTab; renderDrawer(); } return; }
     if (el.dataset.tab) { S.tab = el.dataset.tab; go('/' + el.dataset.tab); return; }
     if (el.dataset.nav) { e.preventDefault(); S.tab = el.dataset.nav; go('/' + el.dataset.nav); return; }
@@ -1248,8 +1301,8 @@
     if (e.target.id === 'portfolioSort') { S.pMetric = e.target.value; render(); }
     if (e.target.id === 'portfolioStatus') { S.compliance = e.target.value; render(); }
   });
-  document.addEventListener('input', (e) => { if (e.target.id === 'portfolioSearch') { S.query = e.target.value; document.getElementById('search').value = S.query; renderList(); } });
-  document.getElementById('search').addEventListener('input', (e) => { S.query = e.target.value; const local = document.getElementById('portfolioSearch'); if (local) local.value = S.query; renderList(); });
+  document.addEventListener('input', (e) => { if (e.target.id === 'portfolioSearch') { S.query = e.target.value; document.getElementById('search').value = S.query; renderList(); if (S.tab === 'portfolios') renderDrawer(); } });
+  document.getElementById('search').addEventListener('input', (e) => { S.query = e.target.value; const local = document.getElementById('portfolioSearch'); if (local) local.value = S.query; renderList(); if (S.tab === 'portfolios') renderDrawer(); });
   document.getElementById('scrim').addEventListener('click', closeDrawer);
 
   // Close a drawer and, if we're on a detail route, return to the tab's list URL.
