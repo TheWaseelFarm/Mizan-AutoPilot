@@ -105,7 +105,10 @@
       'sec.methodology': 'المنهجية', 'sec.mtext': 'يتبع الفحص معيار AAOIFI الشرعي رقم 21 — قاعدة «30/30/5» الحالية. فحصان، كلاهما مطلوب: (1) نشاط تجاري مباح، و(2) نسب مالية إلى القيمة السوقية — الدين بفائدة < 30%، والنقد والأوراق ذات الفائدة < 30%، والدخل غير المباح < 5% من الإيراد. تجاوز أي حد = غير متوافق. دخل غير نقي يسير (0–5%) = متوافق · تطهير. (نسبة 33% لدى بعض مزوّدي المؤشرات ليست من AAOIFI.)',
     },
   };
-  let LANG = 'en';
+  // Arabic is the default language; an explicit choice is remembered per browser.
+  let LANG = 'ar';
+  try { const saved = localStorage.getItem('mz_lang'); if (saved === 'en' || saved === 'ar') LANG = saved; } catch (e) { /* private mode */ }
+  const setLang = (l) => { LANG = l; try { localStorage.setItem('mz_lang', l); } catch (e) { /* private mode */ } };
   let THEME = 'light';
   try { THEME = localStorage.getItem('mz_theme') === 'dark' ? 'dark' : 'light'; } catch (e) { /* private mode */ }
   document.documentElement.dataset.theme = THEME;
@@ -1102,13 +1105,13 @@
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-nav],[data-open-portfolio],[data-open-stock],[data-star],[data-follow],[data-tf],[data-lang],[data-fc],[data-alert],[data-select],#langToggle,#kbdBtn,#topFollow,#myImportBtn,#mySampleBtn,#myClearBtn');
     if (!el) return;
-    if (el.id === 'langToggle') { e.preventDefault(); LANG = LANG === 'en' ? 'ar' : 'en'; render(); return; }
+    if (el.id === 'langToggle') { e.preventDefault(); setLang(LANG === 'en' ? 'ar' : 'en'); render(); return; }
     if (el.id === 'kbdBtn') { document.getElementById('search').focus(); return; }
     if (el.id === 'topFollow') { if (el.dataset.followId) { toggleFollow(el.dataset.followId); render(); } else go('/portfolios'); return; }
     if (el.dataset.star != null) { e.preventDefault(); e.stopPropagation(); toggleFollow(el.dataset.star); render(); return; }
     if (el.dataset.follow) { e.preventDefault(); toggleFollow(el.dataset.follow); render(); return; }
     if (el.dataset.tf) { S.tf = el.dataset.tf; render(); return; }
-    if (el.dataset.lang) { LANG = el.dataset.lang; render(); return; }
+    if (el.dataset.lang) { setLang(el.dataset.lang); render(); return; }
     if (el.dataset.fc) { S.compliance = el.dataset.fc; render(); return; }
     if (el.dataset.alert) { S.alertFilter = el.dataset.alert; render(); return; }
     if (el.dataset.nav) { e.preventDefault(); go(el.dataset.nav === 'discover' ? '/' : '/' + el.dataset.nav); return; }
