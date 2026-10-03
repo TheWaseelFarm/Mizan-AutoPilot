@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic NEW HOLDINGS amendment: a position released from confidential treatment. -->
+<informationTable xmlns="http://www.sec.gov/edgar/document/thirteenf/informationtable">
+  <infoTable>
+    <nameOfIssuer>VISA INC</nameOfIssuer><titleOfClass>COM CL A</titleOfClass>
+    <cusip>92826C839</cusip><value>2000000</value>
+    <shrsOrPrnAmt><sshPrnamt>6000</sshPrnamt><sshPrnamtType>SH</sshPrnamtType></shrsOrPrnAmt>
+    <investmentDiscretion>SOLE</investmentDiscretion>
+  </infoTable>
+</informationTable>

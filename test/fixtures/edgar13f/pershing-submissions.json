@@ -1,0 +1,38 @@
+{
+ "cik": "0002026053",
+ "name": "PERSHING SQUARE INC.",
+ "filings": {
+  "recent": {
+   "accessionNumber": [
+    "0001172661-26-003790",
+    "0001172661-26-002339",
+    "0001172661-26-001095",
+    "0001438934-26-001592"
+   ],
+   "filingDate": [
+    "2026-08-14",
+    "2026-05-15",
+    "2026-02-17",
+    "2026-08-25"
+   ],
+   "reportDate": [
+    "2026-06-30",
+    "2026-03-31",
+    "2025-12-31",
+    "2026-06-30"
+   ],
+   "form": [
+    "13F-HR",
+    "13F-HR",
+    "13F-HR",
+    "N-PX"
+   ],
+   "primaryDocument": [
+    "xslForm13F_X02/primary_doc.xml",
+    "xslForm13F_X02/primary_doc.xml",
+    "xslForm13F_X02/primary_doc.xml",
+    "xslN-PX_X01/primary_doc.xml"
+   ]
+  }
+ }
+}

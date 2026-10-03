@@ -1,0 +1,13 @@
+{
+ "cik": "0008888888",
+ "name": "LEGACY PARTNERS LP",
+ "filings": {
+  "recent": {
+   "accessionNumber": ["0008888888-22-000002", "0008888888-22-000001"],
+   "filingDate":      ["2022-11-14",           "2022-08-12"],
+   "reportDate":      ["2022-09-30",           "2022-06-30"],
+   "form":            ["13F-HR",               "13F-HR"],
+   "primaryDocument": ["xslForm13F_X02/primary_doc.xml", "xslForm13F_X02/primary_doc.xml"]
+  }
+ }
+}
