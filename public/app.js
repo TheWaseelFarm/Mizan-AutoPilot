@@ -1,4 +1,4 @@
-/* Mizān web terminal — vanilla JS front-end rendering the design-handoff CSS (styles/*.css).
+/* Mizān web terminal — vanilla JS front-end rendering the investment-desk design system (styles/*.css).
  * Fetches the same /api/feed backend the native app uses; falls back to embedded sample data.
  * Desktop: utility rail + top bar + data tables + side drawers. Mobile: cards + bottom nav.
  * The Sharia verdict is computed here by the same AAOIFI logic as api/_lib/aaoifi.js. */
@@ -37,24 +37,24 @@
   const STR = {
     en: {
       'tab.portfolios': 'Portfolios', 'tab.stocks': 'Stocks', 'tab.following': 'Following', 'tab.alerts': 'Alerts', 'tab.account': 'Account',
-      'p.title': 'Portfolio Intelligence', 'p.sub': 'Track performance, activity, holdings and recent changes across monitored portfolios.',
-      's.title': 'Stock intelligence', 's.sub': 'Explore disclosed activity with evidence and Sharia context.',
-      'sv.top': 'Top performers', 'sv.active': 'Most active', 'sv.followed': 'Most followed', 'sv.alloc': 'Highest compliant allocation', 'sv.conc': 'Most concentrated', 'sv.lag': 'Fastest to disclose',
+      'p.title': 'Portfolio intelligence', 'p.sub': 'Track performance, activity, holdings and recent changes across monitored portfolios.',
+      's.title': 'Stock intelligence', 's.sub': 'Read the capital flows. Evaluate the evidence.',
+      'sv.top': 'Top performers', 'sv.active': 'Most active', 'sv.followed': 'Most followed', 'sv.alloc': 'Highest included allocation', 'sv.conc': 'Most concentrated', 'sv.lag': 'Fastest to disclose',
       'so.conc': 'Concentration (HHI)', 'so.lag': 'Disclosure lag',
       'sv.bought': 'Most bought', 'sv.sold': 'Most sold', 'sv.flow': 'Net flow', 'sv.new': 'New positions', 'sv.incr': 'Increased', 'sv.red': 'Reduced', 'sv.exit': 'Exited',
-      'so.net': 'Absolute net flow', 'flow.note': 'Net flow = gross buying − gross selling over the disclosed window. Non-compliant names stay visible for market awareness but are never actionable. Informational only — not advice.',
+      'so.net': 'Absolute net flow', 'flow.note': 'Net flow = gross buying − gross selling over the disclosed window. Excluded names stay visible for market awareness but are never actionable. Informational only — not advice.',
       'c.filter': 'Filter', 'c.sort': 'Sort', 'c.compare': 'Compare', 'c.why': 'Why this ranking?', 'c.clear': 'Clear all', 'c.search': 'Search portfolios, investors or stocks',
-      'so.return': 'Disclosed return', 'so.activity': 'Disclosed activity', 'so.followers': 'Followers', 'so.alloc': 'Compliant allocation',
+      'so.return': 'Disclosed return', 'so.activity': 'Disclosed activity', 'so.followers': 'Followers', 'so.alloc': 'Included allocation',
       'so.value': 'Disclosed value', 'so.weight': 'Position weight', 'so.filers': 'Number of filers',
-      'v.compliant': 'Included', 'v.purify': 'Watch', 'v.noncompliant': 'Excluded', 'v.review': 'Review',
-      'f.all': 'All names (incl. non-compliant)', 'f.fully': 'Compliant only', 'f.exclude': 'Exclude non-compliant', 'f.evAll': 'Any evidence strength',
+      'v.compliant': 'Included', 'v.purify': 'Watch', 'v.noncompliant': 'Excluded', 'v.review': 'Pending',
+      'f.all': 'All names', 'f.fully': 'Included only', 'f.exclude': 'Hide excluded', 'f.evAll': 'Any evidence strength',
       'h.rank': 'Rank', 'h.portfolio': 'Portfolio / filer', 'h.type': 'Type', 'h.return': 'Disclosed return', 'h.activity': 'Activity',
-      'h.freshness': 'Evidence freshness', 'h.allocation': 'Sharia allocation', 'h.purify': 'Purification', 'h.followers': 'Followers',
-      'h.stock': 'Stock & company', 'h.signal': 'Signal / activity', 'h.evidence': 'Evidence', 'h.filers': 'Filers', 'h.value': 'Disclosed value', 'h.since': 'Since disclosed', 'h.status': 'Sharia status',
+      'h.freshness': 'Evidence freshness', 'h.allocation': 'Included allocation', 'h.purify': 'Purification', 'h.followers': 'Followers',
+      'h.stock': 'Stock & company', 'h.signal': 'Signal / activity', 'h.evidence': 'Evidence', 'h.filers': 'Filers', 'h.value': 'Disclosed value', 'h.since': 'Since disclosed', 'h.status': 'Mizan Status',
       'ev.high': 'High', 'ev.medium': 'Medium', 'ev.low': 'Low',
-      'cmp.title': 'Compare portfolios', 'cmp.return': 'Disclosed return', 'cmp.disclosures': 'Disclosures', 'cmp.alloc': 'Compliant allocation', 'cmp.purify': 'Purification exposure', 'cmp.followers': 'Followers', 'cmp.open': 'Open comparison', 'cmp.tray': 'Compare {n} portfolios', 'cmp.pick': 'Select one more to compare', 'cmp.note': 'All metrics use the latest disclosed filings. Not investment advice.',
+      'cmp.title': 'Compare portfolios', 'cmp.return': 'Disclosed return', 'cmp.disclosures': 'Disclosures', 'cmp.alloc': 'Included allocation', 'cmp.purify': 'Purification exposure', 'cmp.followers': 'Followers', 'cmp.open': 'Open comparison', 'cmp.tray': 'Compare {n} portfolios', 'cmp.pick': 'Select one more to compare', 'cmp.note': 'All metrics use the latest disclosed filings. Not investment advice.',
       'ev.title': '{t} evidence', 'ev.why': 'Why {s} evidence?', 'ev.review': 'Review full evidence', 'ev.recent': 'Recent filer activity', 'ev.setalert': 'Set alert',
-      'g.portfolios': 'Rankings reflect disclosed data and calculated metrics for the selected period. Performance is never colored like a Sharia verdict; this is not advice to buy or sell.',
+      'g.portfolios': 'Rankings reflect disclosed data and calculated metrics for the selected period. Informational only — not advice to buy or sell.',
       'g.disclaimer': 'Screening based on AAOIFI Standard No. 21. Informational only — past disclosed-holdings evidence, delayed by up to 45 days. Not investment advice, brokerage, or a fatwa.',
       'meta.count': '{n} shown', 'live': 'Delayed data', 'sample': 'Sample data', 'freshUpdated': 'Updated',
       'empty.title': 'Nothing matches these filters', 'empty.body': 'Try clearing a filter or widening the time period.',
@@ -62,33 +62,33 @@
       'common.follow': 'Follow', 'common.following': 'Following', 'common.watch': 'Watch',
       'dtl.portfolio': 'Portfolio', 'dtl.stock': 'Stock', 'dtl.return': 'Disclosed return', 'dtl.returnSub': 'Disclosed-holdings performance',
       'dtl.pending': 'Pending', 'dtl.pendingSub': 'Not enough price history yet', 'dtl.attention': 'Attention',
-      'dtl.indicativeSub': 'Indicative — disclosed return, awaiting live prices', 'dtl.weight': 'weight', 'dtl.disclosed': 'disclosed', 'dtl.bought': 'Bought', 'dtl.sold': 'Sold', 'dtl.filedLater': 'filed {n}d later',
+      'dtl.indicativeSub': 'Indicative · disclosed return, price history pending', 'dtl.weight': 'weight', 'dtl.disclosed': 'disclosed', 'dtl.bought': 'Bought', 'dtl.sold': 'Sold', 'dtl.filedLater': 'filed {n}d later',
       'dtl.followers': 'followers', 'dtl.disclosures': 'disclosures', 'dtl.buyers': 'filers buying', 'dtl.filers': 'total filers',
       'dtl.perf': 'Performance', 'dtl.holdings': 'Top holdings', 'dtl.who': 'Who bought & sold', 'dtl.activity': 'Activity log',
       'dtl.nojudge': 'Not enough data yet to judge.', 'dtl.evNote': 'Disclosed-holdings evidence, delayed by filing lag (up to 45 days). Informational only — not advice or a recommendation to follow.',
-      'dtl.compNote': 'Compliance is shown as a label (AAOIFI Standard No. 21). Screening is a filter you apply elsewhere — it does not change the performance shown.',
+      'dtl.compNote': 'Mizan Status is shown as a compact label (AAOIFI Standard No. 21). Screening is a filter you apply elsewhere — it does not change the performance shown.',
       'sec.methodology': 'Methodology', 'sec.mtext': 'Screening follows AAOIFI Shariah Standard No. 21 — the current "30/30/5" rule. Two screens, both required: (1) permissible business activity, and (2) financial ratios vs. market capitalization — interest-bearing debt < 30%, cash + interest-bearing securities < 30%, and non-permissible income < 5% of revenue. Over any limit is Non-compliant. Some impure income (0–5%) is Compliant · purify — you purify that share of dividends. (The 33% figure used by some index providers is not AAOIFI.)',
     },
     ar: {
       'tab.portfolios': 'المحافظ', 'tab.stocks': 'الأسهم', 'tab.following': 'المتابَعون', 'tab.alerts': 'التنبيهات', 'tab.account': 'الحساب',
       'p.title': 'ذكاء المحافظ', 'p.sub': 'تابِع الأداء والنشاط والحيازات والتغيّرات الأخيرة عبر المحافظ المُراقبة.',
-      's.title': 'ذكاء الأسهم', 's.sub': 'استكشف النشاط المُفصَح عنه مع الأدلة والسياق الشرعي.',
-      'sv.top': 'الأفضل أداءً', 'sv.active': 'الأكثر نشاطًا', 'sv.followed': 'الأكثر متابعة', 'sv.alloc': 'أعلى تخصيص متوافق', 'sv.conc': 'الأكثر تركيزًا', 'sv.lag': 'الأسرع إفصاحًا',
+      's.title': 'ذكاء الأسهم', 's.sub': 'اقرأ تدفقات رأس المال وقيّم الأدلة.',
+      'sv.top': 'الأفضل أداءً', 'sv.active': 'الأكثر نشاطًا', 'sv.followed': 'الأكثر متابعة', 'sv.alloc': 'أعلى تخصيص مُدرَج', 'sv.conc': 'الأكثر تركيزًا', 'sv.lag': 'الأسرع إفصاحًا',
       'so.conc': 'التركيز (HHI)', 'so.lag': 'زمن الإفصاح',
       'sv.bought': 'الأكثر شراءً', 'sv.sold': 'الأكثر بيعًا', 'sv.flow': 'صافي التدفق', 'sv.new': 'مراكز جديدة', 'sv.incr': 'زيادة', 'sv.red': 'تخفيض', 'sv.exit': 'خروج',
       'so.net': 'صافي التدفق المطلق', 'flow.note': 'صافي التدفق = إجمالي الشراء − إجمالي البيع خلال نافذة الإفصاح. تبقى الأسماء غير المتوافقة ظاهرة للوعي بالسوق لكنها غير قابلة للتنفيذ. لأغراض معلوماتية فقط — ليست نصيحة.',
       'c.filter': 'تصفية', 'c.sort': 'ترتيب', 'c.compare': 'مقارنة', 'c.why': 'لماذا هذا الترتيب؟', 'c.clear': 'مسح الكل', 'c.search': 'ابحث عن محفظة أو مستثمر أو سهم',
-      'so.return': 'العائد المُفصَح', 'so.activity': 'النشاط المُفصَح', 'so.followers': 'المتابِعون', 'so.alloc': 'التخصيص المتوافق',
+      'so.return': 'العائد المُفصَح', 'so.activity': 'النشاط المُفصَح', 'so.followers': 'المتابِعون', 'so.alloc': 'التخصيص المُدرَج',
       'so.value': 'القيمة المُفصَح عنها', 'so.weight': 'وزن المركز', 'so.filers': 'عدد المُفصِحين',
-      'v.compliant': 'مُدرَج', 'v.purify': 'مراقبة', 'v.noncompliant': 'مُستبعَد', 'v.review': 'قيد المراجعة',
-      'f.all': 'كل الأسماء (متضمنة غير المتوافقة)', 'f.fully': 'المتوافقة فقط', 'f.exclude': 'استبعاد غير المتوافقة', 'f.evAll': 'أي قوة أدلة',
+      'v.compliant': 'مُدرَج', 'v.purify': 'مراقبة', 'v.noncompliant': 'مُستبعَد', 'v.review': 'قيد الانتظار',
+      'f.all': 'كل الأسماء', 'f.fully': 'المُدرَجة فقط', 'f.exclude': 'إخفاء المُستبعَدة', 'f.evAll': 'أي قوة أدلة',
       'h.rank': 'الترتيب', 'h.portfolio': 'المحفظة / المُفصِح', 'h.type': 'النوع', 'h.return': 'العائد المُفصَح', 'h.activity': 'النشاط',
-      'h.freshness': 'حداثة الأدلة', 'h.allocation': 'التخصيص الشرعي', 'h.purify': 'التطهير', 'h.followers': 'المتابِعون',
-      'h.stock': 'السهم والشركة', 'h.signal': 'الإشارة / النشاط', 'h.evidence': 'الأدلة', 'h.filers': 'المُفصِحون', 'h.value': 'القيمة المُفصَح عنها', 'h.since': 'منذ الإفصاح', 'h.status': 'الحالة الشرعية',
+      'h.freshness': 'حداثة الأدلة', 'h.allocation': 'التخصيص المُدرَج', 'h.purify': 'التطهير', 'h.followers': 'المتابِعون',
+      'h.stock': 'السهم والشركة', 'h.signal': 'الإشارة / النشاط', 'h.evidence': 'الأدلة', 'h.filers': 'المُفصِحون', 'h.value': 'القيمة المُفصَح عنها', 'h.since': 'منذ الإفصاح', 'h.status': 'حالة ميزان',
       'ev.high': 'قوي', 'ev.medium': 'متوسط', 'ev.low': 'ضعيف',
-      'cmp.title': 'مقارنة المحافظ', 'cmp.return': 'العائد المُفصَح', 'cmp.disclosures': 'الإفصاحات', 'cmp.alloc': 'التخصيص المتوافق', 'cmp.purify': 'نسبة التطهير', 'cmp.followers': 'المتابِعون', 'cmp.open': 'فتح المقارنة', 'cmp.tray': 'قارن {n} محافظ', 'cmp.pick': 'اختر واحدة أخرى للمقارنة', 'cmp.note': 'تستخدم كل المقاييس أحدث الإفصاحات. ليست نصيحة استثمارية.',
+      'cmp.title': 'مقارنة المحافظ', 'cmp.return': 'العائد المُفصَح', 'cmp.disclosures': 'الإفصاحات', 'cmp.alloc': 'التخصيص المُدرَج', 'cmp.purify': 'نسبة التطهير', 'cmp.followers': 'المتابِعون', 'cmp.open': 'فتح المقارنة', 'cmp.tray': 'قارن {n} محافظ', 'cmp.pick': 'اختر واحدة أخرى للمقارنة', 'cmp.note': 'تستخدم كل المقاييس أحدث الإفصاحات. ليست نصيحة استثمارية.',
       'ev.title': 'أدلة {t}', 'ev.why': 'لماذا الأدلة {s}؟', 'ev.review': 'مراجعة كل الأدلة', 'ev.recent': 'أحدث نشاط للمُفصِحين', 'ev.setalert': 'ضبط تنبيه',
-      'g.portfolios': 'تعكس التصنيفات بيانات مُفصَحًا عنها ومقاييس محسوبة للفترة المحددة. لا يُلوَّن الأداء كحكم شرعي، وهذا ليس نصيحة بالشراء أو البيع.',
+      'g.portfolios': 'تعكس التصنيفات بيانات مُفصَحًا عنها ومقاييس محسوبة للفترة المحددة. معلومات فقط — ليست نصيحة بالشراء أو البيع.',
       'g.disclaimer': 'الفحص وفق معيار AAOIFI رقم 21. لأغراض معلوماتية فقط — أدلة إفصاح سابقة قد تتأخر حتى 45 يومًا. ليست نصيحة استثمارية أو وساطة أو فتوى.',
       'meta.count': '{n} معروض', 'live': 'بيانات مؤجَّلة', 'sample': 'بيانات تجريبية', 'freshUpdated': 'حُدِّث',
       'empty.title': 'لا شيء يطابق هذه المرشحات', 'empty.body': 'جرّب مسح مرشح أو توسيع الفترة الزمنية.',
@@ -96,11 +96,11 @@
       'common.follow': 'متابعة', 'common.following': 'تتابعه', 'common.watch': 'مراقبة',
       'dtl.portfolio': 'المحفظة', 'dtl.stock': 'السهم', 'dtl.return': 'العائد المُفصَح', 'dtl.returnSub': 'أداء الحيازات المُفصَح عنها',
       'dtl.pending': 'قيد الانتظار', 'dtl.pendingSub': 'لا يوجد سجل أسعار كافٍ بعد', 'dtl.attention': 'الاهتمام',
-      'dtl.indicativeSub': 'تقديري — العائد المُفصَح، بانتظار الأسعار الحية', 'dtl.weight': 'الوزن', 'dtl.disclosed': 'أُفصح', 'dtl.bought': 'شراء', 'dtl.sold': 'بيع', 'dtl.filedLater': 'أُفصح بعد {n}ي',
+      'dtl.indicativeSub': 'تقديري · العائد المُفصَح، سجل الأسعار قيد الانتظار', 'dtl.weight': 'الوزن', 'dtl.disclosed': 'أُفصح', 'dtl.bought': 'شراء', 'dtl.sold': 'بيع', 'dtl.filedLater': 'أُفصح بعد {n}ي',
       'dtl.followers': 'متابِع', 'dtl.disclosures': 'إفصاح', 'dtl.buyers': 'جهة تشتري', 'dtl.filers': 'إجمالي المُفصِحين',
       'dtl.perf': 'الأداء', 'dtl.holdings': 'أهم الحيازات', 'dtl.who': 'مَن اشترى وباع', 'dtl.activity': 'سجل النشاط',
       'dtl.nojudge': 'لا توجد بيانات كافية للحكم بعد.', 'dtl.evNote': 'أدلة الحيازات المُفصَح عنها، متأخرة بزمن الإفصاح (حتى 45 يومًا). لأغراض معلوماتية فقط — ليست نصيحة أو توصية بالمتابعة.',
-      'dtl.compNote': 'يُعرض الالتزام كوسم (معيار AAOIFI رقم 21). الفحص مرشِّح تطبّقه في مكان آخر — ولا يغيّر الأداء المعروض.',
+      'dtl.compNote': 'تُعرض حالة ميزان كوسم مختصر (معيار AAOIFI رقم 21). الفحص مرشِّح تطبّقه في مكان آخر — ولا يغيّر الأداء المعروض.',
       'sec.methodology': 'المنهجية', 'sec.mtext': 'يتبع الفحص معيار AAOIFI الشرعي رقم 21 — قاعدة «30/30/5» الحالية. فحصان، كلاهما مطلوب: (1) نشاط تجاري مباح، و(2) نسب مالية إلى القيمة السوقية — الدين بفائدة < 30%، والنقد والأوراق ذات الفائدة < 30%، والدخل غير المباح < 5% من الإيراد. تجاوز أي حد = غير متوافق. دخل غير نقي يسير (0–5%) = متوافق · تطهير. (نسبة 33% لدى بعض مزوّدي المؤشرات ليست من AAOIFI.)',
     },
   };
@@ -465,13 +465,13 @@
     const ar = LANG === 'ar', exp = myExposure();
     const tag = `<span class="mz-badge" style="min-height:1.3rem;font-size:.62rem;background:var(--mz-cobalt-50);color:var(--mz-cobalt-700);border:1px solid var(--mz-cobalt-100)">${ar ? 'قراءة فقط' : 'Read-only'}</span>`;
     const head = `<div style="display:flex;align-items:center;gap:.5rem"><h3 style="margin:0">${ar ? 'محفظتي' : 'My portfolio'}</h3>${tag}</div>`;
-    const note = `<p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;margin:.4rem 0 0">${ar ? 'أضِف حيازاتك لرؤية التزامك الشرعي وكيف تتقاطع مع المحافظ المتابَعة. لأغراض معلوماتية فقط — لا وسيط، لا أوامر، لا ميزانية. تُحفظ في هذا المتصفح فقط.' : 'Add your holdings to see your Sharia exposure and how you overlap with tracked portfolios. Informational only — no broker, no orders, no budget. Stored only in this browser.'}</p>`;
+    const note = `<p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;margin:.4rem 0 0">${ar ? 'أضِف حيازاتك لرؤية توزيع حالة ميزان وكيف تتقاطع مع المحافظ المتابَعة. لأغراض معلوماتية فقط — لا وسيط، لا أوامر، لا ميزانية. تُحفظ في هذا المتصفح فقط.' : 'Add your holdings to see your Mizan Status mix and how you overlap with tracked portfolios. Informational only — no broker, no orders, no budget. Stored only in this browser.'}</p>`;
     if (!exp) {
-      return `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)">${head}${note}<textarea id="myHoldingsInput" rows="3" placeholder="AAPL 20000, MSFT 15000, JPM 10000" style="width:100%;box-sizing:border-box;margin-block-start:.75rem;padding:.6rem;border:var(--mz-border);border-radius:var(--mz-radius-sm);font:inherit;font-size:var(--mz-text-sm);resize:vertical"></textarea><div style="display:flex;gap:.5rem;margin-block-start:.6rem;flex-wrap:wrap"><button class="mz-button mz-button--primary" id="myImportBtn">${ar ? 'تحليل الحيازات' : 'Import holdings'}</button><button class="mz-button mz-button--secondary" id="mySampleBtn">${ar ? 'تجربة حيازات نموذجية' : 'Try sample holdings'}</button></div><p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${ar ? 'الصيغة: رمز ثم قيمة اختيارية، لكل سطر أو مفصولة بفواصل. بدون قيم = أوزان متساوية.' : 'Format: ticker then optional amount, per line or comma-separated. No amounts = equal weight.'}</p></section>`;
+      return `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)">${head}${note}<textarea id="myHoldingsInput" rows="3" aria-label="${ar ? 'رموز الحيازات وقيمها الاختيارية' : 'Holding tickers and optional amounts'}" placeholder="${ar ? 'رمز السهم، ثم القيمة الاختيارية' : 'Ticker, then optional amount'}" style="width:100%;box-sizing:border-box;margin-block-start:.75rem;padding:.6rem;border:var(--mz-border);border-radius:var(--mz-radius-sm);font:inherit;font-size:var(--mz-text-sm);resize:vertical"></textarea><div style="display:flex;gap:.5rem;margin-block-start:.6rem;flex-wrap:wrap"><button class="mz-button mz-button--primary" id="myImportBtn">${ar ? 'تحليل الحيازات' : 'Import holdings'}</button><button class="mz-button mz-button--secondary" id="mySampleBtn">${ar ? 'تجربة حيازات نموذجية' : 'Try sample holdings'}</button></div><p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${ar ? 'الصيغة: رمز ثم قيمة اختيارية، لكل سطر أو مفصولة بفواصل. بدون قيم = أوزان متساوية.' : 'Format: ticker then optional amount, per line or comma-separated. No amounts = equal weight.'}</p></section>`;
     }
     const holdings = exp.rows.map((h) => `<div class="mz-hold"><div class="mz-hold__n"><div class="mz-ltr" style="font-weight:750">${esc(h.ticker)}</div><div class="mz-entity__meta">${esc(h.company || (ar ? 'قيد المراجعة' : 'under review'))} · ${wpct(h.weight)}${ar ? ' وزن' : ' weight'}</div></div>${badge(h.label)}</div>`).join('');
     return `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)">${head}
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-start:.75rem"><span class="mz-muted" style="font-size:var(--mz-text-xs)">${exp.count} ${ar ? 'اسم' : (exp.count === 1 ? 'holding' : 'holdings')}${exp.totalValue != null ? ` · ${fmtMoney(exp.totalValue)}` : ''}</span><span style="font-size:var(--mz-text-xs);font-weight:750;color:var(--mz-cobalt-700)">${wpct(exp.mix.clean + exp.mix.purify)} ${ar ? 'متوافق' : 'compliant'}</span></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-block-start:.75rem"><span class="mz-muted" style="font-size:var(--mz-text-xs)">${exp.count} ${ar ? 'اسم' : (exp.count === 1 ? 'holding' : 'holdings')}${exp.totalValue != null ? ` · ${fmtMoney(exp.totalValue)}` : ''}</span><span style="font-size:var(--mz-text-xs);font-weight:750;color:var(--mz-cobalt-700)">${wpct(exp.mix.clean + exp.mix.purify)} ${ar ? 'مُدرَج ومراقبة' : 'included + watch'}</span></div>
       <div style="margin-block-start:.5rem">${exposureBar(exp.mix)}</div>
       <div class="mz-legend" style="margin-block-start:.6rem">${legendFor(exp.mix)}</div>
       ${exp.mix.purify > 0 && exp.purifyPct > 0 ? `<p class="mz-muted" style="font-size:var(--mz-text-xs);margin:.5rem 0 0">${ar ? `تطهير تقديري ~${exp.purifyPct}% من أرباح الأسماء القابلة للتملّك.` : `Est. purification ~${exp.purifyPct}% of dividends on the ownable names.`}</p>` : ''}
@@ -484,14 +484,14 @@
   function vsMineSection(p) {
     const ar = LANG === 'ar', cmp = compareToMine(p);
     if (!cmp) {
-      return `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.4rem">${ar ? 'مقابل محفظتك' : 'Vs your portfolio'}</div><p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;margin:0 0 .55rem">${ar ? 'أضِف حيازاتك (قراءة فقط) لترى التقاطع والتزامك الشرعي مقابل هذه المحفظة.' : 'Add your holdings (read-only) to see the overlap and your Sharia exposure vs this portfolio.'}</p><button class="mz-button mz-button--secondary" data-nav="account">${ar ? 'أضِف محفظتي' : 'Add my portfolio'}</button></div>`;
+      return `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.4rem">${ar ? 'مقابل محفظتك' : 'Vs your portfolio'}</div><p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;margin:0 0 .55rem">${ar ? 'أضِف حيازاتك (قراءة فقط) لترى التقاطع وتوزيع حالة ميزان مقابل هذه المحفظة.' : 'Add your holdings (read-only) to see the overlap and your Mizan Status mix vs this portfolio.'}</p><button class="mz-button mz-button--secondary" data-nav="account">${ar ? 'أضِف محفظتي' : 'Add my portfolio'}</button></div>`;
     }
     const yourComp = cmp.mine.mix.clean + cmp.mine.mix.purify;
     const stat = (lab, val, col) => `<div style="flex:1"><div class="mz-muted" style="font-size:var(--mz-text-xs)">${lab}</div><div style="font-weight:800;font-variant-numeric:tabular-nums;${col ? `color:${col}` : ''}">${val}</div></div>`;
     const chip = (tk, fail) => `<span class="mz-signal" data-tone="muted"><span class="mz-ltr" style="font-weight:700${fail ? ';text-decoration:line-through' : ''}">${esc(tk)}</span></span>`;
     const list = (arr, empty, showFail) => arr.length ? `<span class="mz-signals">${arr.slice(0, 8).map((h) => chip(h.ticker, showFail && h.label === 'fail')).join('')}</span>` : `<span class="mz-muted" style="font-size:var(--mz-text-xs)">${empty}</span>`;
     return `<div class="mz-drawer__section"><div class="mz-cmp-metric__label" style="margin-block-end:.5rem">${ar ? 'مقابل محفظتك' : 'Vs your portfolio'}</div>
-      <div style="display:flex;gap:1rem;margin-block-end:.65rem">${stat(ar ? 'التزامك' : 'You compliant', wpct(yourComp), 'var(--mz-cobalt-700)')}${stat(ar ? 'التزامهم' : 'Them compliant', wpct(cmp.theirCompliant), 'var(--mz-cobalt-700)')}${stat(ar ? 'مشترك' : 'Shared', String(cmp.overlap.length))}</div>
+      <div style="display:flex;gap:1rem;margin-block-end:.65rem">${stat(ar ? 'التزامك' : 'Your included + watch', wpct(yourComp), 'var(--mz-cobalt-700)')}${stat(ar ? 'التزامهم' : 'Their included + watch', wpct(cmp.theirCompliant), 'var(--mz-cobalt-700)')}${stat(ar ? 'مشترك' : 'Shared', String(cmp.overlap.length))}</div>
       <div style="margin-block-end:.55rem"><div class="mz-entity__meta" style="margin-block-end:.3rem">${ar ? 'تملكونه معًا' : 'You both hold'}</div>${list(cmp.overlap, ar ? 'لا تقاطع' : 'No overlap')}</div>
       <div><div class="mz-entity__meta" style="margin-block-end:.3rem">${ar ? 'يملكونه ولا تملكه' : 'They hold, you don’t'}</div>${list(cmp.theirsOnly, '—', true)}</div>
       <p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.5;margin:.6rem 0 0">${ar ? 'لأغراض معلوماتية فقط — للتوعية، ليست توصية بالشراء أو البيع. الأسماء المشطوبة غير متوافقة.' : 'Informational only — for awareness, not a recommendation. Struck-through names are non-compliant.'}</p></div>`;
@@ -599,8 +599,8 @@
   };
   // Compact compliance tag — small pill, no longer the loud hero (performance-led).
   const compliancePill = (tone) => badge(tone);
-  // Portfolios use the owner's sign-based performance palette; other views keep cobalt.
-  const portfolioColor = (val) => val == null ? 'var(--mz-ink-400)' : val >= 0 ? 'var(--mz-compliant-600)' : 'var(--mz-noncompliant-600)';
+  // Shared copper/ink performance palette; status colors remain a separate compact signal.
+  const portfolioColor = (val) => val == null ? 'var(--mz-ink-400)' : val >= 0 ? 'var(--mz-cobalt-700)' : 'var(--mz-ink-600)';
   const portfolioTone = (p) => p.mix.unscreened > 0 && portfolioFlag(p).tone === 'clean' ? 'purify' : portfolioFlag(p).tone;
   const latestFiling = (rows) => rows.map((r) => r[FIELD.filedDate]).filter((d) => d && isFinite(Date.parse(d))).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
   const portfolioReturn = (ret) => `<span class="mz-pf-return" style="color:${portfolioColor(ret.val)}">${ret.val == null ? '—' : fmtPct(ret.val)}</span>${ret.indicative ? `<span class="mz-cell-context">${LANG === 'ar' ? 'تقديري · منذ الإفصاح' : 'indicative · since disclosed'}</span>` : ''}`;
@@ -672,12 +672,12 @@
   function chart(hist, opts) {
     opts = opts || {};
     const cls = opts.cls || 'mz-chart--full';
-    const h = cls === 'mz-chart--spark' ? 28 : cls === 'mz-chart--card' ? 40 : 120;
+    const h = cls === 'mz-chart--spark' ? 44 : cls === 'mz-chart--card' ? 64 : 180;
     const data = (hist || []).filter((p) => p && isFinite(+p.c));
     if (data.length < 2) return `<div class="mz-chart ${cls} mz-chart__empty" style="height:${h}px">${opts.empty || '—'}</div>`;
     const closes = data.map((p) => +p.c), mn = Math.min(...closes), mx = Math.max(...closes), rng = (mx - mn) || 1;
     const W = 320, H = 100, sw = cls === 'mz-chart--full' ? 1.7 : 1.4;
-    const line = `<polyline points="${chartPath(closes, W, H, mn, mx)}" fill="none" stroke="${esc(opts.color || 'var(--mz-cobalt-600)')}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+    const line = `<polyline points="${chartPath(closes, W, H, mn, mx)}" fill="none" stroke="${esc(opts.color || 'var(--mz-cobalt-600)')}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
     const area = opts.area ? `<polygon points="0,${H} ${chartPath(closes, W, H, mn, mx)} ${W},${H}" fill="${esc(opts.color || 'var(--mz-cobalt-600)')}" opacity="0.08"/>` : '';
     const valueAxis = opts.valueAxis ? `<span class="mz-chart__value-axis">${[mx, (mn + mx) / 2, mn].map((v) => `<span>${(v / closes[0] * 100 - 100).toFixed(0)}%</span>`).join('')}</span>` : '';
     let cmp = '';
@@ -688,7 +688,7 @@
     if (opts.markers && opts.markers.length) {
       const nearest = (d) => { const t0 = Date.parse(d); if (!isFinite(t0)) return -1; let bi = -1, bd = Infinity; for (let i = 0; i < data.length; i++) { const dd = Math.abs(Date.parse(data[i].d) - t0); if (dd < bd) { bd = dd; bi = i; } } return bi; };
       const valid = opts.markers.filter((m) => m && m.d);
-      markers = valid.map((m) => { const i = nearest(m.d); if (i < 0) return ''; const p = at(i); const sell = String(m.side).toUpperCase() === 'SELL'; return `<span class="mz-chart__mk" data-side="${sell ? 'sell' : 'buy'}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${esc((sell ? 'Sold' : 'Bought') + (m.label ? ' ' + m.label : '') + ' · ' + shortDate(m.d))}"></span>`; }).join('');
+      markers = valid.map((m) => { const i = nearest(m.d); if (i < 0) return ''; const p = at(i); const sell = String(m.side).toUpperCase() === 'SELL'; return `<span class="mz-chart__mk" data-side="${sell ? 'sell' : 'buy'}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${esc((sell ? t('dtl.sold') : t('dtl.bought')) + (m.label ? ' ' + m.label : '') + ' · ' + shortDate(m.d))}"></span>`; }).join('');
       // Encode markers so the scrub tooltip can reveal WHAT was traded when it passes over a dot.
       marksAttr = ` data-marks="${esc(JSON.stringify(valid.map((m) => [m.d, String(m.side).toUpperCase() === 'SELL' ? 'S' : 'B', m.label || ''])))}"`;
     }
@@ -702,11 +702,11 @@
       : '';
     const series = esc(JSON.stringify(data.map((p) => [p.d, +p.c])));
     const unit = opts.unit === 'index' ? 'index' : 'price';
-    return `<div class="mz-chart ${cls}" data-series="${series}" data-unit="${unit}" data-min="${mn}" data-max="${mx}"${marksAttr} style="height:${h}px;--mz-chart-color:${esc(opts.color || 'var(--mz-cobalt-600)')}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${area}${cmp}${line}</svg>${valueAxis}${markers}${todayDot}${todayLab}${axisEls}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
+    return `<div class="mz-chart ${cls}" tabindex="0" role="img" aria-label="${esc(LANG === 'ar' ? 'سجل الأداء — اسحب لرؤية التاريخ والقيمة' : 'Performance history — scrub for date and value')}" data-series="${series}" data-unit="${unit}" data-min="${mn}" data-max="${mx}"${marksAttr} style="height:${h}px;--mz-chart-color:${esc(opts.color || 'var(--mz-cobalt-600)')}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${area}${cmp}${line}</svg>${valueAxis}${markers}${todayDot}${todayLab}${axisEls}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
   }
 
   // Interactive scrub — ONE handler drives every chart (touch + pointer). Registered once.
-  const chartTip = (() => { const el = document.createElement('div'); el.className = 'mz-chart-tip'; document.body.appendChild(el); return el; })();
+  const chartTip = (() => { const el = document.createElement('div'); el.className = 'mz-chart-tip'; el.id = 'chartTooltip'; el.setAttribute('role', 'tooltip'); document.body.appendChild(el); return el; })();
   function chartHideTip() { if (!chartTip.classList.contains('is-on')) return; chartTip.classList.remove('is-on'); document.querySelectorAll('.mz-chart.is-active').forEach((c) => c.classList.remove('is-active')); }
   function chartScrub(clientX, target) {
     const el = target && target.closest && target.closest('.mz-chart[data-series]');
@@ -730,9 +730,25 @@
       } catch (e) { /* ignore */ }
     }
     chartTip.textContent = `${el.dataset.unit === 'index' ? c.toFixed(2) + (LANG === 'ar' ? ' · مؤشر' : ' · index') : '$' + c.toFixed(2)} · ${shortDate(d)}${extra}`;
-    chartTip.style.left = (rect.left + px) + 'px'; chartTip.style.top = (rect.top + py) + 'px';
     chartTip.classList.add('is-on');
+    const halfTip = chartTip.getBoundingClientRect().width / 2;
+    chartTip.style.left = Math.max(halfTip + 8, Math.min(window.innerWidth - halfTip - 8, rect.left + px)) + 'px';
+    chartTip.style.top = Math.max(chartTip.getBoundingClientRect().height + 16, rect.top + py) + 'px';
   }
+  // Keyboard access uses the same scrub calculation and tooltip as pointer/touch.
+  document.addEventListener('keydown', (e) => {
+    const el = e.target.closest && e.target.closest('.mz-chart[data-series]');
+    if (!el || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const data = JSON.parse(el.dataset.series), last = data.length - 1;
+    const current = +(el.dataset.scrubIndex || 0);
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? last : Math.max(0, Math.min(last, current + (e.key === 'ArrowRight' ? 1 : -1)));
+    el.dataset.scrubIndex = next;
+    el.setAttribute('aria-describedby', 'chartTooltip');
+    const rect = el.getBoundingClientRect();
+    chartScrub(rect.left + next / last * rect.width, el);
+  });
+  document.addEventListener('focusout', (e) => { if (e.target.matches('.mz-chart')) chartHideTip(); });
   document.addEventListener('pointermove', (e) => chartScrub(e.clientX, e.target));
   document.addEventListener('pointerdown', (e) => chartScrub(e.clientX, e.target));
   document.addEventListener('pointerup', chartHideTip);
@@ -764,14 +780,17 @@
     document.documentElement.lang = LANG; document.documentElement.dir = LANG === 'ar' ? 'rtl' : 'ltr';
     document.body.classList.toggle('mz-portfolios-page', S.tab === 'portfolios');
     const brand = document.querySelector('.mz-utility-rail__brand');
-    brand.innerHTML = S.tab === 'portfolios' ? 'mizan<small>Financial Intelligence</small>' : 'm<span class="mz-brand-balance" aria-hidden="true"></span>';
+    brand.innerHTML = `<span class="mz-brand-glyph" aria-hidden="true">m.</span><span class="mz-brand-name">mizān<small>${LANG === 'ar' ? 'ذكاء مالي على الطيار الآلي' : 'Financial Intelligence on Autopilot'}</small></span>`;
     // rail
     const navItems = [['portfolios', I.portfolios, 'tab.portfolios'], ['stocks', I.stocks, 'tab.stocks'], ['following', I.star, 'tab.following'], ['alerts', I.bell, 'tab.alerts'], ['account', I.user, 'tab.account']];
     document.getElementById('railNav').innerHTML = navItems.map(([k, ic, lk]) => `<a href="/${k}" class="mz-rail-link" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
     const lang = document.getElementById('langToggle'); lang.innerHTML = `<span style="width:1.4rem">${I.globe}</span><span>${LANG === 'en' ? 'ع' : 'EN'}</span>`;
     document.getElementById('themeToggle').innerHTML = `<span style="width:1.4rem">${I.user.replace('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', '<circle cx="12" cy="12" r="8"/><path d="M12 4v16"/>')}</span><span>${LANG === 'ar' ? (THEME === 'light' ? 'داكن' : 'فاتح') : (THEME === 'light' ? 'Dark' : 'Light')}</span>`;
-    document.getElementById('brandCaption').textContent = LANG === 'ar' ? 'ذكاء السوق' : 'Market intelligence';
+    document.getElementById('brandCaption').textContent = LANG === 'ar' ? 'اكتشف · قيّم · راقب' : 'Discover · Evaluate · Monitor';
     document.getElementById('search').setAttribute('aria-label', t('c.search'));
+    document.querySelector('.mz-utility-rail').setAttribute('aria-label', LANG === 'ar' ? 'التنقل الرئيسي' : 'Primary navigation');
+    document.getElementById('mobileNav').setAttribute('aria-label', LANG === 'ar' ? 'التنقل الرئيسي' : 'Primary navigation');
+    document.getElementById('timebar').setAttribute('aria-label', LANG === 'ar' ? 'الفترة الزمنية' : 'Time period');
     // top tabs
     document.querySelectorAll('#topTabs .mz-product-tab').forEach((b) => { const on = b.dataset.tab === S.tab || (S.tab === 'portfolios' && b.dataset.tab === 'portfolios'); b.textContent = t('tab.' + b.dataset.tab); b.setAttribute('aria-selected', (b.dataset.tab === S.tab) || (['following', 'alerts', 'account'].includes(S.tab) && b.dataset.tab === 'portfolios' && false)); });
     document.querySelectorAll('#topTabs .mz-product-tab').forEach((b) => b.setAttribute('aria-selected', b.dataset.tab === (S.tab === 'stocks' ? 'stocks' : 'portfolios')));
@@ -781,7 +800,7 @@
     document.getElementById('bellBtn').setAttribute('aria-label', t('tab.alerts'));
     document.getElementById('langToggle').setAttribute('aria-label', t('acct.lang'));
     document.getElementById('themeToggle').setAttribute('aria-label', LANG === 'ar' ? 'تبديل المظهر' : 'Toggle appearance');
-    document.getElementById('freshness').innerHTML = S.tab === 'portfolios' ? `${I.clock}<span>${LANG === 'ar' ? 'بيانات متأخرة' : 'Delayed data'}</span>` : esc(S.live ? t('live') : t('sample'));
+    document.getElementById('freshness').innerHTML = `${I.clock}<span>${S.loading ? (LANG === 'ar' ? 'جارٍ قراءة الإفصاحات' : 'Reading disclosures') : esc(S.live ? t('live') : t('sample') + ' · ' + t('live'))}</span>`;
     // mobile nav
     document.getElementById('mobileNav').innerHTML = navItems.map(([k, ic, lk]) => `<a href="/${k}" class="mz-mobile-nav__item" data-nav="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span style="width:1.4rem">${ic}</span><span>${t(lk)}</span></a>`).join('');
   }
@@ -812,7 +831,7 @@
     cmp.dataset.active = S.compareMode;
     document.getElementById('portfolioControls')?.remove();
     if (isP) {
-      document.getElementById('controlRow').insertAdjacentHTML('afterbegin', `<div id="portfolioControls" class="mz-pf-controls"><label>${LANG === 'ar' ? 'ترتيب حسب' : 'Sort by'}<select id="portfolioSort">${P_SUB.map(([k]) => `<option value="${k}" ${k === S.pMetric ? 'selected' : ''}>${t(P_SORT[k])}</option>`).join('')}</select></label><label>${LANG === 'ar' ? 'الحالة' : 'Status'}<select id="portfolioStatus">${[['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('v.compliant')], ['watch', t('v.purify')], ['excluded', t('v.noncompliant')], ...(S.compliance === 'exclude' ? [['exclude', t('f.exclude')]] : [])].map(([k, label]) => `<option value="${k}" ${S.compliance === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label><div class="mz-search mz-pf-search"><span class="mz-search__icon">${I.search}</span><input id="portfolioSearch" type="search" aria-label="${LANG === 'ar' ? 'بحث المحافظ' : 'Search portfolios'}" placeholder="${LANG === 'ar' ? 'بحث المحافظ…' : 'Search portfolios...'}" value="${esc(S.query)}"></div></div>`);
+      document.getElementById('controlRow').insertAdjacentHTML('afterbegin', `<div id="portfolioControls" class="mz-pf-controls"><label>${LANG === 'ar' ? 'ترتيب حسب' : 'Sort by'}<select id="portfolioSort">${P_SUB.map(([k]) => `<option value="${k}" ${k === S.pMetric ? 'selected' : ''}>${t(P_SORT[k])}</option>`).join('')}</select></label><label>${t('h.status')}<select id="portfolioStatus">${[['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('v.compliant')], ['watch', t('v.purify')], ['excluded', t('v.noncompliant')], ...(S.compliance === 'exclude' ? [['exclude', t('f.exclude')]] : [])].map(([k, label]) => `<option value="${k}" ${S.compliance === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label><div class="mz-search mz-pf-search"><span class="mz-search__icon">${I.search}</span><input id="portfolioSearch" type="search" aria-label="${LANG === 'ar' ? 'بحث المحافظ' : 'Search portfolios'}" placeholder="${LANG === 'ar' ? 'بحث المحافظ…' : 'Search portfolios...'}" value="${esc(S.query)}"></div></div>`);
     }
     // applied chips
     const chips = [];
@@ -845,7 +864,7 @@
         item(ar ? 'تحتاج انتباهًا' : 'Requiring attention', attn, ar ? 'مراقبة أو مستبعدة' : 'Watch or excluded', I.info, 'var(--mz-purify-600)');
       return;
     }
-    // Stocks keeps its existing hero — this redesign is scoped to the Portfolios page.
+    // The stock brief leads with the selected-period return and filing context.
     el.className = 'mz-brief';
     const ret = lead ? returnOf(histOf(lead.ticker), lead.perf) : null;
     const name = lead ? lead.ticker : t('dtl.pending');
@@ -871,7 +890,7 @@
   }
   function screeningSection(rows) {
     const ar = LANG === 'ar', names = [...new Map(rows.map((r) => [r.ticker, r])).values()];
-    return `<section class="mz-drawer__section mz-screening"><div class="mz-section-title"><h3>${ar ? 'أدلة الفحص الشرعي' : 'Screening evidence'}</h3><span class="mz-eyebrow">AAOIFI · 30/30/5</span></div><p class="mz-entity__meta">${ar ? 'نسب الأسماء المُفصَح عنها؛ ليست متوسطًا للمحفظة.' : 'Ratios for disclosed names; no portfolio averaging.'}</p>${names.map((r) => `<details class="mz-screening__name" ${names.length === 1 ? 'open' : ''}><summary><b class="mz-ltr">${esc(r.ticker)}</b>${badge(r.label || labelOf(r))}</summary>${ratioMeters(r)}<p class="mz-entity__meta">${ar ? 'النشاط التجاري' : 'Business activity'}: ${r.businessStatus === 'fail' ? (ar ? 'لم يجتز' : 'Does not pass') : r.businessStatus === 'pass' ? (ar ? 'اجتاز' : 'Passes') : (ar ? 'قيد المراجعة' : 'Under review')} · ${ar ? 'أُفصح' : 'Disclosed'} ${esc(fDisclosed(r) || '—')}</p></details>`).join('')}</section>`;
+    return `<section class="mz-drawer__section mz-screening"><div class="mz-section-title"><h3>${ar ? 'أدلة فحص ميزان' : 'Screening evidence'}</h3><span class="mz-eyebrow">AAOIFI · 30/30/5</span></div><p class="mz-entity__meta">${ar ? 'نسب الأسماء المُفصَح عنها؛ ليست متوسطًا للمحفظة.' : 'Ratios for disclosed names; no portfolio averaging.'}</p>${names.map((r) => `<details class="mz-screening__name" ${names.length === 1 ? 'open' : ''}><summary><b class="mz-ltr">${esc(r.ticker)}</b>${badge(r.label || labelOf(r))}</summary>${ratioMeters(r)}<p class="mz-entity__meta">${ar ? 'النشاط التجاري' : 'Business activity'}: ${r.businessStatus === 'fail' ? (ar ? 'لم يجتز' : 'Does not pass') : r.businessStatus === 'pass' ? (ar ? 'اجتاز' : 'Passes') : (ar ? 'قيد المراجعة' : 'Under review')} · ${ar ? 'أُفصح' : 'Disclosed'} ${esc(fDisclosed(r) || '—')}</p></details>`).join('')}</section>`;
   }
 
   /* ---------------------------------------------------------------- tables + cards */
@@ -884,9 +903,9 @@
       document.getElementById('resultMeta').textContent = '';
       document.getElementById('legend').innerHTML = '';
       document.getElementById('thead').innerHTML = '';
-      document.getElementById('cards').innerHTML = '';
+      document.getElementById('cards').innerHTML = emptyState(I.clock, LANG === 'ar' ? 'جارٍ قراءة الإفصاحات…' : 'Reading disclosures…', LANG === 'ar' ? 'نحضّر الأدلة لمساحة عملك.' : 'Preparing the evidence for your workspace.');
       document.getElementById('tableWrap').style.display = '';
-      document.getElementById('tbody').innerHTML = `<tr><td colspan="8"><div class="mz-state"><div class="mz-state__content"><p class="mz-muted">${LANG === 'ar' ? 'جارٍ تحميل البيانات الحية…' : 'Loading live data…'}</p></div></div></td></tr>`;
+      document.getElementById('tbody').innerHTML = `<tr><td colspan="8"><div class="mz-state"><div class="mz-state__content"><span class="mz-loading-mark" aria-hidden="true">${I.clock}</span><p class="mz-muted" role="status">${LANG === 'ar' ? 'جارٍ قراءة الإفصاحات…' : 'Reading disclosures…'}</p><div class="mz-skeleton" style="height:8px;width:12rem"></div></div></div></td></tr>`;
       return;
     }
     document.getElementById('marketBrief').hidden = ['following', 'alerts', 'account'].includes(S.tab);
@@ -903,7 +922,7 @@
       thead.innerHTML = `<tr><th>#</th><th>${t('h.portfolio')}</th><th>${t('h.return')} (${esc(tfLabelNow())})</th><th>${t('h.activity')}</th><th>${t('dtl.holdings')}</th><th>${LANG === 'ar' ? 'آخر تقديم' : 'Last filing'}</th><th>${LANG === 'ar' ? 'حالة ميزان' : 'Mizan Status'}</th><th>${t('common.follow')}</th></tr>`;
       tbody.innerHTML = list.map((p, i) => {
         const sel = S.compareMode ? S.selected.includes(p.name) : S.drawer?.type === 'detail' && S.drawer.name === p.name;
-        const first = S.compareMode ? `<button class="mz-check-btn" data-select="${esc(p.name)}" data-on="${sel}" aria-label="Select">${sel ? I.check : ''}</button>` : `<span class="mz-rank">${i + 1}</span>`;
+        const first = S.compareMode ? `<button class="mz-check-btn" data-select="${esc(p.name)}" data-on="${sel}" aria-label="${LANG === 'ar' ? 'اختر للمقارنة' : 'Select for comparison'}">${sel ? I.check : ''}</button>` : `<span class="mz-rank">${i + 1}</span>`;
         const date = latestFiling(p.rows);
         return `<tr tabindex="0" role="button" data-row="portfolio" data-id="${esc(p.name)}" data-selected="${sel}"><td>${first}</td><td>${entity(esc(p.initials), p.name, esc(typeLabel(p.kind)))}</td><td><div class="mz-perf-cell">${portfolioReturn(p.ret)}${chart(sliceTf(portfolioIndexHist(p.rows)), { cls: 'mz-chart--spark', unit: 'index', color: portfolioColor(p.ret.val) })}</div></td><td class="mz-cell-num">${p.count}<span class="mz-cell-context">${LANG === 'ar' ? 'إفصاح' : p.count === 1 ? 'Disclosure' : 'Disclosures'}</span></td><td class="mz-cell-num">${p.holdings}<span class="mz-cell-context">${LANG === 'ar' ? 'أسهم' : p.holdings === 1 ? 'Stock' : 'Stocks'}</span></td><td>${date ? esc(shortDate(date)) : '—'}<span class="mz-cell-context">${p.fresh == null ? t('dtl.pending') : `${p.fresh}${LANG === 'ar' ? 'ي مضت' : 'd ago'}`}</span></td><td>${compliancePill(portfolioTone(p))}</td><td>${starBtn(p.name)}</td></tr>`;
       }).join('') || emptyRow(8);
@@ -930,7 +949,7 @@
     document.getElementById('guardrail').textContent = t('flow.note');
   }
   // Honest "why is this empty" note. When most disclosed names have no Sharia verdict yet they
-  // are (correctly) hidden — an unscreened name is never shown as compliant — so the board can
+  // are (correctly) hidden — an unscreened name is never shown as included — so the board can
   // read empty while real data exists. This explains that with the real counts from /api/status
   // (total disclosures) and the live feed (S.rows = the screened names that passed the gate),
   // instead of a silent zero. Returns '' when the data is healthy or status is unavailable.
@@ -945,8 +964,8 @@
     const hidden = Math.max(0, total - screenedShown);
     if (!hidden && !screeningOff) return '';
     const ar = LANG === 'ar';
-    const en = `Sharia screening ${screeningOff ? "isn’t enabled yet" : 'is still catching up'} — ${screenedShown} of ${total} disclosed ${total === 1 ? 'name has' : 'names have'} a verdict, so ${hidden} ${hidden === 1 ? 'name is' : 'names are'} hidden (an unscreened name is never shown as compliant). Rankings fill in once screening ${screeningOff ? 'is turned on' : 'completes'}.`;
-    const arS = `الفحص الشرعي ${screeningOff ? 'غير مُفعَّل بعد' : 'لا يزال قيد الاستكمال'} — ${screenedShown} من ${total} اسمًا مُفصحًا لها حكم، لذا تُخفى ${hidden} اسمًا (لا يُعرض الاسم غير المفحوص كمتوافق). تُعبّأ القوائم بمجرد ${screeningOff ? 'تفعيل الفحص' : 'اكتمال الفحص'}.`;
+    const en = `Mizan screening ${screeningOff ? "isn’t enabled yet" : 'is still catching up'} — ${screenedShown} of ${total} disclosed ${total === 1 ? 'name has' : 'names have'} a verdict, so ${hidden} ${hidden === 1 ? 'name is' : 'names are'} hidden (an unscreened name is never shown as included). Rankings fill in once screening ${screeningOff ? 'is turned on' : 'completes'}.`;
+    const arS = `فحص ميزان ${screeningOff ? 'غير مُفعَّل بعد' : 'لا يزال قيد الاستكمال'} — ${screenedShown} من ${total} اسمًا مُفصحًا لها حكم، لذا تُخفى ${hidden} اسمًا (لا يُعرض الاسم غير المفحوص كمُدرَج). تُعبّأ القوائم بمجرد ${screeningOff ? 'تفعيل الفحص' : 'اكتمال الفحص'}.`;
     return `<p class="mz-muted" style="font-size:var(--mz-text-xs);line-height:1.6;margin:.6rem auto 0;max-width:40rem">${ar ? arS : en}</p>`;
   }
 
@@ -1000,7 +1019,8 @@
     const div = document.createElement('div'); div.id = 'acctPanel';
     const title = { following: 'follow.title', alerts: 'alerts.title', account: 'acct.title' }[S.tab];
     document.getElementById('pageTitle').textContent = t(title);
-    document.getElementById('pageSub').textContent = '';
+    document.getElementById('pageSub').textContent = (LANG === 'ar' ? { following: 'المحافظ التي تهمّك. الأدلة التي تحتاجها.', alerts: 'أحدث الإفصاحات من المحافظ التي تتابعها.', account: 'مساحة عملك، حسب تفضيلاتك.' } : { following: 'Your watchlist. Your next perspective.', alerts: 'The latest disclosures from portfolios you follow.', account: 'Your workspace, on your terms.' })[S.tab];
+    div.className = 'mz-secondary mz-secondary--' + S.tab;
     document.getElementById('guardrail').textContent = S.tab === 'account' ? t('g.disclaimer') : '';
 
     if (S.tab === 'account') {
@@ -1009,7 +1029,7 @@
         myPortfolioPanel() +
         `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)"><h3>${LANG === 'ar' ? 'المظهر' : 'Appearance'}</h3>${seg('data-theme-pick', THEME, [['light', LANG === 'ar' ? 'فاتح' : 'Light'], ['dark', LANG === 'ar' ? 'داكن' : 'Dark']])}</section>` +
         `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)"><h3>${t('acct.lang')}</h3>${seg('data-lang', LANG, [['en', 'English'], ['ar', 'العربية']])}</section>` +
-        `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)"><h3>${LANG === 'ar' ? 'حساسية الحكم' : 'Verdict tolerance'}</h3><p class="mz-muted" style="margin:.25rem 0 .75rem;font-size:var(--mz-text-sm)">${LANG === 'ar' ? 'يضبط الافتراضي لكل القوائم.' : 'Sets the default across every list.'}</p>${seg('data-fc', S.compliance, [['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('f.fully')], ['exclude', t('f.exclude')]])}</section>` +
+        `<section class="mz-surface" style="padding:var(--mz-space-5);margin-block-end:var(--mz-space-4)"><h3>${LANG === 'ar' ? 'مرشّح حالة ميزان الافتراضي' : 'Default Mizan Status filter'}</h3><p class="mz-muted" style="margin:.25rem 0 .75rem;font-size:var(--mz-text-sm)">${LANG === 'ar' ? 'يضبط الافتراضي لكل القوائم.' : 'Sets the default across every list.'}</p>${seg('data-fc', S.compliance, [['all', LANG === 'ar' ? 'الكل' : 'All'], ['fully', t('f.fully')], ['exclude', t('f.exclude')]])}</section>` +
         `<section class="mz-surface" style="padding:var(--mz-space-5)"><h3>${t('sec.methodology')}</h3><p class="mz-muted" style="margin:0;line-height:1.55">${t('sec.mtext')}</p></section>`;
     } else if (S.tab === 'following') {
       const followed = derivePortfolios(S.rows).filter((p) => S.follows.has(p.name) && p.holdings >= MIN_HOLDINGS);
@@ -1274,9 +1294,9 @@
   function alertWhy() {
     const isP = S.tab === 'portfolios';
     const key = isP ? P_SORT[S.pMetric] : S_SORT[S_SUB.find((x) => x[0] === S.sMetric)[3]];
-    const msg = isP
-      ? `Ranked by ${t(key).toLowerCase()} for the selected period — a neutral, evidence-only figure from disclosed data. Never a Sharia signal, never a prediction.`
-      : `Ranked by ${t(key).toLowerCase()}. Disclosed value is summed disclosed dollars; filers is the number of independent disclosing investors; evidence strength grows with independent, consistent, fresh filings.`;
+    const msg = LANG === 'ar'
+      ? (isP ? `الترتيب حسب ${t(key)} للفترة المحددة، باستخدام البيانات المُفصَح عنها. معلومات فقط — ليست توقّعًا للأداء أو حكمًا لحالة ميزان.` : `الترتيب حسب ${t(key)}. القيمة هي مجموع القيم المُفصَح عنها، والمُفصِحون هم المستثمرون المستقلون. تزيد قوة الأدلة مع استقلال الإفصاحات واتّساقها وحداثتها.`)
+      : (isP ? `Ranked by ${t(key).toLowerCase()} for the selected period, using disclosed data. Informational only — not a performance prediction or Mizan Status signal.` : `Ranked by ${t(key).toLowerCase()}. Disclosed value is summed disclosed dollars; filers is the number of independent disclosing investors; evidence strength grows with independent, consistent, fresh filings.`);
     window.alert(t('c.why') + '\n\n' + msg);
   }
   document.addEventListener('click', (e) => {
