@@ -700,7 +700,16 @@
   const recentRows = (rows, days) => rows.filter((r) => (daysSince(r[FIELD.filedDate]) ?? 1e9) <= days);
   const byFiled = (a, b) => (Date.parse(b[FIELD.filedDate]) || 0) - (Date.parse(a[FIELD.filedDate]) || 0);
   const eligible = () => derivePortfolios(S.rows).filter((p) => p.holdings >= MIN_HOLDINGS);
-  const dataLabel = () => S.loading ? L('Loading…', 'جارٍ التحميل…') : S.live ? L('Delayed data', 'بيانات متأخرة') : L('Sample data', 'بيانات نموذجية');
+  // Never "Live": prices are cached daily closes and filings lag trades by law. Say exactly how fresh.
+  const dayMonth = (d) => { const ms = Date.parse(d); return isFinite(ms) ? new Date(ms).toLocaleDateString(LANG === 'ar' ? 'ar' : 'en-US', { month: 'short', day: 'numeric', ...(/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? { timeZone: 'UTC' } : {}) }) : ''; };
+  const priceAsOf = () => { let best = null; for (const k in S.prices) { const h = (S.prices[k] && S.prices[k][FIELD.priceHistory]) || []; const d = h.length ? h[h.length - 1].d : null; if (d && (!best || Date.parse(d) > Date.parse(best))) best = d; } return best; };
+  const dataLabel = () => {
+    if (S.loading) return L('Loading…', 'جارٍ التحميل…');
+    if (!S.live) return L('Sample data', 'بيانات نموذجية');
+    const pd = priceAsOf(), fd = latestFiling(S.rows), age = pd ? daysSince(pd) : null;
+    const parts = [pd ? L(`Prices ${dayMonth(pd)}`, `الأسعار ${dayMonth(pd)}`) : L('Prices pending', 'الأسعار قيد الانتظار'), fd ? L(`Filings to ${dayMonth(fd)}`, `الإفصاحات حتى ${dayMonth(fd)}`) : ''];
+    return parts.filter(Boolean).join(' · ') + (age != null && age > 5 ? L(' · Stale', ' · قديمة') : '');
+  };
 
   /* ---- Real portraits. Congress members: official public-domain portrait when the feed carries a
      Bioguide id. Everyone else: the Wikipedia/Wikimedia image, accepted ONLY when the article's
@@ -739,7 +748,24 @@
     const src = opts.noPhoto ? null : photoFor(name, opts.group || 'fund', opts.row);
     return `<span class="avatar ${opts.cls || ''}" data-tone="${TONE[opts.tone] || 'pending'}" data-photo="${esc(name)}" aria-hidden="true">${esc(opts.initials || ini(name))}${src ? imgTag(src) : ''}</span>`;
   }
-  const pAvatar = (p, cls) => avatar(p.name, { group: p.group, tone: portfolioTone(p), cls, initials: p.initials, row: p.rows[0] });
+  // Portfolio-level Mizan Status = the real mix of its distinct names, never a blanket verdict
+  // (one excluded name used to stamp a 31-of-48-passing portfolio "EXCLUDED").
+  function shareOf(p) {
+    const names = new Map(); p.rows.forEach((r) => names.set(r.ticker, r.label));
+    const c = { clean: 0, purify: 0, fail: 0, unscreened: 0 }; names.forEach((l) => { c[l] = (c[l] || 0) + 1; });
+    const total = names.size || 1, pass = c.clean + c.purify;
+    // Band (pill / cover / portrait hue): all Included -> included; nothing excluded, or at least
+    // half passing -> watch; under half passing -> excluded; nothing screened yet -> pending.
+    const band = c.unscreened === total ? 'unscreened' : (c.fail === 0 && c.purify === 0 && c.unscreened === 0) ? 'clean' : (c.fail === 0 || pass / total >= 0.5) ? 'purify' : 'fail';
+    return { ...c, total, pass, ratio: pass / total, band };
+  }
+  const sharePill = (p) => {
+    const sh = shareOf(p);
+    const tip = L(`${sh.clean} Included · ${sh.purify} Watch · ${sh.fail} Excluded${sh.unscreened ? ` · ${sh.unscreened} Pending` : ''} (AAOIFI 30/30/5)`, `${sh.clean} مُدرَج · ${sh.purify} مراقبة · ${sh.fail} مستبعد${sh.unscreened ? ` · ${sh.unscreened} قيد المراجعة` : ''} (AAOIFI 30/30/5)`);
+    const txt = sh.pass === sh.total ? L(`ALL ${sh.total} PASS`, `كلها تجتاز (${sh.total})`) : L(`${sh.pass} OF ${sh.total} PASS`, `${sh.pass} من ${sh.total} تجتاز`);
+    return `<span class="status ${STATUS_CLS[sh.band]}" title="${esc(tip)}">${esc(txt)}</span>`;
+  };
+  const pAvatar = (p, cls) => avatar(p.name, { group: p.group, tone: shareOf(p).band, cls, initials: p.initials, row: p.rows[0] });
 
   // Return carries its context (timeframe, or "indicative" when prices are pending). Blue/ink only.
   const retTag = (ret) => {
@@ -783,13 +809,13 @@
   function investorCard(p) {
     const moves = recentRows(p.rows, 30).length;
     return `<article class="card investor-card" tabindex="0" role="link" data-open-portfolio="${esc(p.name)}">
-      <div class="cover ${COVER[portfolioTone(p)] || ''}">${pAvatar(p, 'portrait')}</div>
-      <div class="body"><h3>${esc(p.name)}</h3><div class="meta">${esc(typeLabel(p.kind))} · ${esc(L(`latest filing ${shortDate(latestFiling(p.rows)) || '—'}`, `آخر إفصاح ${shortDate(latestFiling(p.rows)) || '—'}`))}</div>${badge(portfolioTone(p))}
+      <div class="cover ${COVER[shareOf(p).band] || ''}">${pAvatar(p, 'portrait')}</div>
+      <div class="body"><h3>${esc(p.name)}</h3><div class="meta">${esc(typeLabel(p.kind))} · ${esc(L(`latest filing ${shortDate(latestFiling(p.rows)) || '—'}`, `آخر إفصاح ${shortDate(latestFiling(p.rows)) || '—'}`))}</div>${sharePill(p)}
       <div class="kpirow"><div class="kpi"><b>${p.holdings}</b><span>${L('holdings', 'أسهم')}</span></div><div class="kpi"><b>${moves}</b><span>${L('moves · 30d', 'تحركات · 30ي')}</span></div><div class="kpi"><b>${ago(p.fresh)}</b><span>${L('freshness', 'الحداثة')}</span></div></div></div></article>`;
   }
   function pageDiscover() {
     const ports = eligible();
-    const featured = [...ports].sort((a, b) => ((b.ret && b.ret.val) ?? -1e9) - ((a.ret && a.ret.val) ?? -1e9)).slice(0, 4);
+    const featured = [...ports].sort((a, b) => shareOf(b).ratio - shareOf(a).ratio || (((b.ret && b.ret.val) ?? -1e9) - ((a.ret && a.ret.val) ?? -1e9))).slice(0, 4);
     const week = recentRows(S.rows, 7), followedWeek = new Set(week.filter((r) => S.follows.has(r.actor)).map((r) => r.actor)).size;
     const latest = latestFiling(S.rows);
     const today = S.follows.size
@@ -826,7 +852,8 @@
     const r = p.ret || {}, known = r.val != null && isFinite(r.val);
     const note = thinIdxNote(p) ? ', ' + thinIdxNote(p) : '';
     const ret = known ? L(`Return ${r.val >= 0 ? '▲' : '▼'} ${Math.abs(r.val).toFixed(1)}% (${r.indicative ? 'indicative, since disclosed' : r.tf || tfLabelNow()}${note}).`, `العائد ${r.val >= 0 ? '▲' : '▼'} ${Math.abs(r.val).toFixed(1)}% (${r.indicative ? 'تقديري، منذ الإفصاح' : r.tf || tfLabelNow()}${note}).`) : L('Return pending.', 'العائد قيد الانتظار.');
-    const comp = p.mix.fail ? L('Holds Excluded names.', 'يضم أسماء مستبعدة.') : p.mix.unscreened ? L('Some names are pending screening.', 'بعض الأسماء بانتظار الفحص.') : p.mix.purify ? L('Included, with names that need purification.', 'مُدرَج، مع أسماء تحتاج تطهيرًا.') : L('All disclosed names are Included.', 'كل الأسماء المُفصَح عنها مُدرَجة.');
+    const sh = shareOf(p);
+    const comp = L(`${sh.pass} of ${sh.total} names pass AAOIFI (${sh.clean} Included, ${sh.purify} Watch)${sh.fail ? `; ${sh.fail} Excluded` : ''}${sh.unscreened ? `; ${sh.unscreened} pending screening` : ''}.`, `${sh.pass} من ${sh.total} أسماء تجتاز AAOIFI (${sh.clean} مُدرَج، ${sh.purify} مراقبة)${sh.fail ? `؛ ${sh.fail} مستبعد` : ''}${sh.unscreened ? `؛ ${sh.unscreened} قيد الفحص` : ''}.`);
     const act = L(`${plural(p.count, 'disclosure', 'disclosures')} across ${plural(p.holdings, 'name', 'names')}; latest filed ${ago(p.fresh)} ago.`, `${p.count} إفصاح عبر ${p.holdings} أسماء؛ آخرها منذ ${ago(p.fresh)}.`);
     return `${ret} ${comp} ${act}`;
   }
@@ -836,7 +863,7 @@
     if (!p) return `<aside class="card panel">${emptyCard(t('dtl.pending'), t('empty.body'))}</aside>`;
     const moves = recentRows(p.rows, 30).length, events = p.rows.slice().sort(byFiled).slice(0, 3);
     const thin = p.holdings < MIN_HOLDINGS;
-    return `<aside class="card panel"><div class="panel-head">${pAvatar(p)}<div><div class="eyebrow">${L('Selected investor', 'المستثمر المحدد')}</div><h2>${esc(p.name)}</h2>${badge(portfolioTone(p))}</div></div>
+    return `<aside class="card panel"><div class="panel-head">${pAvatar(p)}<div><div class="eyebrow">${L('Selected investor', 'المستثمر المحدد')}</div><h2>${esc(p.name)}</h2>${sharePill(p)}</div></div>
       <div class="hero">${esc(L(`${moves} ${moves === 1 ? 'move' : 'moves'}`, `${moves} تحركات`))}</div>
       <div class="summary">${esc(L('Disclosures filed in the last 30 days.', 'إفصاحات خلال آخر 30 يومًا.'))} ${esc(mizanRead(p))}</div>
       <div class="activity">${events.map((r) => `<div class="event"><i></i><div><strong>${esc(sideWord(r.side).replace(/^./, (c) => c.toUpperCase()))} <span dir="ltr">${esc(r.ticker)}</span></strong><small>${esc(disclosedMoney(r))} · ${esc(shortDate(fDisclosed(r)) || '—')}${lagText(r) ? ' · ' + esc(lagText(r)) : ''}</small></div><span class="mono">${String(r.side).toUpperCase() === 'SELL' ? '↓' : '↑'}</span></div>`).join('')}</div>
@@ -847,17 +874,17 @@
     S.tab = 'portfolios';
     const list = currentList(), all = eligible();
     const sel = list.find((p) => p.name === S.sel) || list[0];
-    const statusOpts = STATUS_OPTS();
+    const statusOpts = [['all', L('Status: all', 'الحالة: الكل')], ['fully', L('All names Included', 'كل الأسماء مُدرَجة')], ['watch', L('All pass · some purification', 'كلها تجتاز · بعضها يحتاج تطهيرًا')], ['exclude', L('No excluded names', 'بلا أسماء مستبعدة')], ['excluded', L('Has excluded names', 'تضم أسماء مستبعدة')]];
     const metric = (label, val, sub) => `<div class="metric"><span>${label}</span><b>${val}</b><small>${sub}</small></div>`;
     const rows = list.map((p) => `<tr data-select="${esc(p.name)}" aria-selected="${sel && sel.name === p.name}" tabindex="0">
         <td><a class="person" href="/portfolio/${encodeURIComponent(p.name)}" data-open-portfolio="${esc(p.name)}">${pAvatar(p)}<div><strong>${esc(p.name)}</strong><small>${esc(typeLabel(p.kind))} · ${esc(plural2(p.holdings, 'holding', 'holdings', 'أسهم'))}</small></div></a></td>
         <td>${retTag(p.ret)}${thinIdxNote(p) && p.ret && p.ret.val != null ? `<small class="ctx">${esc(thinIdxNote(p))}</small>` : ''}</td>
         <td class="mono">${esc(plural2(p.count, 'update', 'updates', 'إفصاح'))}</td>
         <td class="mono">${ago(p.fresh)}<small>${esc(shortDate(latestFiling(p.rows)) || '—')}</small></td>
-        <td>${badge(portfolioTone(p))}</td><td>${star(p.name)}</td></tr>`).join('');
+        <td>${sharePill(p)}</td><td>${star(p.name)}</td></tr>`).join('');
     return pageHead(L('Portfolio Intelligence', 'ذكاء المحافظ'), L('People first. Data when you need it.', 'الأشخاص أولًا. والبيانات عند الحاجة.'), L('Compare disclosed portfolios without losing the human context behind each decision.', 'قارن المحافظ المُفصَح عنها دون أن تفقد السياق الإنساني وراء كل قرار.'),
         sel ? `<button class="btn btn-primary" type="button" data-follow="${esc(sel.name)}">${S.follows.has(sel.name) ? t('common.following') : L('+ Follow portfolio', '+ متابعة المحفظة')}</button>` : '') +
-      `<div class="metric-strip">${metric(L('Tracked portfolios', 'محافظ متابَعة'), list.length, L(`of ${all.length} with ≥${MIN_HOLDINGS} holdings`, `من ${all.length} بثلاثة أسهم فأكثر`))}${metric(L('New filings', 'إفصاحات جديدة'), recentRows(list.flatMap((p) => p.rows), 30).length, L('last 30 days', 'آخر 30 يومًا'))}${metric(L('Fresh this week', 'حديثة هذا الأسبوع'), list.filter((p) => p.fresh != null && p.fresh <= 7).length, L('filed ≤ 7 days ago', 'خلال 7 أيام'))}${metric(L('Watch status', 'حالة مراقبة'), list.filter((p) => portfolioTone(p) === 'purify').length, L('need purification', 'تحتاج تطهيرًا'))}${metric(L('Pending', 'قيد المراجعة'), list.filter((p) => p.mix.unscreened > 0).length, L('names awaiting screening', 'أسماء بانتظار الفحص'))}</div>
+      `<div class="metric-strip">${metric(L('Tracked portfolios', 'محافظ متابَعة'), list.length, L(`of ${all.length} with ≥${MIN_HOLDINGS} holdings`, `من ${all.length} بثلاثة أسهم فأكثر`))}${metric(L('New filings', 'إفصاحات جديدة'), recentRows(list.flatMap((p) => p.rows), 30).length, L('last 30 days', 'آخر 30 يومًا'))}${metric(L('Fresh this week', 'حديثة هذا الأسبوع'), list.filter((p) => p.fresh != null && p.fresh <= 7).length, L('filed ≤ 7 days ago', 'خلال 7 أيام'))}${metric(L('All names pass', 'كل الأسماء تجتاز'), list.filter((p) => shareOf(p).pass === shareOf(p).total).length, L('no excluded or pending names', 'بلا أسماء مستبعدة أو معلّقة'))}${metric(L('With excluded names', 'تضم أسماء مستبعدة'), list.filter((p) => shareOf(p).fail > 0).length, L('see the pass share per investor', 'انظر نسبة الاجتياز لكل مستثمر'))}</div>
       <div class="toolbar">${seg(['1M', '3M', '6M', '1Y', '3Y', 'ALL'])}<select class="select" id="pSort" aria-label="${L('Sort', 'ترتيب')}">${P_SUB.map(([k]) => `<option value="${k}" ${k === S.pMetric ? 'selected' : ''}>${L('Sort: ', 'ترتيب: ')}${esc(t(P_SORT[k]).toLowerCase())}</option>`).join('')}</select><select class="select" id="pStatus" aria-label="${t('h.status')}">${statusOpts.map(([k, l]) => `<option value="${k}" ${S.compliance === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><input class="search" id="pSearch" type="search" style="width:220px" value="${esc(S.query)}" placeholder="${L('Find a portfolio', 'ابحث عن محفظة')}" aria-label="${L('Find a portfolio', 'ابحث عن محفظة')}"></div>
       <div class="grid two"><div class="card table-card"><table class="table"><thead><tr><th>${L('Investor', 'المستثمر')}</th><th>${L('Return', 'العائد')} (${esc(tfLabelNow())})</th><th>${L('Activity', 'النشاط')}</th><th>${L('Freshness', 'الحداثة')}</th><th>${L('Mizan Status', 'حالة ميزان')}</th><th>${L('Follow', 'متابعة')}</th></tr></thead><tbody>${rows || `<tr><td colspan="6">${emptyCard(t('empty.title'), t('empty.body'), readinessNote())}</td></tr>`}</tbody></table></div>
       ${portfolioPanel(sel)}</div>${footnote()}`;
@@ -882,7 +909,7 @@
     const sides = {}; p.rows.forEach((r) => { const k = sides[r.ticker] || (sides[r.ticker] = new Set()); k.add(String(r.side).toUpperCase() === 'SELL' ? 'S' : 'B'); });
     const sideTxt = (tk) => sides[tk].size > 1 ? L('bought & sold', 'شراء وبيع') : sides[tk].has('S') ? L('sold', 'بيع') : L('bought', 'شراء');
     const marks = p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, label: r.ticker }));
-    return `<div class="detail-hero">${pAvatar(p)}<div><div class="eyebrow">${esc(L('Investor profile', 'ملف المستثمر'))} · ${esc(typeLabel(p.kind))}</div><h1>${esc(p.name)}</h1><p>${esc(typeLabel(p.kind))} · ${esc(plural2(p.holdings, 'disclosed name', 'disclosed names', 'أسماء مُفصَح عنها'))} · ${esc(plural2(p.count, 'disclosure', 'disclosures', 'إفصاح'))}</p><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${badge(portfolioTone(p))}<span class="chip">${esc(L(`Updated ${ago(p.fresh)} ago`, `حُدّث منذ ${ago(p.fresh)}`))}</span>${thin ? '' : star(p.name)}</div></div>
+    return `<div class="detail-hero">${pAvatar(p)}<div><div class="eyebrow">${esc(L('Investor profile', 'ملف المستثمر'))} · ${esc(typeLabel(p.kind))}</div><h1>${esc(p.name)}</h1><p>${esc(typeLabel(p.kind))} · ${esc(plural2(p.holdings, 'disclosed name', 'disclosed names', 'أسماء مُفصَح عنها'))} · ${esc(plural2(p.count, 'disclosure', 'disclosures', 'إفصاح'))}</p><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${sharePill(p)}<span class="chip">${esc(L(`Updated ${ago(p.fresh)} ago`, `حُدّث منذ ${ago(p.fresh)}`))}</span>${thin ? '' : star(p.name)}</div></div>
         <div class="detail-stat"><span class="muted">${L('Recent activity', 'النشاط الأخير')}</span><b>${esc(L(`${moves} ${moves === 1 ? 'move' : 'moves'}`, `${moves} تحركات`))}</b><small class="muted">${L('last 30 days', 'آخر 30 يومًا')}</small></div></div>
       <div class="detail-grid"><div class="grid">
         ${thin ? `<section class="card block"><h2>${L('Activity only', 'النشاط فقط')}</h2><p class="muted" style="line-height:1.6">${esc(L(`Fewer than ${MIN_HOLDINGS} distinct disclosed names, so this filer is not ranked, followable or shown as a portfolio return. The disclosures below are the evidence.`, `أقل من ${MIN_HOLDINGS} أسماء مُفصَح عنها، لذا لا يُرتَّب هذا المُفصِح ولا يمكن متابعته ولا يُعرض له عائد محفظة. الإفصاحات أدناه هي الأدلة.`))}</p></section>` : `<section class="card block"><div class="section-title"><h2>${L('Portfolio movement', 'حركة المحفظة')}</h2>${seg(['1M', '3M', '6M', '1Y', 'ALL'])}</div><div style="display:flex;align-items:baseline;gap:10px">${retTag(p.ret)}${idxN < MIN_HOLDINGS ? `<span class="chip">${esc(L(`Based on ${idxN} of ${p.holdings} names — indicative only`, `مبني على ${idxN} من ${p.holdings} أسماء — تقديري فقط`))}</span>` : ''}</div>${chartFrame(chart(sliceTf(portfolioIndexHist(p.rows)), { unit: 'index', markers: marks, axis: true, empty: t('dtl.pending') }), tradeLegend())}<p class="footnote">${esc(L(`Equal-weight index (start = 100) of ${idxN} of ${p.holdings} disclosed names — those with cached prices; Excluded names are left out. Trades outside the price window are not pinned.`, `مؤشر متساوي الأوزان (البداية = 100) لـ ${idxN} من ${p.holdings} أسماء مُفصَح عنها — ذات الأسعار المخزّنة، دون الأسماء المستبعدة.`))}</p></section>`}
@@ -942,7 +969,7 @@
     const chips = [['all', L('All', 'الكل')], ['filings', L('New filings', 'إفصاحات جديدة')], ['freshness', L('Freshness', 'الحداثة')]];
     const items = [
       ...(f === 'freshness' ? [] : notes.map((r) => { const d = daysSince(r[FIELD.filedDate]); return { d, html: `<div class="row"><span class="alert-tags">${d != null && d <= 7 ? `<span class="chip">${L('NEW', 'جديد')}</span>` : ''}${badge(r.label)}</span><div class="person" data-open-stock="${esc(r.ticker)}" role="link" tabindex="0">${avatar(r.actor, { group: groupOf(r.kind), tone: r.label, row: r, initials: r.initials })}<div><strong>${esc(r.actor)} ${sideWord(r.side)} <span dir="ltr">${esc(r.ticker)}</span></strong><small>${esc(disclosedMoney(r))} · ${esc(L('disclosed', 'أُفصح'))} ${esc(shortDate(fDisclosed(r)) || '—')}${lagText(r) ? ' · ' + esc(lagText(r)) : ''}</small></div></div><span class="mono">${ago(d)}</span></div>` }; })),
-      ...(f === 'filings' ? [] : stale.map((p) => ({ d: p.fresh, html: `<div class="row"><span class="alert-tags"><span class="chip">${L('STALE', 'قديم')}</span>${badge(portfolioTone(p))}</span><div class="person" data-open-portfolio="${esc(p.name)}" role="link" tabindex="0">${pAvatar(p)}<div><strong>${esc(L(`${p.name} has no fresh disclosure in ${p.fresh} days`, `لا إفصاح جديد من ${p.name} منذ ${p.fresh} يومًا`))}</strong><small>${L('Evidence freshness', 'حداثة الأدلة')}</small></div></div><span class="mono">${ago(p.fresh)}</span></div>` }))),
+      ...(f === 'filings' ? [] : stale.map((p) => ({ d: p.fresh, html: `<div class="row"><span class="alert-tags"><span class="chip">${L('STALE', 'قديم')}</span>${sharePill(p)}</span><div class="person" data-open-portfolio="${esc(p.name)}" role="link" tabindex="0">${pAvatar(p)}<div><strong>${esc(L(`${p.name} has no fresh disclosure in ${p.fresh} days`, `لا إفصاح جديد من ${p.name} منذ ${p.fresh} يومًا`))}</strong><small>${L('Evidence freshness', 'حداثة الأدلة')}</small></div></div><span class="mono">${ago(p.fresh)}</span></div>` }))),
     ].sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9));
     return pageHead(L('Monitor', 'راقب'), L('Alerts that explain what changed.', 'تنبيهات تشرح ما الذي تغيّر.'), L('From the investors you follow, newest first, with amount, date and filing lag.', 'من المستثمرين الذين تتابعهم، الأحدث أولًا، مع المبلغ والتاريخ وتأخر الإفصاح.'), `<a class="btn btn-primary" href="/account" data-nav="account">${L('Alert settings', 'إعدادات التنبيهات')}</a>`) +
       `<div class="toolbar">${chips.map(([k, l]) => `<button type="button" class="chip ${f === k ? 'on' : ''}" data-alert="${k}" aria-pressed="${f === k}">${l}</button>`).join('')}</div>` +
