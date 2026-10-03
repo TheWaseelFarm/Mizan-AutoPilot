@@ -21,7 +21,7 @@
 // Tunables (all optional env):
 //   QUIVER_API_BASE        default https://api.quiverquant.com
 //   QUIVER_SOURCES         comma list: congress,insiders,sec13f  (default all)
-//   QUIVER_CONGRESS_PATH   default /beta/bulk/congresstrading
+//   QUIVER_CONGRESS_PATH   default /beta/live/congresstrading (recent; bulk is 50MB+ full history)
 //   QUIVER_INSIDER_PATH    default /beta/live/insiders
 //   QUIVER_13F_PATH        default /beta/live/sec13fchanges
 
@@ -55,6 +55,25 @@ function midpoint(amount){
   return v.length>=2 ? Math.round((v[0]+v[1])/2) : (v[0]??null);
 }
 function money(n){ return n==null ? "" : `$${Math.round(n).toLocaleString("en-US")}`; }
+// STOCK Act PTR bands. Quiver's bulk feed gives only the band's lower bound as a
+// numeric string ("15001.0"); expand it back to the disclosed range.
+const PTR_BANDS = [
+  [1001, 15000], [15001, 50000], [50001, 100000], [100001, 250000],
+  [250001, 500000], [500001, 1000000], [1000001, 5000000],
+  [5000001, 25000000], [25000001, 50000000], [50000001, null],
+];
+function ptrRange(raw){
+  const s = String(raw ?? "").trim();
+  if(!s) return { amount: "", amountMid: null };
+  if(/[-–]|\$/.test(s)) return { amount: s, amountMid: midpoint(s) };   // already "$1,001 - $15,000"
+  const lo = numOrNull(s);
+  const band = lo != null && PTR_BANDS.find(([a]) => a === Math.round(lo));
+  if(!band) return { amount: money(lo), amountMid: lo };
+  const [a, b] = band;
+  return b == null
+    ? { amount: `Over ${money(a - 1)}`, amountMid: a }
+    : { amount: `${money(a)} - ${money(b)}`, amountMid: Math.round((a + b) / 2) };
+}
 function cleanTicker(v){
   const t = String(v||"").trim().toUpperCase();
   return (!t || t === "--" || !/[A-Z]/.test(t)) ? null : t;
@@ -98,8 +117,14 @@ function mapCongress(t){
   const ticker = cleanTicker(pick(t, ["Ticker","ticker","symbol"]));
   if(!ticker) return null;
 
+  // Equities only: options, bonds, crypto etc. would read as a stock position.
+  const assetType = String(pick(t, ["TickerType","AssetType"]) || "").toLowerCase();
+  if(/option|^op$|bond|crypto|^gs$|other/.test(assetType)) return null;
+
   const name = pick(t, ["Representative","Senator","Name","representative"]) || "Public Official Filing";
   const typeStr = String(pick(t, ["Transaction","TransactionType","Type","transaction"]) || "").toLowerCase();
+  // "Exchange" is neither a buy nor a sell — skip rather than mislabel it.
+  if(typeStr.includes("exchange")) return null;
   const side = typeStr.includes("sale") || typeStr.includes("sell") ? "SELL" : "BUY";
 
   // Combined endpoint carries the chamber in "House" ("Representatives"/"Senate").
@@ -108,9 +133,7 @@ function mapCongress(t){
     : (chamber.includes("house") || chamber.includes("representative")) ? "House PTR"
     : "Congress PTR";
 
-  const amountRaw = pick(t, ["Range","Amount","Trade_Size_USD","amount","range"]);
-  const amount = typeof amountRaw === "number" ? money(amountRaw) : (amountRaw || "");
-  const amountMid = typeof amountRaw === "number" ? amountRaw : midpoint(amountRaw);
+  const { amount, amountMid } = ptrRange(pick(t, ["Range","range","Amount","Trade_Size_USD","amount"]));
   const filedRaw = pick(t, ["ReportDate","Filed","Disclosed","filingDate","reportDate"]);
 
   return {
@@ -202,7 +225,7 @@ function sourcesEnabled(){
 function registry(){
   const on = sourcesEnabled();
   return [
-    { key: "congress", path: process.env.QUIVER_CONGRESS_PATH || "/beta/bulk/congresstrading", map: mapCongress, cap: 60 },
+    { key: "congress", path: process.env.QUIVER_CONGRESS_PATH || "/beta/live/congresstrading", map: mapCongress, cap: 60 },
     { key: "insiders", path: process.env.QUIVER_INSIDER_PATH  || "/beta/live/insiders",         map: mapInsider,  cap: 60 },
     { key: "sec13f",   path: process.env.QUIVER_13F_PATH      || "/beta/live/sec13fchanges",    map: map13F,      cap: 80 },
   ].filter(s => on.has(s.key));
