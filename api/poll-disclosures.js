@@ -4,7 +4,12 @@
 import { requireCron } from "./_lib/cron.js";
 import { supabase } from "./_lib/supabase.js";
 import { classifyAAOIFI } from "./_lib/aaoifi.js";
- import { fetchNewDisclosures } from "./_lib/sources/fmp.js";  // -> ./sources/quiver.js later
+import { fetchNewDisclosures as fetchFromFmp } from "./_lib/sources/fmp.js";
+import { fetchNewDisclosures as fetchFromQuiver } from "./_lib/sources/quiver.js";
+// Prefer Quiver (real congressional data) when a key is present; else keep FMP.
+const fetchNewDisclosures = () =>
+  process.env.QUIVER_API_KEY ? fetchFromQuiver() : fetchFromFmp();
+const activeSource = () => (process.env.QUIVER_API_KEY ? "quiver" : "fmp");
 // Cache-aware screener. Uses Zoya when SCREENING_API_KEY is set, else the mock adapter —
 // the app keeps working without a key.
 import { screenCached } from "./_lib/screening/index.js";
@@ -59,7 +64,7 @@ export default async function handler(req, res) {
     } catch (e) {
       const rateLimited = /429|limit reach|rate limit|too many/i.test(e.message || "");
       return res.status(200).json({
-        ok: false, checked: 0, inserted: 0,
+        ok: false, source: activeSource(), checked: 0, inserted: 0,
         skipped: rateLimited ? "source_rate_limited" : "source_error",
         detail: String(e.message || e).slice(0, 200),
       });
@@ -82,7 +87,7 @@ export default async function handler(req, res) {
         notified += await notifyFollowers(db, { ...rec, id: data[0].id });
       }
     }
-    return res.status(200).json({ ok: true, checked: incoming.length, inserted, notified });
+    return res.status(200).json({ ok: true, source: activeSource(), checked: incoming.length, inserted, notified });
   } catch (e) {
     // Keep the cron alive on unexpected errors too (report in the body, not via a 5xx that
     // would get the job auto-disabled). Truly fatal misconfig still surfaces here.
