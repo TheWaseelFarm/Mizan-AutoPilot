@@ -4,6 +4,9 @@
 // the poll loop to screen + upsert (each becomes a disclosure row carrying `position_value`),
 // so fund composition weights by the reported holding value — exact, never a sum of re-files.
 //
+// NOTE: the live 13F source is now ./edgar13f.js (SEC EDGAR directly, same row shape, wired into
+// poll-disclosures behind ENABLE_13F). This FMP-based scaffold is kept as an alternative.
+//
 // STATUS: real fetch is scaffolded but OFF until wired. It needs:
 //   1. FMP_API_KEY (same key as prices/PTRs), and
 //   2. a fund → CIK map (13F filings are keyed by the fund's SEC CIK, not its name).
