@@ -40,7 +40,7 @@ export async function fetchPrice(ticker) {
   if (data && data.status === "error") {
     const msg = String(data.message || "Twelve Data error");
     if (data.code === 429 || /api credits|rate limit|too many|run out/i.test(msg)) throw new RateLimitError(msg);
-    if (/not found|invalid symbol|no data|not available/i.test(msg)) return null; // genuine no-data
+    if (/not found|invalid symbol|no data|not available|available starting with|missing or invalid/i.test(msg)) return null; // genuine no-data
     throw new Error(msg);
   }
 

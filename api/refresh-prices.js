@@ -1,15 +1,26 @@
 // GET /api/refresh-prices?secret=CRON_SECRET
 // Refreshes cached quotes + daily history (via Twelve Data) for the distinct tickers in
-// `disclosures`, OLDEST updated_at first. One API call per ticker; MAX_TICKERS keeps a run
-// under Twelve Data's free per-minute cap (8/min).
-// Idempotent; returns { done, failed, remaining } so the daily routine can call it repeatedly.
+// `disclosures` that are DUE (never fetched, or last attempted > 20h ago), half never-fetched /
+// half oldest-existing per batch (see _lib/price-queue.js). One API call per ticker; MAX_TICKERS
+// keeps a run under Twelve Data's free per-minute cap (8/min). A FAILED attempt also touches
+// updated_at (without clobbering cached history), so tickers that always fail (paid-plan or
+// invalid symbols) rotate to the back instead of blocking the queue.
+// Idempotent; returns { done, failed, remaining } where `remaining` = tickers still DUE after this
+// batch, so a caller can loop until it reaches 0.
 import { requireCron } from "./_lib/cron.js";
 import { supabase } from "./_lib/supabase.js";
 import { fetchPrice } from "./_lib/prices/twelvedata.js";
+import { pickBatch } from "./_lib/price-queue.js";
 
 const MAX_TICKERS = 8; // Twelve Data free tier: 8 requests/min. One run (1 call/ticker) stays
                        // under the per-minute cap; the daily routine calls this several times
                        // (oldest-first) to cycle every ticker.
+
+// Record a failed attempt: bump updated_at only (an upsert of just these columns leaves any cached
+// history/quote intact). Best-effort — never throws.
+async function markAttempt(db, ticker) {
+  try { await db.from("prices").upsert({ ticker, updated_at: new Date().toISOString() }, { onConflict: "ticker" }); } catch (e) { /* ignore */ }
+}
 
 export default async function handler(req, res) {
   if (!requireCron(req, res)) return;
@@ -26,20 +37,14 @@ export default async function handler(req, res) {
     if (pErr) throw pErr;
     const seenAt = new Map((priceRows || []).map(r => [r.ticker, r.updated_at]));
 
-    // Oldest first: never-fetched (−Infinity) before any timestamp, then ascending.
-    const ordered = tickers.sort((a, b) => {
-      const ta = seenAt.has(a) ? Date.parse(seenAt.get(a) || 0) : -Infinity;
-      const tb = seenAt.has(b) ? Date.parse(seenAt.get(b) || 0) : -Infinity;
-      return ta - tb;
-    });
-    const batch = ordered.slice(0, MAX_TICKERS);
+    const { batch, due } = pickBatch(tickers, seenAt, { max: MAX_TICKERS });
 
     let done = 0, noData = 0, errored = 0, rateLimited = false;
     const sampleErrors = [];
     for (const ticker of batch) {
       try {
         const p = await fetchPrice(ticker);
-        if (!p) { noData++; continue; } // genuinely no data — leave cache untouched
+        if (!p) { noData++; await markAttempt(db, ticker); continue; } // genuinely no data — keep cache, rotate to back
         const { error } = await db.from("prices").upsert(
           { ticker, history: p.history, quote: p.quote, updated_at: new Date().toISOString() },
           { onConflict: "ticker" }
@@ -53,6 +58,7 @@ export default async function handler(req, res) {
           break;
         }
         errored++;
+        await markAttempt(db, ticker);
         if (sampleErrors.length < 3) sampleErrors.push(`${ticker}: ${e.message}`.slice(0, 300));
       }
     }
@@ -63,7 +69,7 @@ export default async function handler(req, res) {
       noData,
       errored,
       rateLimited,
-      remaining: Math.max(0, ordered.length - batch.length),
+      remaining: Math.max(0, due - batch.length),
       sampleErrors, // first few real FMP messages, for diagnosis
       ...(rateLimited && {
         hint: "Twelve Data rate limit hit (free tier: 8/min, 800/day). The run stops and the " +

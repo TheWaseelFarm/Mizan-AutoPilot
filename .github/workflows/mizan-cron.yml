@@ -30,9 +30,19 @@ jobs:
           resp=$(curl -fsS --max-time 60 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/poll-disclosures")
           echo "poll-disclosures -> $resp"
       - name: Refresh prices
+        # Each call refreshes <= 8 tickers (Twelve Data free tier: 8 calls/min, 800/day). Loop one
+        # call per minute until nothing is due (a ticker is due when never fetched or last
+        # attempted > 20h ago) or the provider rate-limits us. Steady state: the first call
+        # returns remaining=0 and the loop exits immediately.
+        timeout-minutes: 30
         run: |
-          resp=$(curl -fsS --max-time 60 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/refresh-prices")
-          echo "refresh-prices -> $resp"
+          for i in $(seq 1 24); do
+            resp=$(curl -fsS --max-time 60 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/refresh-prices")
+            echo "refresh-prices [$i] -> $resp"
+            echo "$resp" | grep -q '"rateLimited":true' && { echo "rate limited — stopping, next run continues"; break; }
+            echo "$resp" | grep -Eq '"remaining":0[,}]' && break
+            sleep 61
+          done
 
   rescreen:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 7 * * *' }}
