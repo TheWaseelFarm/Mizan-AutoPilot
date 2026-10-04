@@ -1632,31 +1632,105 @@
         ${rows ? `<p class="footnote ps-note">${esc(L(`Holding or bought / Sold counts each filer once, by their latest disclosed action; a 13F row is a holding at quarter end. Since public = the median price move after each filing on this side went public (late filings left out). Past disclosures, not a forecast.`, `يملكونه أو اشتروه / باعوه: يُحسب كل مستثمر مرة واحدة بحسب أحدث تداول أفصح عنه، وسطر نموذج 13F مركز قائم بنهاية الربع. منذ النشر = وسيط تحرك السعر بعد نشر كل إفصاح في هذا الجانب (دون الإفصاحات المتأخرة). إفصاحات سابقة، وليست توقعًا.`))}</p>` : ''}</div>${footnote()}`;
   }
 
-  /* ---- Alerts (prototype/alerts.html). Same alert source as before: disclosures from the filers
-     you follow, newest first; plus freshness notes for followed portfolios gone quiet (> 21d). */
+  /* ---- Alerts (SPEC §3.5 AL-1). One row per filing (actor + filing date), so a 19-trade filing is
+     one row, not 19. Groups from what you follow come first, then the latest filings from everyone.
+     Each row answers "what's new, and has the price moved since it went public?" with counted,
+     dated facts; the per-ticker verdict pills sit inside the expander. Freshness notes stay. */
+  const tradesTxt = (n, fund) => fund ? L(plural(n, 'position', 'positions'), pluralAr(n, 'مركزًا واحدًا', 'مركزين', 'مراكز', 'مركزًا')) : L(plural(n, 'trade', 'trades'), pluralAr(n, 'صفقة واحدة', 'صفقتين', 'صفقات', 'صفقة'));
+  // "published Sep 30 (26 days)" / 13F "filed Sep 2 (64 days after quarter end)".
+  const publishedTxt = (r) => {
+    const d = dayMonth(r[FIELD.filedDate]) || '—', n = lagOf(r);
+    if (is13F(r)) return L(`filed ${d}${n != null ? ` (${daysEn(n)} after quarter end)` : ''}`, `نُشر في ${d}${n != null ? ` (بعد نهاية الربع بـ${daysAr(n)})` : ''}`);
+    return L(`published ${d}${n != null ? ` (${daysEn(n)})` : ''}`, `تاريخ النشر ${d}${n != null ? ` (بعد ${daysAr(n)})` : ''}`);
+  };
+  // Header for a multi-trade filing: "Kevin Hern filed 19 trades · Sep 28 — 18 sells, 1 buy across 10 names · 14–28 days after the trades".
+  const alertHead = (g) => {
+    const who = esc(LANG === 'ar' ? bidi(g.actor) : g.actor), d = dayMonth(g.filed) || '—', lag = dayRange(g.lagMin, g.lagMax);
+    if (g.fund) {
+      const qe = dayMonth(fDisclosed(g.rows[0])) || '—';
+      return `${who} ${esc(L(`reported ${tradesTxt(g.n, true)} · filed ${d}`, `أعلن ${tradesTxt(g.n, true)} في نموذج 13F · نُشر في ${d}`))}<small>${esc(L(`held at the ${qe} quarter end · ${plural(g.names.length, 'name', 'names')}${lag ? ` · ${lag} after quarter end` : ''}`, `مراكز قائمة بنهاية الربع (${qe}) · الأسهم: ${bidi(g.names.length)}${lag ? ` · بعد نهاية الربع بـ${lag}` : ''}`))}</small>`;
+    }
+    return `${LANG === 'ar' ? `نشر ${who} إفصاحًا يضم ${esc(tradesTxt(g.n))} · ${esc(d)}` : `${who} filed ${esc(tradesTxt(g.n))} · ${esc(d)}`}<small>${esc(L(`${plural(g.sells, 'sell', 'sells')}, ${plural(g.buys, 'buy', 'buys')} across ${plural(g.names.length, 'name', 'names')}${lag ? ` · ${lag} after the trades` : ''}`, `بيع: ${bidi(g.sells)} · شراء: ${bidi(g.buys)} · الأسهم: ${bidi(g.names.length)}${lag ? ` · بعد الصفقات بـ${lag}` : ''}`))}</small>`;
+  };
+  // Expander: the filing's trades, one line per ticker + side ("ITW · sold (4 trades) · $1K–$15K each · since public ▲x%").
+  function alertTrades(g) {
+    const m = new Map(); g.rows.forEach((r) => { const k = r.ticker + '\u0000' + (isSell(r) ? 'S' : 'B'); (m.get(k) || m.set(k, []).get(k)).push(r); });
+    const line = (rs) => {
+      const r = rs[0], n = rs.length, sp = med(rs.map((x) => perfOf(x, 'sincePublic')));
+      const act = capFirst(actionText(r)) + (n > 1 ? L(` ×${n}`, ` (${tradesTxt(n)})`) : '');
+      let amt = amountText(r);
+      if (n > 1 && !is13F(r)) {
+        const pr = rs.map((x) => parseRange(x.amount));
+        amt = pr.every(Boolean) && pr.every((x) => x[0] === pr[0][0] && x[1] === pr[0][1]) ? L(`${fmtRange(r)} each`, `${fmtRange(r)} لكلٍّ منها`)
+          : pr.every(Boolean) ? L(`${fmtLoHi(pr.reduce((a, x) => a + x[0], 0), pr.reduce((a, x) => a + x[1], 0))} in total`, `المجموع ${fmtLoHi(pr.reduce((a, x) => a + x[0], 0), pr.reduce((a, x) => a + x[1], 0))}`) : '—';
+      }
+      const ds = rs.map(fDisclosed).filter((d) => isFinite(Date.parse(d))).sort((a, b) => Date.parse(a) - Date.parse(b));
+      const when = is13F(r) || n === 1 || !ds.length || dayMonth(ds[0]) === dayMonth(ds[ds.length - 1]) ? tradeDateText(r)
+        : L(`trades ${dayMonth(ds[0])}–${dayMonth(ds[ds.length - 1])}`, `تواريخ الصفقات ${dayMonth(ds[0])} – ${dayMonth(ds[ds.length - 1])}`);
+      const late = rs.find(isLatePtr);
+      return `<div class="al-trade" tabindex="0" role="link" data-open-stock="${esc(r.ticker)}"><b dir="ltr">${esc(r.ticker)}</b>${badge(r.label)}<span>${esc([act, amt, is13F(r) ? '' : when].filter(Boolean).join(' · '))}${valueNote(r) ? ` <small>${esc(valueNote(r))}</small>` : ''} · ${sp == null ? esc(L('since public: prices pending', 'منذ النشر: بانتظار بيانات السعر')) : `${esc(L('since public', 'منذ النشر'))} ${arrowPct(sp)}`}${late ? lateChip(late) : ''}</span></div>`;
+    };
+    const lines = [...m.values()]; if (g.fund) lines.sort((a, b) => (posValue(b[0]) ?? -1) - (posValue(a[0]) ?? -1)); // 13F: biggest reported position first
+    return more(g.fund ? L(`Show the ${g.n} positions`, `عرض المراكز (${g.n})`) : L(`Show the ${g.n} trades`, `عرض الصفقات (${g.n})`), `<div class="al-trades">${lines.map(line).join('')}</div>`);
+  }
+  // Right column: the price move since this filing went public (median over its priced rows), or pending.
+  const alertSince = (g) => {
+    if (g.n === 1) { const sp = perfOf(g.rows[0], 'sincePublic'); return sp == null ? `<span class="muted">${esc(L('pending', 'بانتظار السعر'))}</span>` : pctTag(sp, L('since public', 'منذ النشر')); }
+    return g.nPx ? pctTag(g.med, L(`since this filing went public (median) · n=${g.nPx}`, `منذ نشر هذا الإفصاح (الوسيط) · العدد: ${g.nPx}`)) : `<span class="muted">${esc(L('pending', 'بانتظار السعر'))}</span>`;
+  };
+  function alertRow(g, hit) {
+    const d = daysSince(g.filed), isNew = d != null && d <= 7 ? `<span class="chip">${L('NEW', 'جديد')}</span>` : '';
+    const av = avatar(g.actor, { group: groupOf(g.rows[0].kind), tone: 'pending', row: g.rows[0], initials: g.rows[0].initials });
+    const src = srcLabel(g.rows[0]), ago2 = agoTxt(d);
+    if (g.n === 1) {
+      const r = g.rows[0];
+      return `<div class="row al-row"><span class="alert-tags">${isNew}${badge(r.label)}</span><div><div class="person" data-open-stock="${esc(r.ticker)}" role="link" tabindex="0">${av}<div><strong>${actorAct(r)}</strong><small>${esc([amountText(r), tradeDateText(r), publishedTxt(r)].join(' · '))}${valueNote(r) ? ` · ${esc(valueNote(r))}` : ''}${lateChip(r)}</small><small>${esc([src, ago2].filter(Boolean).join(' · '))}</small></div></div></div><span class="al-since">${alertSince(g)}</span></div>`;
+    }
+    const inc = hit && hit.size ? L(`includes ${[...hit].join(', ')}, which you follow`, `يشمل ${[...hit].join('، ')} من متابعاتك`) : '';
+    return `<div class="row al-row"><span class="alert-tags">${isNew}</span><div><div class="person" data-open-portfolio="${esc(g.actor)}" role="link" tabindex="0">${av}<div><strong>${alertHead(g)}</strong><small>${esc([src, ago2, g.late ? L(`${plural(g.late, 'late filing', 'late filings')}`, `إفصاحات متأخرة: ${g.late}`) : '', inc].filter(Boolean).join(' · '))}</small></div></div>${alertTrades(g)}</div><span class="al-since">${alertSince(g)}</span></div>`;
+  }
   function pageAlerts() {
     const anyFollow = S.follows.size > 0;
-    const notes = (anyFollow ? S.rows.filter((r) => S.follows.has(r.actor) || S.follows.has(r.ticker)) : S.rows.slice(0, 400)).sort(byFiled).slice(0, 60);
+    const groups = filingGroups(S.rows);
+    // A filing is "yours" when its filer is followed (whole filing) or it includes a followed ticker.
+    const hitOf = (g) => S.follows.has(g.actor) ? new Set() : new Set(g.names.filter((tk) => S.follows.has(tk)));
+    const mine = anyFollow ? groups.filter((g) => S.follows.has(g.actor) || g.names.some((tk) => S.follows.has(tk))) : [];
+    const others = groups.filter((g) => !mine.includes(g)).slice(0, anyFollow ? 15 : 30);
     const stale = eligible().filter((p) => S.follows.has(p.name) && p.fresh != null && p.fresh > 21);
     const f = S.alertFilter || 'all';
     const chips = [['all', L('All', 'الكل')], ['filings', L('New filings', 'إفصاحات جديدة')], ['freshness', L('Freshness', 'آخر إفصاح')]];
-    const items = [
-      ...(f === 'freshness' ? [] : notes.map((r) => { const d = daysSince(r[FIELD.filedDate]); return { d, html: `<div class="row"><span class="alert-tags">${d != null && d <= 7 ? `<span class="chip">${L('NEW', 'جديد')}</span>` : ''}${badge(r.label)}</span><div class="person" data-open-stock="${esc(r.ticker)}" role="link" tabindex="0">${avatar(r.actor, { group: groupOf(r.kind), tone: 'pending', row: r, initials: r.initials })}<div><strong>${actorAct(r)}</strong><small>${esc(amountText(r))} · ${esc(tradeDateText(r))}${lagText(r) ? ' · ' + esc(lagText(r)) : ''}${lateChip(r)}</small></div></div><span class="mono">${ago(d)}</span></div>` }; })),
-      ...(f === 'filings' ? [] : stale.map((p) => ({ d: p.fresh, html: `<div class="row"><span class="alert-tags"><span class="chip">${L('STALE', 'لا إفصاح حديث')}</span>${sharePill(p)}</span><div class="person" data-open-portfolio="${esc(p.name)}" role="link" tabindex="0">${pAvatar(p)}<div><strong>${esc(L(`${p.name} has no fresh disclosure in ${p.fresh} days`, `لا إفصاح جديد من \u2066${p.name}\u2069؛ المدة بالأيام: ${p.fresh}`))}</strong><small>${L('Evidence freshness', 'تاريخ الإفصاح')}</small></div></div><span class="mono">${ago(p.fresh)}</span></div>` }))),
+    const staleRow = (p) => ({ d: p.fresh, html: `<div class="row"><span class="alert-tags"><span class="chip">${L('STALE', 'لا إفصاح حديث')}</span>${sharePill(p)}</span><div class="person" data-open-portfolio="${esc(p.name)}" role="link" tabindex="0">${pAvatar(p)}<div><strong>${esc(L(`${p.name} has no fresh disclosure in ${p.fresh} days`, `لا إفصاح جديد من ⁦${p.name}⁩؛ المدة بالأيام: ${p.fresh}`))}</strong><small>${L('Evidence freshness', 'تاريخ الإفصاح')}</small></div></div><span class="mono">${ago(p.fresh)}</span></div>` });
+    const own = [
+      ...(f === 'freshness' ? [] : mine.map((g) => ({ d: daysSince(g.filed), html: alertRow(g, hitOf(g)) }))),
+      ...(f === 'filings' ? [] : stale.map(staleRow)),
     ].sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9));
-    return pageHead(L('Monitor', 'راقب'), L('Alerts that explain what changed.', 'تابع آخر التغيّرات.'), anyFollow ? L('From the investors and stocks you follow, newest first, with amount, date and filing lag.', 'تداولات من تتابعهم من مستثمرين وأسهم، من الأحدث إلى الأقدم. مع المبلغ والتاريخ ومدة تأخر الإفصاح.') : L('You are not following anyone yet, so this is the latest filings from all investors. Follow some to keep this list yours.', 'لا تتابع أحدًا بعد، لذلك نعرض أحدث إفصاحات كل المستثمرين. تابع بعضهم لتصبح هذه القائمة خاصة بك.'), `<a class="btn btn-primary" href="/portfolios" data-nav="portfolios">${L('Follow investors', 'تابع مستثمرين')}</a>`) +
-      `<div class="toolbar">${chips.map(([k, l]) => `<button type="button" class="chip ${f === k ? 'on' : ''}" data-alert="${k}" aria-pressed="${f === k}">${l}</button>`).join('')}</div>` +
-      (items.length ? `<div class="card block alerts"><div class="timeline">${items.map((x) => x.html).join('')}</div></div>`
-        : emptyCard(S.follows.size ? L("You're all caught up", 'اطّلعت على جميع التنبيهات') : L('No alerts yet', 'لا توجد تنبيهات بعد'), L('Follow portfolios to be notified here when they file new disclosures.', 'تابع المحافظ لتصلك تنبيهات هنا عند نشر إفصاحات جديدة.'), `<a class="btn btn-primary" href="/portfolios" data-nav="portfolios">${L('Explore portfolios', 'استكشف المحافظ')}</a>`));
+    const rest = f === 'freshness' ? [] : others.map((g) => alertRow(g));
+    const card = (html) => `<div class="card block alerts"><div class="timeline">${html}</div></div>`;
+    const body = own.length || rest.length
+      ? (own.length ? card(own.map((x) => x.html).join('')) : '') +
+        (rest.length ? (anyFollow ? `<h2 class="al-sub">${L('Latest filings from everyone', 'أحدث إفصاحات كل المستثمرين')}</h2>` : '') + card(rest.join('')) : '')
+      : emptyCard(S.follows.size ? L("You're all caught up", 'اطّلعت على جميع التنبيهات') : L('No alerts yet', 'لا توجد تنبيهات بعد'), L('Follow portfolios to be notified here when they file new disclosures.', 'تابع المحافظ لتصلك تنبيهات هنا عند نشر إفصاحات جديدة.'), `<a class="btn btn-primary" href="/portfolios" data-nav="portfolios">${L('Explore portfolios', 'استكشف المحافظ')}</a>`);
+    return pageHead(L('Monitor', 'راقب'), L('Alerts that explain what changed.', 'تابع آخر التغيّرات.'), anyFollow ? L('Filings from the investors and stocks you follow come first, then the latest from everyone. One row per filing, with its dates, time to publish and the price move since it went public.', 'إفصاحات من تتابعهم من مستثمرين وأسهم أولًا، ثم أحدث إفصاحات الجميع. صف واحد لكل إفصاح، مع التواريخ ومدة النشر وحركة السعر منذ نشره.') : L('You are not following anyone yet, so this is the latest filings from all investors, one row per filing. Follow some to keep this list yours.', 'لا تتابع أحدًا بعد، لذلك نعرض أحدث إفصاحات كل المستثمرين، صفًا واحدًا لكل إفصاح. تابع بعضهم لتصبح هذه القائمة خاصة بك.'), `<a class="btn btn-primary" href="/portfolios" data-nav="portfolios">${L('Follow investors', 'تابع مستثمرين')}</a>`) +
+      `<div class="toolbar">${chips.map(([k, l]) => `<button type="button" class="chip ${f === k ? 'on' : ''}" data-alert="${k}" aria-pressed="${f === k}">${l}</button>`).join('')}</div>` + body +
+      footnote(esc(L('Since public = the price move from the close on the filing date to the latest cached close. Past disclosures, not a forecast.', 'منذ النشر = حركة السعر من إغلاق يوم نشر الإفصاح إلى آخر إغلاق محفوظ. إفصاحات سابقة، وليست توقعًا.')));
   }
 
   /* ---- Following (featured-investor cards for what you follow). */
+  // FO-1 stock card line: "Price · 1M ▲4.2% · 4.5% below 52w high · latest filing Sep 30" (price facts from cached closes).
+  const followPxLine = (tk, r) => {
+    const pc = priceCtx(tk), filed = esc(L(`latest filing ${dayMonth(r[FIELD.filedDate]) || '—'}`, `أحدث إفصاح ${dayMonth(r[FIELD.filedDate]) || '—'}`));
+    if (!pc) return `${esc(L('Prices pending', 'بانتظار بيانات السعر'))} · ${filed}`;
+    const hi = Math.abs(pc.fromHi) < 0.05 ? L(pc.win < W52 ? `at its ${pc.win}-day high` : 'at its 52w high', pc.win < W52 ? `عند أعلى سعر في ${bidi(pc.win)} يومًا` : 'عند أعلى سعر في 52 أسبوعًا')
+      : L(`${Math.abs(pc.fromHi).toFixed(1)}% below ${pc.win < W52 ? `${pc.win}-day` : '52w'} high`, `دون أعلى سعر في ${pc.win < W52 ? `${bidi(pc.win)} يومًا` : '52 أسبوعًا'} بـ${bidi(Math.abs(pc.fromHi).toFixed(1) + '%')}`);
+    const stale = pc.stale ? ` · ${esc(L(`as of ${dayMonth(pc.asOf)} · stale`, `حتى ${dayMonth(pc.asOf)} · غير محدّث`))}` : '';
+    return `${esc(L('Price · 1M', 'السعر · شهر'))} ${arrowPct(pc.r1m)}${stale} · ${esc(hi)} · ${filed}`;
+  };
   function pageFollowing() {
     const ports = eligible().filter((p) => S.follows.has(p.name));
     const stocks = [...S.follows].filter((id) => !ports.some((p) => p.name === id) && S.rows.some((r) => r.ticker === id));
     return pageHead(L('Watchlist', 'قائمة المتابعة'), L('The people and names you follow.', 'المحافظ والأسهم التي تتابعها.'), L('Open any profile to see what changed since you last looked.', 'اعرض التفاصيل لمتابعة آخر التغيّرات.')) +
       (ports.length ? `<section><div class="section-title"><h2>${L('Portfolios', 'المحافظ')}</h2></div><div class="discovery">${ports.map(investorCard).join('')}</div></section>` : '') +
-      (stocks.length ? `<section><div class="section-title"><h2>${L('Stocks', 'الأسهم')}</h2></div><div class="grid three">${stocks.map((tk) => { const r = S.rows.filter((x) => x.ticker === tk).sort(byFiled)[0]; return `<div class="signal-card" tabindex="0" role="link" data-open-stock="${esc(tk)}">${badge(r.label)}<h3 dir="ltr">${esc(tk)}</h3><p>${esc(coName(r.company))} · ${esc(L('latest filing', 'آخر إفصاح'))} ${esc(shortDate(r[FIELD.filedDate]) || '—')}</p></div>`; }).join('')}</div></section>` : '') +
+      (stocks.length ? `<section><div class="section-title"><h2>${L('Stocks', 'الأسهم')}</h2></div><div class="grid three">${stocks.map((tk) => { const r = S.rows.filter((x) => x.ticker === tk).sort(byFiled)[0]; return `<div class="signal-card" tabindex="0" role="link" data-open-stock="${esc(tk)}">${badge(r.label)}<h3 dir="ltr">${esc(tk)}</h3><p>${esc(coName(r.company))}</p><p class="fo-px">${followPxLine(tk, r)}</p></div>`; }).join('')}</div></section>` : '') +
       (!ports.length && !stocks.length ? emptyCard(L("You're not following anyone yet", 'قائمة متابعاتك فارغة'), L('Follow a portfolio or stock to keep it here.', 'تابع محفظة أو سهمًا ليظهر هنا.'), `<a class="btn btn-primary" href="/portfolios" data-nav="portfolios">${L('Explore portfolios', 'استكشف المحافظ')}</a>`) : '');
   }
 

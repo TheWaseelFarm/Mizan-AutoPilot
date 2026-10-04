@@ -209,3 +209,18 @@ details.more>summary::-webkit-details-marker{display:none}
 .ss-table .ss-px{display:flex;align-items:center;gap:8px}.ss-table .ss-px .mz-chart--spark{width:72px}
 .ss-table .ss-px .return{font-size:12px}
 .ss-table{min-width:760px}
+/* /alerts (SPEC §3.5 AL-1): one row per filing; the trades sit in an expander with their pills.
+   /following (FO-1): one price line on stock cards. Neutral ink/cobalt only. */
+.alerts .timeline .row.al-row{align-items:start}
+.al-row .person strong small{display:block;margin-top:3px;font-weight:500}
+.al-row .person small + small{margin-top:2px}
+.al-row details.more{margin-inline-start:55px}
+.al-row details.more>summary{padding:8px 0 0}
+.al-trades{display:grid;gap:0;margin-top:6px}
+.al-trade{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 0;border-top:1px solid var(--line);font-size:12px;line-height:1.5;cursor:pointer}
+.al-trade .status{padding:3px 7px;font-size:10px}.al-trade .return{font-size:12px}.al-trade .chip{padding:2px 6px;font-size:10px}
+.al-since{display:flex;flex-direction:column;align-items:flex-end;text-align:end;max-width:180px}
+.al-since .ctx{display:block;font-size:11px;line-height:1.4;color:var(--muted);margin-top:2px}
+.al-sub{margin:22px 0 10px;font-size:15px}
+.signal-card .fo-px{margin-top:6px;line-height:1.5}.signal-card .fo-px .return{font-size:12px}
+@media(max-width:720px){.al-row details.more{margin-inline-start:0}.al-since{grid-column:1/-1;align-items:flex-start;text-align:start;max-width:none}}
