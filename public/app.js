@@ -42,7 +42,7 @@
       's.title': 'Stock intelligence', 's.sub': 'Read the capital flows. Evaluate the evidence.',
       'sv.top': 'Return', 'sv.active': 'Most active', 'sv.followed': 'Most followed', 'sv.alloc': 'Highest pass share', 'sv.conc': 'Most concentrated', 'sv.lag': 'Fastest to disclose',
       'so.conc': 'Concentration (HHI)', 'so.lag': 'Time to publish',
-      'sv.bought': 'Most bought', 'sv.sold': 'Most sold', 'sv.flow': 'Net flow', 'sv.new': 'New positions', 'sv.incr': 'Increased', 'sv.red': 'Reduced', 'sv.exit': 'Exited',
+      'sv.bought': 'Most held or bought', 'sv.sold': 'Most sold', 'sv.flow': 'Net flow', 'sv.new': 'New positions', 'sv.incr': 'Increased', 'sv.red': 'Reduced', 'sv.exit': 'Exited',
       'so.net': 'Absolute net flow', 'flow.note': 'Net flow = gross buying − gross selling over the disclosed window. Excluded names stay visible for market awareness but are never actionable. Informational only — not advice.',
       'c.filter': 'Filter', 'c.sort': 'Sort', 'c.compare': 'Compare', 'c.why': 'Why this ranking?', 'c.clear': 'Clear all', 'c.search': 'Search portfolios, investors or stocks',
       'so.return': 'Disclosed return', 'so.activity': 'Disclosed activity', 'so.followers': 'Followers', 'so.alloc': 'Highest pass share',
@@ -76,7 +76,7 @@
       's.title': 'متابعة الأسهم', 's.sub': 'اطّلع على الشراء والبيع وراجع الإفصاحات.',
       'sv.top': 'العائد', 'sv.active': 'الأكثر نشاطًا', 'sv.followed': 'الأكثر متابعة', 'sv.alloc': 'أعلى نسبة اجتياز', 'sv.conc': 'الأعلى تركّزًا', 'sv.lag': 'الأسرع إفصاحًا',
       'so.conc': 'تركّز المحفظة', 'so.lag': 'المدة حتى النشر',
-      'sv.bought': 'الأكثر شراءً', 'sv.sold': 'الأكثر بيعًا', 'sv.flow': 'صافي التدفق', 'sv.new': 'استثمارات جديدة', 'sv.incr': 'زيادة الاستثمار', 'sv.red': 'تقليل الاستثمار', 'sv.exit': 'بيع كامل الاستثمار',
+      'sv.bought': 'الأكثر امتلاكًا أو شراءً', 'sv.sold': 'الأكثر بيعًا', 'sv.flow': 'صافي التدفق', 'sv.new': 'استثمارات جديدة', 'sv.incr': 'زيادة الاستثمار', 'sv.red': 'تقليل الاستثمار', 'sv.exit': 'بيع كامل الاستثمار',
       'so.net': 'حجم صافي الشراء أو البيع', 'flow.note': 'صافي التدفق = إجمالي الشراء − إجمالي البيع خلال فترة الإفصاح. تظهر الأسهم غير المتوافقة للاطلاع على حركة السوق فقط. لأغراض معلوماتية فقط — ليست نصيحة استثمارية.',
       'c.filter': 'تصفية', 'c.sort': 'ترتيب', 'c.compare': 'مقارنة', 'c.why': 'لماذا هذا الترتيب؟', 'c.clear': 'مسح الكل', 'c.search': 'ابحث عن محفظة أو مستثمر أو سهم',
       'so.return': 'العائد حسب الإفصاحات', 'so.activity': 'التداولات المعلنة', 'so.followers': 'المتابِعون', 'so.alloc': 'أعلى نسبة اجتياز',
@@ -466,20 +466,28 @@
   // Shared conclusion-first hero: WHO this is -> composed headline -> return (hero) + attraction.
   // `who` = { avatar, name, sub, ltr }; `stats` are the localized attraction rows.
 
+  // /stocks rows (SPEC §3.4), counted by FILER, never by dollars: each actor's latest row decides
+  // the side (whoHolds). A ticker is in the "held or bought" view when ≥1 filer's latest action is
+  // BUY, in the "sold" view when ≥1 filer's latest action is SELL. The since-public median is the
+  // stock's price after publication: every non-late row on the view's side, whatever the verdict.
   function deriveStocks(rows, side) {
-    const m = new Map();
-    for (const r of rows) {
-      if ((String(r.side).toUpperCase() === 'SELL' ? 'SELL' : 'BUY') !== side) continue;
-      let s = m.get(r.ticker);
-      if (!s) { s = { ticker: r.ticker, company: r.company || r.ticker, label: r.label, dollar: 0, filers: new Set(), rows: [], fresh: null }; m.set(r.ticker, s); }
-      s.dollar += Math.abs(+r.amountMid || 0); s.filers.add(r.actor); s.rows.push(r); s.label = r.label;
-      const ds = daysSince(r.filingDate); if (ds != null && (s.fresh == null || ds < s.fresh)) s.fresh = ds;
+    const sell = side === 'SELL', by = new Map();
+    for (const r of rows) (by.get(r.ticker) || by.set(r.ticker, []).get(r.ticker)).push(r);
+    const out = [];
+    for (const [ticker, rs] of by) {
+      const w = whoHolds(ticker, rs), on = sell ? w.sold : w.holding;
+      if (!on.length) continue;
+      const newest = rs.slice().sort(byFiled)[0]; // the newest filing carries the current verdict
+      const sp = rs.filter((r) => isSell(r) === sell && !isLatePtr(r) && perfOf(r, 'sincePublic') != null);
+      const filed = [...new Set(sp.map((r) => r[FIELD.filedDate]).filter((d) => isFinite(Date.parse(d))))].sort((a, b) => Date.parse(a) - Date.parse(b));
+      out.push({
+        ticker, company: newest.company || (rs.find((r) => r.company) || {}).company || ticker, label: newest.label,
+        w, on, filerCount: on.length, filers: new Set(on.map((r) => r.actor)), rows: rs,
+        latest: newest[FIELD.filedDate], fresh: daysSince(newest[FIELD.filedDate]),
+        sp: { med: med(sp.map((r) => perfOf(r, 'sincePublic'))), n: sp.length, from: filed[0], to: filed[filed.length - 1] },
+      });
     }
-    return [...m.values()].map((s) => {
-      const perfs = s.rows.map((r) => r.performance && r.performance.sinceDisclosed).filter((x) => x != null && isFinite(x));
-      const perf = perfs.length ? +(perfs.reduce((a, b) => a + b, 0) / perfs.length).toFixed(1) : null;
-      return { ...s, filerCount: s.filers.size, perf, ret: returnOf(histOf(s.ticker), perf) };
-    });
+    return out;
   }
   const evStrength = (n) => n >= 8 ? 'high' : n >= 3 ? 'medium' : 'low';
 
@@ -532,7 +540,7 @@
   const saveFollows = () => { try { localStorage.setItem('mz_follows', JSON.stringify([...S.follows])); } catch (e) { /* private mode */ } };
 
   const P_SUB = [['top', 'sv.top'], ['active', 'sv.active'], ['followed', 'sv.followed'], ['alloc', 'sv.alloc'], ['conc', 'sv.conc'], ['lag', 'sv.lag']];
-  const S_SUB = [['bought', 'sv.bought', 'BUY', 'value'], ['sold', 'sv.sold', 'SELL', 'value'], ['flow', 'sv.flow', '', 'net'], ['new', 'sv.new', 'BUY', 'filers'], ['incr', 'sv.incr', 'BUY', 'weight'], ['red', 'sv.red', 'SELL', 'weight'], ['exit', 'sv.exit', 'SELL', 'filers']];
+  const S_SUB = [['bought', 'sv.bought', 'BUY', 'filers'], ['sold', 'sv.sold', 'SELL', 'filers'], ['flow', 'sv.flow', '', 'net'], ['new', 'sv.new', 'BUY', 'filers'], ['incr', 'sv.incr', 'BUY', 'weight'], ['red', 'sv.red', 'SELL', 'weight'], ['exit', 'sv.exit', 'SELL', 'filers']];
   const P_SORT = { top: 'so.return', active: 'so.activity', followed: 'so.followers', alloc: 'so.alloc', conc: 'so.conc', lag: 'so.lag' };
   const S_SORT = { value: 'so.value', weight: 'so.weight', filers: 'so.filers', net: 'so.net' };
   const TFS = [['1W', '1W'], ['1M', '1M'], ['3M', '3M'], ['6M', '6M'], ['1Y', '1Y'], ['3Y', '3Y'], ['5Y', '5Y'], ['ALL', 'All']];
@@ -666,8 +674,8 @@
     if (S.compliance !== 'all') list = list.filter((s) => S.compliance === 'fully' ? s.label === 'clean' : S.compliance === 'watch' ? s.label === 'purify' : S.compliance === 'excluded' ? s.label === 'fail' : s.label !== 'fail');
     if (S.evFilter !== 'all') list = list.filter((s) => evStrength(s.filerCount) === S.evFilter);
     if (S.followedOnly) list = list.filter((s) => S.follows.has(s.ticker));
-    const srt = { value: (a, b) => b.dollar - a.dollar, weight: (a, b) => b.filerCount - a.filerCount || b.dollar - a.dollar, filers: (a, b) => b.filerCount - a.filerCount || b.dollar - a.dollar };
-    return list.sort(srt[cfg[3]]);
+    // Distinct filers on the view's side, then the newest filing. No dollar sort (SPEC SS-2).
+    return list.sort((a, b) => b.filerCount - a.filerCount || (Date.parse(b.latest) || 0) - (Date.parse(a.latest) || 0) || a.ticker.localeCompare(b.ticker));
   }
 
   /* ---------------------------------------------------------------- small render helpers */
@@ -1145,6 +1153,8 @@
       ${g0 ? `<h3 class="ps-h">${L('Latest filing', 'أحدث إفصاح')}</h3><p class="ps-line">${esc(filingHead(g0))}<small class="ctx">${esc(agoTxt(daysSince(g0.filed)))}</small></p>` : ''}
       <div style="display:flex;gap:8px;margin-top:14px"><a class="btn btn-primary" href="/portfolio/${encodeURIComponent(p.name)}" data-open-portfolio="${esc(p.name)}">${L('Open profile', 'عرض التفاصيل')}</a>${thin ? '' : `<button class="btn btn-secondary" type="button" data-follow="${esc(p.name)}">${S.follows.has(p.name) ? t('common.following') : t('common.follow')}</button>`}</div></aside>`;
   }
+  // "3 filers" / "3 مستثمرين" (nom: the Arabic nominative dual, "مستثمران").
+  const filersTxt = (n, nom) => L(plural(n, 'filer', 'filers'), pluralAr(n, 'مستثمر واحد', nom ? 'مستثمران' : 'مستثمرَين', 'مستثمرين', 'مستثمرًا'));
   // PS-1 strip: what is happening across ALL filers (ranked or not), so it agrees with /alerts.
   function portfoliosStrip(list, all) {
     const r30 = recentRows(S.rows, 30), f30 = new Set(r30.map((r) => r.actor)).size;
@@ -1154,7 +1164,7 @@
       const w = whoHolds(tk), n = w.holding.length, d = Date.parse(w.latest && w.latest[FIELD.filedDate]) || 0;
       if (n && (!top || n > top.n || (n === top.n && d > top.d))) top = { tk, n, d };
     }
-    const filers = (n, nom) => L(plural(n, 'filer', 'filers'), pluralAr(n, 'مستثمر واحد', nom ? 'مستثمران' : 'مستثمرَين', 'مستثمرين', 'مستثمرًا'));
+    const filers = filersTxt;
     return strip([
       stat(esc(L('Tracked portfolios', 'محافظ معروضة')), esc(list.length), esc(L(`≥${MIN_HOLDINGS} held names each${list.length !== all.length ? ` · of ${all.length}` : ''}`, `لكل محفظة ${MIN_HOLDINGS} أسهم مملوكة على الأقل${list.length !== all.length ? ` · من ${all.length}` : ''}`))),
       stat(esc(L('Filed in the last 30 days', 'إفصاحات آخر 30 يومًا')), esc(L(plural(r30.length, 'trade', 'trades'), r30.length ? pluralAr(r30.length, 'صفقة واحدة', 'صفقتان', 'صفقات', 'صفقة') : bidi(0))),
@@ -1562,20 +1572,64 @@
       </aside></div>${footnote()}`;
   }
 
-  /* ---- Stocks list (no prototype page — built from prototype pagehead, metric strip and table). */
+  /* ---- Stocks list — revamp SPEC §3.4. Questions in order: where filers converge (counted by
+     filer, each once, by their latest action), what the price did after those filings went public,
+     and where the price sits now. No dollar totals or dollar sort: 13F values and PTR ranges never mix. */
+  // "7 funds · 1 official" / "صناديق: 7 · أعضاء كونغرس: 1" — who is on the view's side, by source.
+  const sideSplit = (rs) => {
+    const f = rs.filter(is13F).length, o = rs.filter((r) => !is13F(r) && isPTR(r)).length, x = rs.length - f - o;
+    return [f ? L(plural(f, 'fund', 'funds'), `صناديق: ${bidi(f)}`) : '', o ? L(plural(o, 'official', 'officials'), `أعضاء كونغرس: ${bidi(o)}`) : '', x ? L(plural(x, 'other filer', 'other filers'), `آخرون: ${bidi(x)}`) : ''].filter(Boolean).join(' · ');
+  };
+  // Since public (median) for a ticker: n, then the filing-date span (horizons differ); n < 3 says so.
+  const stockSpCell = (s) => {
+    if (!s.sp.n) return `<span class="return muted">—</span><small class="ctx">${esc(L('prices pending', 'بانتظار بيانات السعر'))}</small>`;
+    const dm = (d) => dayMonth(d).replace(/ /g, ' '); // keep "2 سبتمبر" / "Sep 2" on one line
+    const span = s.sp.from === s.sp.to ? dm(s.sp.from) : LANG === 'ar' ? `${dm(s.sp.from)}\u00a0–\u00a0${dm(s.sp.to)}` : `${dm(s.sp.from)}–${dm(s.sp.to)}`;
+    return pctTag(s.sp.med, L(`n=${s.sp.n} · filed ${span}${s.sp.n < 3 ? ' · few filings' : ''}`, `العدد: ${bidi(s.sp.n)} · النشر: ${span}${s.sp.n < 3 ? ' · إفصاحات قليلة' : ''}`));
+  };
+  // Distance from the 52-week high (a plain price fact in ink, never a verdict hue); "—" under PX_MIN closes.
+  const fromHiCell = (tk) => {
+    const pc = priceCtx(tk); if (!pc) return `<span class="muted">—</span><small class="ctx">${esc(L('prices pending', 'بانتظار بيانات السعر'))}</small>`;
+    const v = Math.abs(pc.fromHi) < 0.05 ? '0.0%' : `−${Math.abs(pc.fromHi).toFixed(1)}%`;
+    return `${esc(LANG === 'ar' ? bidi(v) : v)}${pc.win < W52 ? `<small class="ctx">${esc(L(`${pc.win}-day high`, `أعلى سعر في ${bidi(pc.win)} يومًا`))}</small>` : ''}`;
+  };
+  // Small "Price · tf" cell: the shared spark chart plus the price change over the active timeframe.
+  const stockPxCell = (tk) => {
+    const h = histOf(tk), last = h.length ? h[h.length - 1].d : null, stale = last && (daysSince(last) ?? 0) > STALE_DAYS;
+    if (h.length < 2) return `<div class="ss-px">${chart(h, { cls: 'mz-chart--spark' })}<small class="ctx">${esc(L('prices pending', 'بانتظار بيانات السعر'))}</small></div>`;
+    const v = seriesReturn(sliceTf(h).map((p) => +p.c));
+    return `<div class="ss-px">${chart(sliceTf(h), { cls: 'mz-chart--spark' })}<div>${pctTag(v, stale ? L(`as of ${dayMonth(last)} · stale`, `حتى ${dayMonth(last)} · غير محدّث`) : '')}</div></div>`;
+  };
+  function stocksStrip(list) {
+    const held2 = deriveStocks(S.rows, 'BUY').filter((s) => s.filerCount >= 2).length;
+    const r7 = recentRows(S.rows, 7), f7 = new Set(r7.map((r) => r.actor)).size, all = new Set(S.rows.map((r) => r.actor)).size;
+    const view = S_SUB.find((v) => v[0] === S.sMetric) || S_SUB[0];
+    return strip([
+      stat(esc(L('Names in view', 'أسهم معروضة')), esc(list.length), esc(t(view[1]))),
+      stat(esc(L('Held or bought by ≥2 filers', 'يملكه أو اشتراه مستثمران أو أكثر')), esc(held2), esc(L('each filer counted once, by their latest filing', 'يُحسب كل مستثمر مرة واحدة، بحسب أحدث إفصاح له'))),
+      stat(esc(L('Filed in the last 7 days', 'إفصاحات آخر 7 أيام')), esc(L(plural(r7.length, 'trade', 'trades'), r7.length ? pluralAr(r7.length, 'صفقة واحدة', 'صفقتان', 'صفقات', 'صفقة') : bidi(0))),
+        esc(r7.length ? L(`from ${filersTxt(f7)}`, `من ${filersTxt(f7)}`) : L('no filings in the last 7 days', 'لا توجد إفصاحات خلال 7 أيام'))),
+      stat(esc(L('Filers', 'المستثمرون')), esc(all), esc(L('with screened disclosures', 'لديهم إفصاحات مفحوصة'))),
+    ], 4);
+  }
   function pageStocks() {
-    S.tab = 'stocks'; if (S.sMetric === 'flow') S.sMetric = 'bought';
-    const list = currentList();
-    const views = S_SUB.filter((x) => x[0] !== 'flow' && !['new', 'incr', 'red', 'exit'].includes(x[0])); // those four need prior-filing comparison (not built yet)
+    S.tab = 'stocks'; if (!['bought', 'sold'].includes(S.sMetric)) S.sMetric = 'bought';
+    const list = currentList(), sold = S.sMetric === 'sold';
+    const views = S_SUB.filter((x) => x[0] === 'bought' || x[0] === 'sold'); // new/increased/reduced/exited need a prior filing to compare (not built yet)
+    const th = (label, ctx) => `<th>${label}${ctx ? `<small class="ctx">${esc(ctx)}</small>` : ''}</th>`;
     const rows = list.map((s) => `<tr data-open-stock="${esc(s.ticker)}" data-select tabindex="0">
         <td><div class="person">${avatar(s.ticker, { tone: 'pending', initials: s.ticker.slice(0, 4), noPhoto: true })}<div><strong dir="ltr">${esc(s.ticker)}</strong><small>${esc(coName(s.company))}</small></div></div></td>
-        <td><div style="display:flex;align-items:center;gap:12px"><div>${retTag(s.ret)}</div>${chart(sliceTf(histOf(s.ticker)), { cls: 'mz-chart--spark' })}</div></td>
-        <td class="mono">${s.filerCount}</td><td class="mono">${s.rows.some(hasAmount) ? fmtMoney(s.dollar) : '—'}</td>
-        <td class="mono">${ago(s.fresh)}</td><td>${badge(s.label)}</td><td>${star(s.ticker)}</td></tr>`).join('');
-    return pageHead(L('Stock intelligence', 'متابعة الأسهم'), L('What disclosed investors are trading.', 'تداولات المستثمرين كما ترد في الإفصاحات.'), L('Every name carries its disclosed flow, filers and Mizan Status.', 'اطّلع على التداولات المعلنة لكل سهم، ومن تداوله، ونتيجة فحصه الشرعي.')) +
-      `<div class="metric-strip">${stat(L('Names in view', 'أسهم معروضة'), list.length, esc(t(views.find((v) => v[0] === S.sMetric)[1])))}${stat(L('Disclosed value', 'قيمة التداولات المعلنة'), fmtMoney(list.reduce((a, s) => a + s.dollar, 0)), L('sum of disclosed ranges', 'مجموع القيم التقديرية في الإفصاحات'))}${stat(L('Filers', 'المستثمرون'), new Set(list.flatMap((s) => [...s.filers])).size, L('independent investors', 'مستثمرون مستقلون'))}${stat(L('Included', 'متوافق'), list.filter((s) => s.label === 'clean').length, (LANG === 'ar' ? 'أيوفي 30/30/5' : 'AAOIFI 30/30/5'))}${stat(L('Excluded', 'غير متوافق'), list.filter((s) => s.label === 'fail').length, L('shown for awareness', 'للاطلاع فقط'))}</div>
-      <div class="toolbar">${seg(['1M', '3M', '6M', '1Y', '3Y', 'ALL'])}<select class="select" id="sView" aria-label="${L('View', 'العرض')}">${views.map(([k, lk]) => `<option value="${k}" ${k === S.sMetric ? 'selected' : ''}>${esc(t(lk))}</option>`).join('')}</select><select class="select" id="sStatus" aria-label="${t('h.status')}">${STATUS_OPTS().map(([k, l]) => `<option value="${k}" ${S.compliance === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><input class="search" id="pSearch" type="search" style="width:220px" value="${esc(S.query)}" placeholder="${L('Find a stock', 'ابحث عن سهم')}" aria-label="${L('Find a stock', 'ابحث عن سهم')}"></div>
-      <div class="card table-card"><table class="table"><thead><tr><th>${L('Stock', 'السهم')}</th><th>${L('Return', 'العائد')} (${esc(tfLabelNow())})</th><th>${L('Filers', 'المستثمرون')}</th><th>${L('Disclosed value', 'قيمة التداولات المعلنة')}</th><th>${L('Freshness', 'آخر إفصاح')}</th><th>${L('Mizan Status', 'التوافق الشرعي')}</th><th>${L('Follow', 'متابعة')}</th></tr></thead><tbody>${rows || `<tr><td colspan="7">${emptyCard(t('empty.title'), t('empty.body'), readinessNote())}</td></tr>`}</tbody></table></div>${footnote()}`;
+        <td class="mono ss-sides">${s.w.holding.length} / ${s.w.sold.length}<small class="ctx">${esc(sideSplit(s.on))}</small></td>
+        <td>${stockSpCell(s)}</td>
+        <td class="mono">${fromHiCell(s.ticker)}</td>
+        <td class="mono ss-date">${esc(dayMonth(s.latest) || '—')}<small class="ctx">${esc(agoTxt(s.fresh) || '—')}</small></td>
+        <td>${stockPxCell(s.ticker)}</td>
+        <td>${badge(s.label)}</td><td>${star(s.ticker)}</td></tr>`).join('');
+    return pageHead(L('Traded stocks', 'الأسهم المتداولة'), L('What disclosed investors are trading.', 'تداولات المستثمرين كما ترد في الإفصاحات.'), L('Every name shows how many filers hold or sold it, the price since their filings went public, and its Mizan Status.', 'لكل سهم: عدد من يملكه ومن باعه، وحركة السعر منذ نشر الإفصاحات، ونتيجة فحصه الشرعي.')) +
+      stocksStrip(list) +
+      `<div class="toolbar">${seg(['1M', '3M', '6M', '1Y', '3Y', 'ALL'])}<select class="select" id="sView" aria-label="${L('View', 'العرض')}">${views.map(([k, lk]) => `<option value="${k}" ${k === S.sMetric ? 'selected' : ''}>${esc(t(lk))}</option>`).join('')}</select><select class="select" id="sStatus" aria-label="${t('h.status')}">${STATUS_OPTS().map(([k, l]) => `<option value="${k}" ${S.compliance === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><input class="search" id="pSearch" type="search" style="width:220px" value="${esc(S.query)}" placeholder="${L('Find a stock', 'ابحث عن سهم')}" aria-label="${L('Find a stock', 'ابحث عن سهم')}"></div>
+      <div class="card table-card"><table class="table ss-table"><thead><tr>${th(L('Stock', 'السهم'))}${th(L('Holding or bought / Sold', 'يملكونه أو اشتروه / باعوه'), sold ? L('filers, each counted once · split: sellers', 'المستثمرون، كلٌّ مرة واحدة · التفصيل للبائعين') : L('filers, each counted once', 'المستثمرون، كلٌّ مرة واحدة'))}${th(L('Since public (median)', 'منذ النشر (الوسيط)'), sold ? L('sales · any verdict', 'المبيعات · أيًّا كانت نتيجة الفحص') : L('buys & 13F holdings · any verdict', 'المشتريات ومراكز 13F · أيًّا كانت نتيجة الفحص'))}${th(L('vs 52-week high', 'عن أعلى 52 أسبوعًا'))}${th(L('Latest filing', 'أحدث إفصاح'))}${th(esc(tfPriceLabel()))}${th(L('Mizan Status', 'التوافق الشرعي'))}${th(L('Follow', 'متابعة'))}</tr></thead><tbody>${rows || `<tr><td colspan="8">${emptyCard(t('empty.title'), t('empty.body'), readinessNote())}</td></tr>`}</tbody></table>
+        ${rows ? `<p class="footnote ps-note">${esc(L(`Holding or bought / Sold counts each filer once, by their latest disclosed action; a 13F row is a holding at quarter end. Since public = the median price move after each filing on this side went public (late filings left out). Past disclosures, not a forecast.`, `يملكونه أو اشتروه / باعوه: يُحسب كل مستثمر مرة واحدة بحسب أحدث تداول أفصح عنه، وسطر نموذج 13F مركز قائم بنهاية الربع. منذ النشر = وسيط تحرك السعر بعد نشر كل إفصاح في هذا الجانب (دون الإفصاحات المتأخرة). إفصاحات سابقة، وليست توقعًا.`))}</p>` : ''}</div>${footnote()}`;
   }
 
   /* ---- Alerts (prototype/alerts.html). Same alert source as before: disclosures from the filers

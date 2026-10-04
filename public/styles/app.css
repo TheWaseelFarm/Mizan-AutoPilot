@@ -202,3 +202,10 @@ details.more>summary::-webkit-details-marker{display:none}
 .ps-table .person{gap:9px}.ps-table .person .avatar{width:34px;height:34px;font-size:11px}
 .ps-table .ps-date{white-space:nowrap}.ps-table td small.ctx{white-space:normal}
 .ps-table{min-width:700px}
+/* /stocks (SPEC §3.4): filer counts and since-public lead; the price column is small and last. */
+.ss-table th,.ss-table td{padding:12px 8px}.ss-table th:first-child,.ss-table td:first-child{padding-inline-start:14px}
+.ss-table .person{gap:9px}.ss-table .person .avatar{width:34px;height:34px;font-size:11px}
+.ss-table td small.ctx{white-space:normal}.ss-table .ss-date,.ss-table .ss-sides{white-space:nowrap}
+.ss-table .ss-px{display:flex;align-items:center;gap:8px}.ss-table .ss-px .mz-chart--spark{width:72px}
+.ss-table .ss-px .return{font-size:12px}
+.ss-table{min-width:760px}
