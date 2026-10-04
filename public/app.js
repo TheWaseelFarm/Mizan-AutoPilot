@@ -1133,38 +1133,194 @@
       ${portfolioPanel(sel)}</div>${footnote()}`;
   }
 
-  /* ---- Portfolio detail (prototype/portfolio-detail.html). */
-  function screeningRows(rows) {
-    const names = [...new Map(rows.map((r) => [r.ticker, r])).values()];
-    const pct = (v) => v == null || v === '' || !isFinite(+v) ? '—' : (+v).toFixed(1) + '%';
-    const notAssessed = L('Ratios not assessed — fails the business-activity screen', 'لم تُحتسب النسب — السهم لم يجتز فحص النشاط التجاري');
-    return names.map((r) => `<div class="holding"><span><b dir="ltr">${esc(r.ticker)}</b>${badge(r.label)}</span><span class="muted">${r.businessStatus === 'fail' ? notAssessed : `${L('Debt', 'الديون')} ${pct(r.debtPct ?? r.debtRatio)} · ${L('Cash', 'النقد')} ${pct(r.cashPct || null)} · ${L('Impure', 'الدخل غير المباح')} ${pct(r.impurePct)}`}</span><span class="mono">${r.businessStatus === 'fail' ? L('Activity ✕', 'النشاط غير متوافق ✕') : r.businessStatus === 'pass' ? L('Activity ✓', 'النشاط متوافق ✓') : L('Review', 'مراجعة')}</span></div>`).join('');
+  /* ---- Portfolio detail (prototype/portfolio-detail.html) — revamp SPEC §3.2. Questions in order:
+     the return and its basis (PF-0), what happened once the filings were public (PF-1), what they just
+     filed (PF-2), what they hold and how each did (PF-3/4/5), and what of it passes AAOIFI (PF-6).
+     Counted, dated facts only; thin samples say so instead of printing a percentage. */
+  const kindWord = (p) => p.group === 'official' ? L('Congress member', 'عضو كونغرس') : typeLabel(p.kind);
+  const daysTxt = (n) => L(daysEn(n), daysAr(n));
+  // "3–28 days" / "⁦3–28⁩ يومًا" (one value when the range is a single number).
+  const dayRange = (a, b) => a == null ? '' : a === b ? daysTxt(a) : L(`${a}–${b} days`, `${bidi(a + '–' + b)} يومًا`);
+  const agoTxt = (n) => n == null ? '' : n === 0 ? L('today', 'اليوم') : L(`${daysEn(n)} ago`, `قبل ${daysAr(n)}`);
+  // Next 13F deadline: the quarter after the reported quarter end, plus 45 days. ISO date (UTC).
+  const next13FDue = (qEnd) => {
+    const ms = Date.parse(qEnd || ''); if (!isFinite(ms)) return null;
+    const x = new Date(ms), q = Math.floor(x.getMonth() / 3), end = Date.UTC(x.getFullYear(), q * 3 + 6, 0);
+    return new Date(end + 45 * 864e5).toISOString().slice(0, 10);
+  };
+  // Arabic counted noun after "k من n": 3–10 -> plural, otherwise the accusative singular.
+  const arCount = (n, few, many) => { const k = n % 100; return k >= 3 && k <= 10 ? few : many; };
+
+  // PF-0 One freshness caption: PTR last filing + the 45-day rule; 13F quarter end, filing lag, next deadline.
+  function freshCaption(p, fund) {
+    const last = p.rows.slice().sort(byFiled)[0]; if (!last) return '';
+    if (fund) {
+      const qEnd = fDisclosed(last), lag = lagOf(last), due = next13FDue(qEnd), past = due && Date.parse(due) < Date.now();
+      const dueTxt = !due ? '' : past ? L(` · next 13F was due by ${shortDate(due)}; not yet in Mizan`, ` · كان موعد نموذج 13F القادم قبل ${shortDate(due)}، ولم يصل بعد إلى ميزان`)
+        : L(` · next 13F due by ${shortDate(due)}`, ` · موعد نموذج 13F القادم: قبل ${shortDate(due)}`);
+      return L(`Holdings as of ${shortDate(qEnd) || '—'} · filed ${dayMonth(last[FIELD.filedDate]) || '—'}${lag != null ? ` (${daysEn(lag)} after quarter end)` : ''}`,
+        `المراكز كما في ${shortDate(qEnd) || '—'} · نُشر في ${dayMonth(last[FIELD.filedDate]) || '—'}${lag != null ? ` (بعد نهاية الربع بـ${daysAr(lag)})` : ''}`) + dueTxt;
+    }
+    const d = last[FIELD.filedDate], age = daysSince(d);
+    const rule = isPTR(last) ? L(' · officials file within 45 days of a trade', ' · يُفصح أعضاء الكونغرس عن صفقاتهم خلال 45 يومًا') : ''; // the STOCK Act rule; other filers have their own deadlines
+    return L(`Last filing ${shortDate(d) || '—'}${age != null ? ` (${agoTxt(age)})` : ''}`, `أحدث إفصاح ${shortDate(d) || '—'}${age != null ? ` (${agoTxt(age)})` : ''}`) + rule;
   }
+
+  // PF-1 Since-public strip (4 cells) + one read caption. Medians and k-of-n only when n >= MIN_EVIDENCE.
+  function sincePublicStrip(p, fund, thin) {
+    const fs = followStats(p.rows);
+    const lags = p.rows.filter((r) => !isLatePtr(r)).map(lagOf).filter((x) => x != null);
+    const lagMed = med(lags), lagMin = lags.length ? Math.min(...lags) : null, lagMax = lags.length ? Math.max(...lags) : null;
+    const cell4 = stat(esc(L('Time to publish (median)', 'المدة حتى النشر (الوسيط)')), lagMed == null ? '—' : esc(daysTxt(Math.round(lagMed))),
+      esc(fund ? L(`after quarter end${lagMin !== lagMax ? ` · range ${dayRange(lagMin, lagMax)}` : ''} · 13F deadline 45 days`, `بعد نهاية الربع${lagMin !== lagMax ? ` · المدى ${dayRange(lagMin, lagMax)}` : ''} · مهلة نموذج 13F ‏45 يومًا`)
+        : lagMin == null ? '' : lagMin === lagMax ? L('after the trade', 'بعد الصفقة') : L(`range ${dayRange(lagMin, lagMax)}`, `المدى ${dayRange(lagMin, lagMax)}`)));
+    if (thin) return strip([cell4]);
+    const why = fs.n === 0 ? (fs.pending ? L('prices pending', 'بانتظار بيانات السعر') : L('no priced positions in passing names', 'لا توجد مراكز مسعّرة في الأسهم المتوافقة'))
+      : L(`Too few to judge (n=${fs.n})`, `عدد غير كافٍ للحكم (${bidi(fs.n)})`);
+    const nTxt = L(`n=${fs.n}`, `العدد: ${bidi(fs.n)}`);
+    const cells = [
+      stat(esc(L('Since filing went public (median)', 'منذ نشر الإفصاح (الوسيط)')), fs.ok ? esc(signedPct(fs.med)) : '—',
+        esc(fs.ok ? `${nTxt} · ${L(`filer's own from ${fund ? 'quarter end' : 'trade date'}`, `ما حققه المستثمر منذ ${fund ? 'نهاية الربع' : 'الصفقة'}`)} ${signedPct(fs.filer)}` : why)),
+      stat(esc(L('Higher since public', 'ارتفع منذ النشر')), fs.ok ? esc(L(`${fs.up} of ${fs.n}`, `${bidi(fs.up)} من ${bidi(fs.n)}`)) : '—',
+        esc(fs.ok ? L('priced positions in passing names', 'مراكز مسعّرة في الأسهم المتوافقة') : why)),
+      stat(esc(fund ? L('Quarter end → filing (median)', 'من نهاية الربع إلى النشر (الوسيط)') : L('Moved before public (median)', 'التحرك قبل النشر (الوسيط)')), fs.ok ? esc(signedPct(fs.pre)) : '—',
+        esc(fs.ok ? (fund ? L('before the 13F was public', 'قبل نشر نموذج 13F') : L('during the filing lag', 'خلال مدة تأخر النشر')) : why)),
+      cell4,
+    ];
+    // The read: which filings, priced to which close, and the counted outcome (template, §4).
+    const fl = fs.filings, lastF = fl[fl.length - 1];
+    const from = !fl.length ? '' : fl.length === 1 ? L(`From 1 filing (${shortDate(fl[0])})`, `من إفصاح واحد (${shortDate(fl[0])})`)
+      : L(`From ${fl.length} filings (${dayMonth(fl[0])} – ${shortDate(lastF)})`, `من ${pluralAr(fl.length, 'إفصاح واحد', 'إفصاحين', 'إفصاحات', 'إفصاحًا')} (${dayMonth(fl[0])} – ${shortDate(lastF)})`);
+    const asOf = fs.set.map((r) => { const h = histOf(r.ticker); return h.length ? h[h.length - 1].d : ''; }).sort().pop();
+    const head = [from, asOf ? L(`to ${dayMonth(asOf)} close`, `حتى إغلاق ${dayMonth(asOf)}`) : '', L('past disclosures, not a forecast', 'إفصاحات سابقة، وليست توقعًا')].filter(Boolean).join(' · ')
+      + (fs.late ? L(` · ${plural(fs.late, 'late filing', 'late filings')} left out`, ` · إفصاحات متأخرة مستبعدة: ${bidi(fs.late)}`) : '') + L('.', '.');
+    const read = !fs.ok ? '' : ' ' + L(`${fs.up} of ${fs.n} priced positions in passing names were higher after their filing went public (median ${fmtPct(fs.med)}). ${fund ? `The median move from quarter end to filing was ${fmtPct(fs.pre)}.` : `The median move before the filing was public was ${fmtPct(fs.pre)}.`}`,
+      `ارتفع ${bidi(fs.up)} من ${bidi(fs.n)} ${arCount(fs.n, 'مراكز مسعّرة', 'مركزًا مسعّرًا')} في الأسهم المتوافقة بعد نشر الإفصاح (الوسيط ${bidi(fmtPct(fs.med))}). ${fund ? `بلغ وسيط تحرك السعر من نهاية الربع إلى النشر ${bidi(fmtPct(fs.pre))}.` : `بلغ وسيط تحرك السعر قبل نشر الإفصاح ${bidi(fmtPct(fs.pre))}.`}`);
+    return strip(cells, 4) + `<p class="muted pf-read">${esc(head + read)}</p>`;
+  }
+
+  // PF-2 Latest filing: one group per filing (actor + filing date); the newest open, older ones collapsed.
+  function filingCard(p) {
+    const gs = filingGroups(p.rows); if (!gs.length) return '';
+    const head = (g) => {
+      const r0 = g.rows[0], lag = dayRange(g.lagMin, g.lagMax);
+      if (g.fund) return L(`Reported holdings at ${dayMonth(fDisclosed(r0)) || '—'} quarter end · filed ${dayMonth(g.filed) || '—'}${lag ? ` (${lag})` : ''} · ${plural(g.n, 'position', 'positions')}`,
+        `مراكز معلنة بنهاية الربع (${dayMonth(fDisclosed(r0)) || '—'}) · نُشر في ${dayMonth(g.filed) || '—'}${lag ? ` (بعد ${lag})` : ''} · المراكز: ${bidi(g.n)}`);
+      return L(`Filed ${dayMonth(g.filed) || '—'} · ${srcLabel(r0)}${lag ? ` · ${lag} after the ${g.n === 1 ? 'trade' : 'trades'}` : ''} — ${plural(g.buys, 'buy', 'buys')}, ${plural(g.sells, 'sell', 'sells')} across ${plural(g.names.length, 'name', 'names')}`,
+        `نُشر في ${dayMonth(g.filed) || '—'} · ${srcLabel(r0)}${lag ? ` · بعد ${g.n === 1 ? 'الصفقة' : 'الصفقات'} بـ${lag}` : ''} — شراء: ${bidi(g.buys)} · بيع: ${bidi(g.sells)} · الأسهم: ${bidi(g.names.length)}`);
+    };
+    const row = (r) => { const sp = perfOf(r, 'sincePublic');
+      return `<div class="row" tabindex="0" role="link" data-open-stock="${esc(r.ticker)}"><span class="mono" dir="ltr">${esc(r.ticker)}</span><div><b>${esc(capFirst(actionText(r)))}</b> · ${esc(amountText(r))}${valueNote(r) ? ` <small>${esc(valueNote(r))}</small>` : ''}<div class="muted">${is13F(r) ? '' : esc(tradeDateText(r)) + ' · '}${sp == null ? esc(L('since public: prices pending', 'منذ النشر: بانتظار بيانات السعر')) : `${esc(L('since public', 'منذ النشر'))} ${arrowPct(sp)}`}${lateChip(r)}</div></div>${badge(r.label)}</div>`; };
+    gs.forEach((g) => { if (g.fund) g.rows.sort((a, b) => (posValue(b) ?? -1) - (posValue(a) ?? -1)); });
+    const [g0, ...older] = gs, first = g0.rows.slice(0, 8), rest = g0.rows.slice(8);
+    const quarters = new Set(p.rows.filter(is13F).map((r) => { const q = quarterOf(fDisclosed(r)); return q ? q.y + 'Q' + q.q : ''; }));
+    const firstQ = g0.fund && quarters.size === 1 ? `<p class="footnote">${esc(L('First quarter in Mizan; changes need two quarters.', 'أول ربع في بياناتنا؛ تظهر التغييرات بعد ربعين.'))}</p>` : '';
+    return `<section class="card block pf-filing"><h2>${L('Latest filing', 'أحدث إفصاح')}</h2><p class="pf-ghead">${esc(head(g0))}</p>
+      <div class="timeline">${first.map(row).join('')}</div>${rest.length ? more(L(`Show all ${g0.n}`, `عرض الكل (${g0.n})`), `<div class="timeline">${rest.map(row).join('')}</div>`) : ''}${firstQ}
+      ${older.length ? `<h3 class="pf-sub">${L('Earlier filings', 'إفصاحات سابقة')}</h3>${older.slice(0, 6).map((g) => more(head(g), `<div class="timeline">${g.rows.map(row).join('')}</div>`)).join('')}` : ''}</section>`;
+  }
+
+  // PF-4 Holdings: top 10 by weight, with the decision facts for each (since public, distance from the 52w high).
+  function holdingsCard(p) {
+    const hs = [...p.heldMap].map(([tk, v]) => {
+      const buys = p.rows.filter((r) => r.ticker === tk && !isSell(r)).sort(byTradeDesc), lb = buys[0] || v.row, f13 = is13F(lb);
+      let w = 0, known = buys.length > 0, range = '';
+      if (f13) { const pv = posValue(lb); known = pv != null; w = pv || 0; } else {
+        buys.forEach((r) => { if (!hasAmount(r) && r[FIELD.positionValue] == null) known = false; w += fWeightBasis(r); });
+        const pr = buys.map((r) => parseRange(r.amount));
+        range = buys.length === 1 ? fmtRange(buys[0]) : pr.length && pr.every(Boolean) ? fmtLoHi(pr.reduce((a, x) => a + x[0], 0), pr.reduce((a, x) => a + x[1], 0)) : '';
+      }
+      return { tk, label: v.label, row: lb, f13, w, known, range, nBuy: buys.length, sp: perfOf(lb, 'sincePublic'), pc: priceCtx(tk) };
+    }).sort((a, b) => b.w - a.w || a.tk.localeCompare(b.tk));
+    if (!hs.length) return `<section class="card block"><h2>${L('Holdings', 'الأسهم المملوكة')}</h2><p class="muted">${esc(L('No current holdings in the disclosures.', 'لا توجد أسهم حالية في الإفصاحات.'))}</p></section>`;
+    const total = hs.reduce((a, h) => a + h.w, 0), weightsKnown = total > 0 && hs.every((h) => h.known);
+    const pct = (h) => Math.round(h.w / total * 100);
+    const ptrW = hs.filter((h) => !h.f13).map(pct), flat = ptrW.length === 1 || (ptrW.length > 1 && Math.max(...ptrW) - Math.min(...ptrW) <= 1); // one name or near-equal ranges: a % adds nothing
+    const row = (h) => {
+      const r = h.row, dt = dayMonth(fDisclosed(r)) || '—', fd = dayMonth(r[FIELD.filedDate]) || '—';
+      const when = h.f13 ? L(`held at ${dt} quarter end`, `مركز قائم بنهاية الربع (${dt})`) : L(`bought ${dt} · public ${fd}`, `تاريخ الصفقة ${dt} · تاريخ النشر ${fd}`);
+      const hiTxt = !h.pc ? '' : Math.abs(h.pc.fromHi) < 0.05 ? L(`at its ${h.pc.win >= W52 ? '52w' : h.pc.win + '-day'} high`, `عند أعلى سعر في ${h.pc.win >= W52 ? '52 أسبوعًا' : bidi(h.pc.win) + ' يومًا'}`)
+        : L(`${Math.abs(h.pc.fromHi).toFixed(1)}% below ${h.pc.win >= W52 ? '52w' : h.pc.win + '-day'} high`, `أقل من أعلى سعر في ${h.pc.win >= W52 ? '52 أسبوعًا' : bidi(h.pc.win) + ' يومًا'} بـ${bidi(Math.abs(h.pc.fromHi).toFixed(1) + '%')}`);
+      const ctx = `${esc(L('since public', 'منذ النشر'))} ${h.sp == null ? esc(L('pending', 'بانتظار السعر')) : arrowPct(h.sp)}${hiTxt ? ' · ' + esc(hiTxt) : ''}`;
+      const times = h.nBuy >= 2 && !h.f13 ? `<span class="chip">${esc(L(`Bought ${h.nBuy}×`, h.nBuy === 2 ? 'اشتراه مرتين' : `اشتراه ${bidi(h.nBuy)} ${arCount(h.nBuy, 'مرات', 'مرة')}`))}</span>` : '';
+      let wv, wc;
+      if (h.f13) { wv = weightsKnown ? pct(h) + '%' : '—'; wc = [h.known ? amountText(r) : valueNote(r), weightsKnown ? L('of screened positions shown', 'من المراكز المفحوصة المعروضة') : ''].filter(Boolean).join(' · '); }
+      else if (!weightsKnown || flat) { wv = h.range || '—'; wc = L('disclosed range', 'نطاق الإفصاح'); }
+      else { wv = '≈' + pct(h) + '%'; wc = [L('est. from ranges', 'تقدير من نطاقات الإفصاح'), h.range].filter(Boolean).join(' · '); }
+      return `<div class="holding pf-hold" tabindex="0" role="link" data-open-stock="${esc(h.tk)}"><span><b dir="ltr">${esc(h.tk)}</b>${badge(h.label)}${times}</span><span class="muted">${esc(coName(r.company) || '')} · ${esc(when)}<small class="ctx">${ctx}</small></span><span class="mono">${esc(numIso(wv))}${wc ? `<small class="ctx">${esc(wc)}</small>` : ''}</span></div>`;
+    };
+    const top = hs.slice(0, 10), rest = hs.slice(10);
+    const fundNote = hs.some((h) => h.f13) ? `<p class="footnote">${esc(L('Showing screened positions only; other reported positions await AAOIFI screening.', 'نعرض المراكز المفحوصة فقط؛ بقية المراكز المعلنة بانتظار الفحص الشرعي.'))}</p>` : '';
+    const ptrNote = hs.some((h) => !h.f13) && weightsKnown && !flat ? `<p class="footnote">${esc(L('≈ est. from disclosed ranges (midpoints of the disclosed dollar ranges).', '≈ تقدير من نطاقات الإفصاح (منتصف كل نطاق معلن).'))}</p>` : '';
+    return `<section class="card block"><h2>${L('Holdings', 'الأسهم المملوكة')}</h2><div class="holdings">${top.map(row).join('')}</div>
+      ${rest.length ? more(L(`Show all ${hs.length} holdings`, `عرض جميع الأسهم المملوكة (${hs.length})`), `<div class="holdings">${rest.map(row).join('')}</div>`) : ''}${ptrNote}${fundNote}</section>`;
+  }
+
+  // PF-5 Exits: what the price did after each sale went public. Counts only; no "right" or "wrong".
+  function exitsCard(p) {
+    const ex = [...p.exitedMap].map(([tk, v]) => ({ tk, label: v.label, row: v.row })).sort((a, b) => byTradeDesc(a.row, b.row));
+    if (!ex.length) return '';
+    const sells = p.rows.filter(isSell).map((r) => perfOf(r, 'sincePublic')).filter((v) => v != null);
+    const lower = sells.filter((v) => v < 0).length, higher = sells.filter((v) => v > 0).length;
+    const summary = sells.length >= MIN_EVIDENCE ? `<p class="muted pf-read">${esc(L(`After ${sells.length} public sales: ${lower} lower, ${higher} higher · median since public ${fmtPct(med(sells))}`, `إفصاحات البيع المنشورة: ${bidi(sells.length)} · انخفض السعر بعدها: ${bidi(lower)} · ارتفع: ${bidi(higher)} · الوسيط منذ النشر ${bidi(fmtPct(med(sells)))}`))}</p>` : '';
+    const row = (h) => { const r = h.row, sp = perfOf(r, 'sincePublic');
+      return `<div class="holding" tabindex="0" role="link" data-open-stock="${esc(h.tk)}"><span><b dir="ltr">${esc(h.tk)}</b>${badge(h.label)}</span><span class="muted">${esc(coName(r.company) || '')} · ${esc(is13F(r) ? actionText(r) : L('sold', 'تاريخ البيع'))} ${esc(dayMonth(fDisclosed(r)) || '—')} · ${esc(amountText(r))}${lateChip(r)}</span><span class="mono">${sp == null ? '<span class="return muted">—</span>' : arrowPct(sp)}<small class="ctx">${esc(sp == null ? L('prices pending', 'بانتظار بيانات السعر') : L('since sale went public', 'منذ نشر إفصاح البيع'))}</small></span></div>`; };
+    return `<section class="card block"><h2>${L('After they sold', 'بعد البيع')}</h2>${summary}<div class="holdings">${ex.slice(0, 5).map(row).join('')}</div>
+      ${ex.length > 5 ? more(L(`Show all ${ex.length} exits`, `عرض جميع عمليات البيع (${ex.length})`), `<div class="holdings">${ex.slice(5).map(row).join('')}</div>`) : ''}</section>`;
+  }
+
+  // PF-6 Can I hold it? Held names only: the pass count, why the rest fail, and any passing name near a limit.
+  function canHoldCard(p) {
+    const items = [...p.heldMap].map(([tk, v]) => ({ tk, label: v.label, r: p.rows.filter((x) => x.ticker === tk).sort(byFiled)[0] }));
+    if (!items.length) return '';
+    const sh = shareOf(p), fails = items.filter((h) => h.label === 'fail'), biz = fails.filter((h) => h.r.businessStatus === 'fail').length;
+    const pct1 = (v) => numIso(v > 0 && v < 0.05 ? '<0.1%' : v.toFixed(1) + '%');
+    const ratioShort = (k) => ({ debt: L('debt', 'الديون'), cash: L('cash', 'النقد'), impure: L('impure income', 'الدخل غير المباح') }[k]);
+    const near = items.filter((h) => h.label === 'clean' || h.label === 'purify').flatMap((h) => screenCause(h.r).near.map((n) => ({ tk: h.tk, ...n })));
+    const line = L(`Passes AAOIFI: ${sh.pass} of ${plural(sh.total, 'held name', 'held names')}`, `اجتاز الفحص: ${bidi(sh.pass)} من ${bidi(sh.total)} من الأسهم المملوكة`)
+      + (fails.length ? L(` · ${fails.length} Excluded (${[biz ? `${biz} business activity` : '', fails.length - biz ? plural(fails.length - biz, 'ratio', 'ratios') : ''].filter(Boolean).join(', ')})`,
+        ` · غير متوافق: ${bidi(fails.length)} (${[biz ? `النشاط التجاري: ${bidi(biz)}` : '', fails.length - biz ? `النسب المالية: ${bidi(fails.length - biz)}` : ''].filter(Boolean).join('، ')})`) : '')
+      + (sh.unscreened ? L(` · ${sh.unscreened} pending`, ` · قيد الفحص: ${bidi(sh.unscreened)}`) : '')
+      + (near.length ? L(' · near a limit: ', ' · قريب من الحد: ') + near.map((n) => `${numIso(n.tk)} ${ratioShort(n.k)} ${pct1(n.v)}`).join(L(', ', '، ')) : '');
+    const ratios = (r) => RATIO_KEYS.map((k) => { const v = ratioVal(r, k); return `${ratioShort(k)} ${v == null ? '—' : pct1(v)}`; }).join(' · ');
+    const imp = (h) => ratioVal(h.r, 'impure') ?? 0;
+    const order = [...fails.sort((a, b) => (a.r.businessStatus === 'fail' ? 0 : 1) - (b.r.businessStatus === 'fail' ? 0 : 1) || a.tk.localeCompare(b.tk)),
+      ...items.filter((h) => h.label === 'purify').sort((a, b) => imp(b) - imp(a)), ...items.filter((h) => h.label === 'clean').sort((a, b) => a.tk.localeCompare(b.tk)),
+      ...items.filter((h) => h.label !== 'fail' && h.label !== 'purify' && h.label !== 'clean')];
+    const row = (h) => {
+      const sc = screenCause(h.r), isNear = sc.near.length && h.label !== 'fail';
+      const txt = h.label === 'fail' ? (sc.kind === 'business' ? sc.text + L(' · ratios not assessed', ' · لم تُحتسب النسب') : sc.text || ratios(h.r))
+        : h.label === 'purify' ? L(`Purify ${pct1(imp(h))} of dividends · `, `يُطهَّر ${pct1(imp(h))} من التوزيعات · `) + ratios(h.r)
+          : h.label === 'clean' ? ratios(h.r) : L('Pending · not yet screened', 'قيد الفحص · لم يُفحص بعد');
+      return `<div class="holding pf-scr" tabindex="0" role="link" data-open-stock="${esc(h.tk)}"><span><b dir="ltr">${esc(h.tk)}</b>${badge(h.label)}${isNear ? `<span class="chip near">${esc(L('Near limit', 'قريب من الحد'))}</span>` : ''}</span><small class="muted">${esc(txt)}</small></div>`;
+    };
+    return `<section class="card block"><div class="section-title"><h2>${L('Can I hold it?', 'ما الذي يجتاز الفحص؟')}</h2><span class="chip">${LANG === 'ar' ? 'أيوفي · 30/30/5' : 'AAOIFI · 30/30/5'}</span></div>
+      <p class="pf-pass">${esc(line)}</p>${more(L('Show ratios', 'عرض النسب'), `<div class="holdings">${order.map(row).join('')}</div>`)}</section>`;
+  }
+
   function pagePortfolio(name) {
     const p = derivePortfolios(S.rows).find((x) => x.name === name);
     if (!p) return emptyCard(L('Portfolio not found', 'المحفظة غير موجودة'), L('It may not be in the current disclosure window.', 'قد لا تكون ضمن فترة الإفصاحات الحالية.'), `<a class="btn btn-primary" href="/portfolios" data-nav="portfolios">${L('Explore portfolios', 'استكشف المحافظ')}</a>`);
-    const moves = recentRows(p.rows, 30).length;
-    const holdings = {};
-    for (const r of p.rows.filter((x) => p.heldMap.has(x.ticker))) { const h = holdings[r.ticker] || (holdings[r.ticker] = { ticker: r.ticker, company: r.company, label: r.label, v: 0, known: true, d: null }); h.known = h.known && (r[FIELD.positionValue] != null ? isFinite(+r[FIELD.positionValue]) : hasAmount(r)); h.v += fWeightBasis(r); const dd = fDisclosed(r); if (dd && (!h.d || Date.parse(dd) > Date.parse(h.d))) h.d = dd; }
-    const hs = Object.values(holdings).sort((a, b) => b.v - a.v), totalV = hs.reduce((a, h) => a + h.v, 0) || 1, weightsKnown = hs.every((h) => h.known);
-    // 13F snapshots store only each fund's top reported positions, so weights are shares of THOSE, not of the whole book.
-    const fundBook = p.rows.every((r) => /13F/i.test(r.source || r.kind || ''));
-    const weightBasis = fundBook ? L('of top reported positions', 'من أكبر الاستثمارات المعلنة') : p.rows.every((r) => r[FIELD.positionValue] != null) ? L('of portfolio', 'من المحفظة') : L('of disclosed value', 'من قيمة التداولات المعلنة');
+    const fund = p.rows.length > 0 && p.rows.every(is13F);
     const thin = p.holdings < MIN_HOLDINGS;
-    const idxN = idxCount(p);
-    const exits = [...p.exitedMap].map(([tk, v]) => ({ ticker: tk, label: v.label, company: v.row.company, d: fDisclosed(v.row) })).sort((a, b) => (Date.parse(b.d) || 0) - (Date.parse(a.d) || 0));
-    const sideTxt = (tk) => { const st = p.heldMap.get(tk); if (st && st.row && is13F(st.row)) return L(`held at ${shortDate(fDisclosed(st.row)) || '—'} quarter end`, `مركز قائم بنهاية الربع (${shortDate(fDisclosed(st.row)) || '—'})`); return L(`held since ${shortDate(st && st.start) || '—'}`, `منذ ${shortDate(st && st.start) || '—'}`); };
+    const idxN = idxCount(p), indicative = idxN < MIN_HOLDINGS || idxN / Math.max(1, p.holdings) < 0.5;
     const marks = p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, h: is13F(r), label: r.ticker }));
-    return `<div class="detail-hero">${pAvatar(p)}<div><div class="eyebrow">${esc(L('Investor profile', 'ملف المستثمر'))} · ${esc(typeLabel(p.kind))}</div><h1>${esc(p.name)}</h1><p>${esc(typeLabel(p.kind))} · ${esc(plural2(p.holdings, 'disclosed name', 'disclosed names', 'الأسهم في الإفصاحات'))} · ${esc(plural2(p.count, 'disclosure', 'disclosures', 'الإفصاحات'))}</p><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${sharePill(p)}<span class="chip">${esc(L(`Updated ${ago(p.fresh)} ago`, `آخر تحديث منذ ${ago(p.fresh)}`))}</span>${thin ? '' : star(p.name)}</div></div>
-        <div class="detail-stat"><span class="muted">${L('Return', 'العائد')}</span><b class="hero-ret">${thin ? '<span class="return muted">—</span>' : retTag(p.ret)}</b><small class="muted">${esc(L(`${moves} ${moves === 1 ? 'trade' : 'trades'} in the last 30 days`, `عدد التداولات خلال آخر 30 يومًا: ${moves}`))}</small></div></div>
+    // PF-0 basis line: what the hero number is (and is not), and how many names back it.
+    const priced = p.ret && p.ret.val != null && !p.ret.indicative && !p.ret.stale;
+    const basis = thin || !priced ? '' : `<small class="muted basis">${esc(L("Equal-weight index of passing names · not the investor's actual P&L", 'مؤشر بأوزان متساوية للأسهم المتوافقة · لا يمثل ربح المستثمر الفعلي'))}</small>
+      <small class="muted basis">${esc(L(`${idxN} of ${p.holdings} held names (passing, priced) · from ${fund ? 'quarter-end' : 'trade'} dates${indicative ? ' — indicative' : ''}`, `الأسهم المحتسبة: ${bidi(idxN)} من ${bidi(p.holdings)} (متوافقة ولها أسعار) · منذ ${fund ? 'نهاية الربع' : 'تواريخ الصفقات'}${indicative ? ' — تقديري' : ''}`))}</small>`;
+    const sub = L(`${kindWord(p)} · ${plural(p.holdings, 'held name', 'held names')} · ${plural(p.count, 'disclosure', 'disclosures')}`, `${kindWord(p)} · الأسهم المملوكة: ${bidi(p.holdings)} · الإفصاحات: ${bidi(p.count)}`);
+    return `<div class="detail-hero">${pAvatar(p)}<div><div class="eyebrow">${esc(L('Investor profile', 'ملف المستثمر'))}</div><h1>${esc(p.name)}</h1><p>${esc(sub)}</p><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${sharePill(p)}${thin ? '' : star(p.name)}</div><p class="muted pf-fresh">${esc(freshCaption(p, fund))}</p></div>
+        <div class="detail-stat"><span class="muted">${L('Return', 'العائد')}</span><b class="hero-ret">${thin ? '<span class="return muted">—</span>' : retTag(p.ret)}</b>${basis}</div></div>
+      ${sincePublicStrip(p, fund, thin)}
       <div class="detail-grid"><div class="grid">
-        ${thin ? `<section class="card block"><h2>${L('Activity only', 'النشاط فقط')}</h2><p class="muted" style="line-height:1.6">${esc(L(`Fewer than ${MIN_HOLDINGS} distinct disclosed names, so this filer is not ranked, followable or shown as a portfolio return. The disclosures below are the evidence.`, `عدد الأسهم المعلنة أقل من ${MIN_HOLDINGS}. لذلك لا يظهر المستثمر في الترتيب، ولا يمكن متابعته، ولا نعرض عائد محفظته. يمكنك مراجعة إفصاحاته أدناه.`))}</p></section>` : `<section class="card block"><div class="section-title"><h2>${L('Portfolio movement', 'حركة المحفظة')}</h2>${seg(['1M', '3M', '6M', '1Y', 'ALL'])}</div><div style="display:flex;align-items:baseline;gap:10px">${retTag(p.ret)}${thinIdxNote(p) ? `<span class="chip">${esc(L(`Based on ${idxN} of ${p.holdings} names — indicative only`, `الأسهم المستخدمة لحساب العائد: ${idxN} من ${p.holdings} — تقديري فقط`))}</span>` : ''}</div>${chartFrame(chart(sliceTf(portfolioIndexHist(p.rows)), { unit: 'index', markers: marks, axis: true, empty: esc(idxN ? L('No prices in this period — try a longer timeframe', 'لا تتوفر أسعار لهذه الفترة — جرّب فترة أطول') : L('No cached prices yet for the passing names in this portfolio', 'أسعار الأسهم المتوافقة في هذه المحفظة غير متاحة بعد')) }), tradeLegend())}<p class="footnote">${esc(L(`Equal-weight index (start = 100) of ${idxN} of ${p.holdings} disclosed names — those with cached prices; Excluded names are left out. Trades outside the price window are not pinned.`, `مؤشر يبدأ من 100 ويعطي كل سهم الوزن نفسه. عدد الأسهم المستخدمة: ${idxN} من ${p.holdings}، بحسب الأسعار المتاحة. نستبعد الأسهم غير المتوافقة. لا تظهر علامات التداولات خارج فترة الأسعار.`))}</p></section>`}
-        <section class="card block"><h2>${L('Current holdings', 'الأسهم الحالية')}</h2><div class="holdings">${hs.map((h) => `<div class="holding" tabindex="0" role="link" data-open-stock="${esc(h.ticker)}"><span><b dir="ltr">${esc(h.ticker)}</b>${badge(h.label)}</span><span class="muted">${esc(h.company || '')} · ${esc(sideTxt(h.ticker))}</span><span class="mono">${weightsKnown ? Math.round(h.v / totalV * 100) + '%' : '—'}<small class="ctx">${esc(weightBasis)}</small></span></div>`).join('') || `<p class="muted">${esc(L('No current holdings in the disclosures.', 'لا توجد أسهم حالية في الإفصاحات.'))}</p>`}</div>${exits.length ? `<h3 style="margin:18px 0 6px;font-size:14px">${L('Recent exits', 'خرج منها مؤخرًا')}</h3><div class="holdings">${exits.map((h) => `<div class="holding" tabindex="0" role="link" data-open-stock="${esc(h.ticker)}"><span><b dir="ltr">${esc(h.ticker)}</b>${badge(h.label)}</span><span class="muted">${esc(h.company || '')} · ${esc(L('sold', 'بيع'))} ${esc(shortDate(h.d) || '—')}</span><span class="mono">—</span></div>`).join('')}</div>` : ''}</section>
-        <section class="card block"><div class="section-title"><h2>${L('Screening evidence', 'تفاصيل الفحص')}</h2><span class="chip">${LANG === 'ar' ? 'أيوفي · 30/30/5' : 'AAOIFI · 30/30/5'}</span></div><div class="holdings">${screeningRows(p.rows)}</div><p class="footnote">${esc(t('dtl.compNote'))}</p></section>
+        ${thin ? `<section class="card block"><h2>${L('Activity only', 'النشاط فقط')}</h2><p class="muted" style="line-height:1.6">${esc(L(`Fewer than ${MIN_HOLDINGS} distinct disclosed names, so this filer is not ranked, followable or shown as a portfolio return. The disclosures below are the evidence.`, `عدد الأسهم المعلنة أقل من ${MIN_HOLDINGS}. لذلك لا يظهر المستثمر في الترتيب، ولا يمكن متابعته، ولا نعرض عائد محفظته. يمكنك مراجعة إفصاحاته أدناه.`))}</p></section>` : `<section class="card block"><div class="section-title"><h2>${L('Portfolio movement', 'حركة المحفظة')}</h2>${seg(['1M', '3M', '6M', '1Y', 'ALL'])}</div><div style="display:flex;align-items:baseline;gap:10px">${retTag(p.ret)}${thinIdxNote(p) ? `<span class="chip">${esc(L(`Based on ${idxN} of ${p.holdings} names — indicative only`, `الأسهم المستخدمة لحساب العائد: ${idxN} من ${p.holdings} — تقديري فقط`))}</span>` : ''}</div>${chartFrame(chart(sliceTf(portfolioIndexHist(p.rows)), { unit: 'index', markers: marks, axis: true, empty: esc(idxN ? L('No prices in this period — try a longer timeframe', 'لا تتوفر أسعار لهذه الفترة — جرّب فترة أطول') : L('No cached prices yet for the passing names in this portfolio', 'أسعار الأسهم المتوافقة في هذه المحفظة غير متاحة بعد')) }), tradeLegend())}<p class="footnote">${esc(L(`Equal-weight index (start = 100) of ${idxN} of ${p.holdings} held names with prices; Excluded names left out.`, `مؤشر بأوزان متساوية (يبدأ من 100) لـ${idxN} من ${p.holdings} من الأسهم المملوكة التي لها أسعار؛ تُستبعد الأسهم غير المتوافقة.`))}</p></section>`}
+        ${holdingsCard(p)}
+        ${exitsCard(p)}
       </div><aside class="grid">
-        <section class="card block"><h2>${L('What changed', 'آخر التغيّرات')}</h2><div class="timeline">${p.rows.slice().sort(byFiled).slice(0, 8).map((r) => `<div class="row"><span class="mono">${ago(daysSince(r[FIELD.filedDate]))}</span><div><b>${actTicker(r)}</b><div class="muted">${esc(amountText(r))} · ${esc(tradeDateText(r))}${lagText(r) ? ' · ' + esc(lagText(r)) : ''}${lateChip(r)}</div></div>${badge(r.label)}</div>`).join('')}</div></section>
-        <section class="card block"><h2>${L('Mizan read', 'ملخص المحفظة')}</h2><p class="muted" style="line-height:1.6">${esc(thin ? mizanRead({ ...p, ret: null }) : mizanRead(p))}</p><p class="footnote">${esc(t('dtl.evNote'))}</p></section>
-      </aside></div>`;
+        ${filingCard(p)}
+        ${canHoldCard(p)}
+      </aside></div>${footnote()}`;
   }
 
   /* ---- Stock detail (prototype/stock-detail.html) — revamp SPEC §3.1. Four questions in order:
