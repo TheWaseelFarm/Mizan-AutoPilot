@@ -135,3 +135,7 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 .hero-note > div{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px}
 /* Phone alert rows: tags on top, text + time on one line. */
 @media(max-width:720px){.alerts .timeline .row{grid-template-columns:1fr auto;gap:8px}.alert-tags{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}}
+/* Fallback (SVG) chart markers match the legend and the Lightweight Charts arrows: ▲ buy, ▼ sell. */
+.mz-chart__mk{width:11px;height:11px;border-radius:0;box-shadow:none;border:0}
+.mz-chart__mk[data-side="buy"]{background:var(--blue);clip-path:polygon(50% 0,100% 100%,0 100%)}
+.mz-chart__mk[data-side="sell"]{background:var(--ink);clip-path:polygon(0 0,100% 0,50% 100%)}
