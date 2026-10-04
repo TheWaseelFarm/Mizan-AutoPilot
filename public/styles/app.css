@@ -107,3 +107,35 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 .mixbar .included{background:var(--green)}.mixbar .watch{background:var(--amber)}.mixbar .excluded{background:var(--red)}.mixbar .pending{background:var(--grey)}
 .investor-card .cover.mixed{background:linear-gradient(135deg,#1f2a33,#7d8d99)}
 .avatar[data-tone="mixed"]{--av:#4b5b67}
+
+/* ---- Return is the hero on cards, panel and profile (performance-led hierarchy). */
+.card-return{margin:2px 0 10px}.card-return .return{font:800 26px/1.1 var(--mono)}
+.panel .hero{border:0;background:none;padding:0;border-radius:0;display:block}
+.panel .hero .return{font:800 34px/1.1 var(--mono)}
+.detail-stat .hero-ret .return{font:800 30px/1.1 var(--mono)}
+.detail-stat .hero-ret .ctx{display:block;text-align:inherit}
+
+/* ---- Council fixes. */
+/* Arabic: the package sets labels, pills and captions in a monospace stack, which has no Arabic
+   glyphs (letters stretch, pills wrap). Use a proportional Arabic-capable stack there; numerals
+   keep tabular alignment. */
+:lang(ar){--font:"Segoe UI","Geeza Pro","SF Arabic","Noto Sans Arabic",Tahoma,system-ui,sans-serif}
+:lang(ar) .status,:lang(ar) .chip,:lang(ar) .eyebrow,:lang(ar) .ctx,:lang(ar) .kpi span,:lang(ar) .mono,:lang(ar) .step-num,:lang(ar) .seg button,:lang(ar) .table th,:lang(ar) .metric small,:lang(ar) .hero-note small,:lang(ar) .event small,:lang(ar) .credit,:lang(ar) .mz-chart__ax,:lang(ar) .mz-chart__todaylab,:lang(ar) .mz-chart-tip,:lang(ar) .brand small{font-family:var(--font);letter-spacing:0;text-transform:none}
+:lang(ar) .mono,:lang(ar) .return,:lang(ar) .kpi b,:lang(ar) .metric b{font-variant-numeric:tabular-nums}
+/* Empty-chart message follows the page direction (the chart box itself is forced LTR). */
+.mz-chart__empty{direction:inherit;unicode-bidi:plaintext;text-align:center;padding:14px}
+/* Top bar: one-line chip and search shortcut; chip stays visible on phones (compact). */
+#dataChip,#kbdBtn{white-space:nowrap}.topactions{flex-shrink:0}
+@media(max-width:720px){.topactions .chip{display:inline-flex;font-size:11px;padding:5px 8px;max-width:100%;overflow:hidden;text-overflow:ellipsis}}
+@media(pointer:coarse){#kbdBtn{display:none}}
+/* List rows: the return leads, activity stays regular weight, nothing wraps mid-figure. */
+.table .return{font-size:16px;white-space:nowrap}.table td small.ctx{white-space:nowrap}
+.table td.mono{font-size:13px;font-weight:400}.table .status{white-space:nowrap}
+/* Hero note pills sit clear of the headline. */
+.hero-note > div{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px}
+/* Phone alert rows: tags on top, text + time on one line. */
+@media(max-width:720px){.alerts .timeline .row{grid-template-columns:1fr auto;gap:8px}.alert-tags{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}}
+/* Fallback (SVG) chart markers match the legend and the Lightweight Charts arrows: ▲ buy, ▼ sell. */
+.mz-chart__mk{width:11px;height:11px;border-radius:0;box-shadow:none;border:0}
+.mz-chart__mk[data-side="buy"]{background:var(--blue);clip-path:polygon(50% 0,100% 100%,0 100%)}
+.mz-chart__mk[data-side="sell"]{background:var(--ink);clip-path:polygon(0 0,100% 0,50% 100%)}
