@@ -53,13 +53,14 @@ export default async function handler(req, res) {
     const batch = ordered.slice(0, BATCH);
 
     let done = 0, failed = 0, skipped = 0;
+    const skipReasons = []; // first few provider messages, so a quota/outage is diagnosable from the job log
     for (const ticker of batch) {
       try {
         const payload = await screenOnce(ticker);          // force fresh (bypass cache)
         // GUARD: never overwrite existing (possibly real) screening with a no-data/mock payload
         // when the provider is down — that silently degrades good names to "unscreened" and
         // empties the feed. Leave the stored screening untouched and move on.
-        if (!payload || /^No screening data/i.test(payload.reasoning || "")) { skipped++; continue; }
+        if (!payload || /^No screening data/i.test(payload.reasoning || "")) { skipped++; if (skipReasons.length < 3) skipReasons.push(`${ticker}: ${String((payload && payload.reasoning) || 'no payload').slice(0, 200)}`); continue; }
         const label = classifyAAOIFI(payload);             // engine decides — never the vendor
         try {
           await db.from("screenings").upsert(
@@ -87,7 +88,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      done, failed, skipped, syncedCash: synced,
+      done, failed, skipped, syncedCash: synced, ...(skipReasons.length && { skipReasons }),
       ...(syncError && { syncError, hint: "run supabase/cash_pct.sql in the Supabase SQL editor (adds the cash_pct column)" }),
       remaining: Math.max(0, ordered.length - batch.length),
       live: usingLiveScreener(),
