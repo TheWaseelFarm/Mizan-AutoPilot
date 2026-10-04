@@ -120,7 +120,7 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
    glyphs (letters stretch, pills wrap). Use a proportional Arabic-capable stack there; numerals
    keep tabular alignment. */
 :lang(ar){--font:"Segoe UI","Geeza Pro","SF Arabic","Noto Sans Arabic",Tahoma,system-ui,sans-serif}
-:lang(ar) .status,:lang(ar) .chip,:lang(ar) .eyebrow,:lang(ar) .ctx,:lang(ar) .kpi span,:lang(ar) .mono,:lang(ar) .step-num,:lang(ar) .seg button,:lang(ar) .table th,:lang(ar) .metric small,:lang(ar) .hero-note small,:lang(ar) .event small,:lang(ar) .credit,:lang(ar) .mz-chart__ax,:lang(ar) .mz-chart__todaylab,:lang(ar) .mz-chart-tip,:lang(ar) .brand small{font-family:var(--font);letter-spacing:0;text-transform:none}
+:lang(ar) .status,:lang(ar) .chip,:lang(ar) .eyebrow,:lang(ar) .ctx,:lang(ar) .kpi span,:lang(ar) .mono,:lang(ar) .step-num,:lang(ar) .seg button,:lang(ar) .table th,:lang(ar) .metric small,:lang(ar) .metric b,:lang(ar) .kpi b,:lang(ar) .hero-note small,:lang(ar) .event small,:lang(ar) .credit,:lang(ar) .mz-chart__ax,:lang(ar) .mz-chart__todaylab,:lang(ar) .mz-chart-tip,:lang(ar) .brand small{font-family:var(--font);letter-spacing:0;text-transform:none}
 :lang(ar) .mono,:lang(ar) .return,:lang(ar) .kpi b,:lang(ar) .metric b{font-variant-numeric:tabular-nums}
 /* Empty-chart message follows the page direction (the chart box itself is forced LTR). */
 .mz-chart__empty{direction:inherit;unicode-bidi:plaintext;text-align:center;padding:14px}
@@ -179,7 +179,7 @@ details.more>summary::-webkit-details-marker{display:none}
 .holding.pf-scr{grid-template-columns:1fr;gap:4px}.holding.pf-scr small{line-height:1.5}
 .holding.pf-hold > span:first-child .chip{padding:2px 6px;font-size:10px}
 .holding .ctx .return{display:inline}
-@media(max-width:720px){.detail-stat .basis{margin-inline-start:0}.pf-filing .timeline .row{grid-template-columns:56px 1fr}}
+@media(max-width:720px){.detail-stat .basis{margin-inline-start:0}.pf-filing .timeline .row{grid-template-columns:56px 1fr}.pf-filing .timeline .row>.status{grid-column:2;justify-self:start;white-space:nowrap}}
 /* ---- /portfolios (SPEC §3.3): column-header context, the panel's 2×2 kpis, top holdings, latest filing,
    and the unranked recent-activity card. Existing package components only; neutral ink/cobalt. */
 .table th small.ctx{display:block;margin-top:3px;font-size:9px;letter-spacing:0;text-transform:none;font-weight:500}
@@ -228,3 +228,8 @@ details.more>summary::-webkit-details-marker{display:none}
    row 1, the facts full width on row 2) instead of squeezing three columns into 390px. */
 @media(max-width:720px){.holding.pf-hold,.holding.pf-exit{grid-template-columns:minmax(0,1fr) auto}.holding.pf-hold > span:nth-child(2),.holding.pf-exit > span:nth-child(2){grid-column:1/-1;order:3}}
 .mz-footer{margin-top:24px}
+/* Review fixes: verdict pills in holdings / exits rows stay one line (rule 1: compact tag); on desktop the
+   ticker + pill + chip column keeps its natural width instead of breaking "يحتاج تطهيرًا" in two. */
+.holding .status{white-space:nowrap}
+@media(min-width:721px){.holding.pf-hold>span:first-child,.holding.pf-exit>span:first-child{min-width:max-content}}
+.fo-other{margin-top:24px}.fo-other .holding{grid-template-columns:1fr auto auto}

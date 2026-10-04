@@ -126,7 +126,7 @@
   const LATE_PTR_DAYS = 45;         // STOCK Act deadline; later PTRs are flagged and left out of medians
   const LIMITS = { debt: 30, cash: 30, impure: 5 };   // AAOIFI No. 21 (mirrors api/_lib/aaoifi.js)
   const NEAR = { debt: 3, cash: 3, impure: 1 };       // "near limit" band, pts, either side
-  const PX_MIN = 60, W52 = 252;     // closes needed for price context / 52-week window
+  const PX_MIN = 60, W52_DAYS = 365; // daily closes needed for price context / 52-week window in calendar days
   // Demo actors that leaked into the live feed; dropped on the client when S.live (sample mode keeps them).
   const SEED_ACTORS = new Set(['Global Value Fund', 'Top Growth Fund', 'Public Official Filing', 'Berkshire Crest Fund', 'Northstar Quant Partners', 'Crescent Lake Capital']);
   const ACTOR_ALIAS = { 'David J. Taylor': 'David Taylor' };
@@ -236,19 +236,30 @@
       fund: (set.length ? set : rows).length > 0 && (set.length ? set : rows).every(is13F),
     };
   }
-  // Price facts from cached daily closes (null under PX_MIN closes). fromHi / vs50 / vs200 / r1m / r3m are percents.
+  // Price facts from cached DAILY closes. Windows are calendar days, so the labels stay true for any data
+  // density: the 52-week window is the last 365 days (win = the days it actually spans, full = a year),
+  // an SMA needs n closes inside a daily-sized span, 1M/3M compare with the close ~30/91 days back.
+  // null (-> "Prices pending") when prices are not live (the embedded sample is weekly, never shown as
+  // price facts), under PX_MIN closes in the window, or when the window is too sparse to be daily.
+  // fromHi / vs50 / vs200 / r1m / r3m are percents.
   function priceCtx(tk) {
-    const h = histOf(tk); if (h.length < PX_MIN) return null;
-    const c = h.map((p) => +p.c), len = c.length, last = c[len - 1], asOf = h[len - 1].d;
-    const win = Math.min(len, W52), w = c.slice(-win), hi = Math.max(...w), lo = Math.min(...w);
-    const sma = (n) => len >= n ? c.slice(-n).reduce((a, b) => a + b, 0) / n : null;
+    if (!S.pricesLive) return null;
+    const DAY = 864e5, ms = (p) => Date.parse(p.d);
+    const h = histOf(tk).filter((p) => isFinite(ms(p))); if (h.length < PX_MIN) return null;
+    const len = h.length, asMs = ms(h[len - 1]), last = +h[len - 1].c, asOf = h[len - 1].d;
+    const w = h.filter((p) => ms(p) >= asMs - W52_DAYS * DAY), span = Math.round((asMs - ms(w[0])) / DAY);
+    if (w.length < PX_MIN || w.length < 0.6 * span * 252 / 365) return null; // not daily closes
+    const wc = w.map((p) => +p.c), hi = Math.max(...wc), lo = Math.min(...wc);
+    const full = span >= W52_DAYS - 7;
+    // n trading days ≈ n·7/5 calendar days; allow holidays and a missing day or two.
+    const sma = (n) => len >= n && (asMs - ms(h[len - n])) / DAY <= n * 1.6 + 7 ? h.slice(-n).reduce((a, p) => a + +p.c, 0) / n : null;
+    const back = (days) => { const tgt = asMs - days * DAY; let i = len - 1; while (i >= 0 && ms(h[i]) > tgt) i--; return i >= 0 && tgt - ms(h[i]) <= 7 * DAY ? (last / +h[i].c - 1) * 100 : null; };
     const sma50 = sma(50), sma200 = sma(200);
-    const back = (k) => len > k ? (last / c[len - k] - 1) * 100 : null;
     return {
-      last, asOf, stale: (daysSince(asOf) ?? 0) > STALE_DAYS, hi, lo, win, len,
+      last, asOf, stale: (daysSince(asOf) ?? 0) > STALE_DAYS, hi, lo, win: full ? W52_DAYS : span, full, len,
       fromHi: (last / hi - 1) * 100, pos: hi > lo ? (last - lo) / (hi - lo) : null,
       sma50, sma200, vs50: sma50 ? (last / sma50 - 1) * 100 : null, vs200: sma200 ? (last / sma200 - 1) * 100 : null,
-      r1m: back(22), r3m: back(64),
+      r1m: back(30), r3m: back(91),
     };
   }
   // Who is on which side of a ticker, counted by filer: each actor's latest row decides.
@@ -910,16 +921,19 @@
   function shareOf(p) {
     const c = { clean: 0, purify: 0, fail: 0, unscreened: 0 };
     (p.heldMap || heldNames(p.rows).held).forEach((v) => { c[v.label] = (c[v.label] || 0) + 1; }); // names still held; newest verdict
-    const total = c.clean + c.purify + c.fail + c.unscreened || 1, pass = c.clean + c.purify;
-    // Band: ANY excluded name -> 'mixed' (neutral ink, never amber — amber means "passes with
-    // purification"); else any pending name -> pending (grey); else purification -> watch (amber); else included.
-    const band = c.fail > 0 ? 'mixed' : c.unscreened > 0 ? 'unscreened' : c.purify > 0 ? 'purify' : 'clean';
-    return { ...c, total, pass, ratio: pass / total, band, exited: (p.exitedMap || new Map()).size };
+    const total = c.clean + c.purify + c.fail + c.unscreened, pass = c.clean + c.purify;
+    // Band: nothing held -> 'none' (neutral, no verdict); ANY excluded name -> 'mixed' (neutral ink, never
+    // amber — amber means "passes with purification"); else any pending name -> pending (grey); else
+    // purification -> watch (amber); else included.
+    const band = !total ? 'none' : c.fail > 0 ? 'mixed' : c.unscreened > 0 ? 'unscreened' : c.purify > 0 ? 'purify' : 'clean';
+    return { ...c, total, pass, ratio: total ? pass / total : 0, band, exited: (p.exitedMap || new Map()).size };
   }
   // compact: the table variant ("5 of 6 pass") where the column header already says "Mizan Status".
   const sharePill = (p, compact) => {
     const sh = shareOf(p);
     const tip = L(`${sh.clean} Included · ${sh.purify} Purify · ${sh.fail} Excluded${sh.unscreened ? ` · ${sh.unscreened} Pending` : ''}${sh.exited ? ` · ${sh.exited} sold (not counted)` : ''} (AAOIFI 30/30/5)`, `متوافق: ${sh.clean} · يحتاج تطهيرًا: ${sh.purify} · غير متوافق: ${sh.fail}${sh.unscreened ? ` · قيد الفحص: ${sh.unscreened}` : ''} ${sh.exited ? ` · بيعت ولا تُحتسب: ${sh.exited}` : ''} (أيوفي 30/30/5)`);
+    // Nothing still held (every row a sale): a neutral count, never a made-up "0 of 1" in a verdict hue.
+    if (sh.band === 'none') return `<span class="status mixed" title="${esc(tip)}">${esc(L(`No held names${sh.exited ? ` · ${sh.exited} sold` : ''}`, `لا أسهم مملوكة${sh.exited ? ` · بيع: ${sh.exited}` : ''}`))}</span>`;
     const txt = compact ? L(`${sh.pass} of ${sh.total} pass`, `اجتاز ${sh.pass} من ${sh.total}`) : L(`Passes AAOIFI: ${sh.pass} of ${sh.total}`, `اجتاز الفحص: ${sh.pass} من ${sh.total}`);
     const bar = `<span class="mixbar" aria-hidden="true">${[['clean', 'included'], ['purify', 'watch'], ['fail', 'excluded'], ['unscreened', 'pending']].map(([k, cls]) => sh[k] ? `<i class="${cls}" style="flex:${sh[k]}"></i>` : '').join('')}</span>`;
     return `<span class="status ${sh.band === 'mixed' ? 'mixed' : STATUS_CLS[sh.band]}" title="${esc(tip)}">${esc(txt)}${compact ? '' : bar}</span>`;
@@ -964,7 +978,8 @@
     document.getElementById('kbdBtn').title = L('Search (⌘K)', 'بحث (⌘K)');
     document.querySelector('.brandmark').textContent = L('M', 'م');
     const thinP = S.page === 'portfolio' && (derivePortfolios(S.rows).find((x) => x.name === S.id) || { holdings: 0 }).holdings < MIN_HOLDINGS;
-    const fid = S.page === 'portfolio' ? (thinP ? null : S.id) : S.page === 'stock' ? S.id : null;
+    const noStock = S.page === 'stock' && !S.loading && !S.rows.some((r) => r.ticker === S.id) && histOf(S.id).length < 2; // "Stock not found"
+    const fid = S.page === 'portfolio' ? (thinP ? null : S.id) : S.page === 'stock' ? (noStock && !S.follows.has(S.id) ? null : S.id) : null;
     const fb = document.getElementById('topFollow');
     fb.textContent = fid && S.follows.has(fid) ? t('common.following') : t('common.follow');
     fb.dataset.followId = fid || ''; fb.hidden = !fid;
@@ -976,7 +991,7 @@
     const moves = recentRows(p.rows, 30).length;
     return `<article class="card investor-card" tabindex="0" role="link" data-open-portfolio="${esc(p.name)}">
       <div class="cover ${COVER[shareOf(p).band] || ''}">${pAvatar(p, 'portrait')}</div>
-      <div class="body"><h3>${esc(p.name)}</h3><div class="meta">${esc(typeLabel(p.kind))} · ${esc(L(`latest filing ${shortDate(latestFiling(p.rows)) || '—'}`, `آخر إفصاح ${shortDate(latestFiling(p.rows)) || '—'}`))}</div><div class="card-return">${retTag(p.ret)}</div>${sharePill(p)}
+      <div class="body"><h3>${esc(p.name)}</h3><div class="meta">${esc(typeLabel(p.kind))} · ${esc(L(`latest filing ${shortDate(latestFiling(p.rows)) || '—'}`, `آخر إفصاح ${shortDate(latestFiling(p.rows)) || '—'}`))}</div><div class="card-return">${retTag(p.ret)}${thinIdxNote(p) ? `<small class="ctx">${esc(thinIdxNote(p))}</small>` : ''}</div>${sharePill(p)}
       <div class="kpirow"><div class="kpi"><b>${p.holdings}</b><span>${L('holdings', 'الأسهم')}</span></div><div class="kpi"><b>${moves}</b><span>${L('moves · 30d', 'عدد التداولات · 30 يومًا')}</span></div><div class="kpi"><b>${ago(p.fresh)}</b><span>${L('freshness', 'آخر إفصاح')}</span></div></div></div></article>`;
   }
   function pageDiscover() {
@@ -1013,7 +1028,10 @@
 
   // How many disclosed names actually back the equal-weight portfolio index / return.
   const idxCount = (p) => [...(p.heldMap || heldNames(p.rows).held)].filter(([tk, v]) => v.label !== 'fail' && v.label !== 'unscreened' && v.start && histOf(tk).length >= 2).length;
-  const thinIdxNote = (p) => { const n = idxCount(p); return (p.ret && p.ret.val != null && !p.ret.indicative && n < MIN_HOLDINGS) ? L(`based on ${n} of ${p.holdings} names`, `الأسهم المستخدمة لحساب العائد: ${n} من ${p.holdings}`) : ''; };
+  // ONE indicative rule for the index return everywhere (PF-0 hero, chart chip, /portfolios table + panel, investor cards):
+  // fewer than MIN_HOLDINGS names, or under half the held names, back it.
+  const idxBasis = (p) => { const n = idxCount(p); return { n, indicative: n < MIN_HOLDINGS || n / Math.max(1, p.holdings) < 0.5 }; };
+  const thinIdxNote = (p) => { const b = idxBasis(p); return (p.ret && p.ret.val != null && !p.ret.indicative && !p.ret.stale && b.indicative) ? L(`based on ${b.n} of ${p.holdings} names — indicative`, `الأسهم المستخدمة لحساب العائد: ${bidi(b.n)} من ${bidi(p.holdings)} — تقديري`) : ''; };
   /* ---- Portfolios (prototype/portfolios.html) — revamp SPEC §3.3. Questions in order: who has the
      return (PS-2 Return), what happened after their filings (Since public), how fresh (Time to publish,
      Latest filing), and who is active this week even when not ranked (PS-4). Counted facts only. */
@@ -1025,7 +1043,8 @@
   };
   // Time to publish cell: median days (PTR: after the trade; 13F: after quarter end).
   const pubLagCell = (p) => {
-    const pl = pubLag(p); if (pl.v == null) return '<span class="muted">—</span>';
+    const pl = pubLag(p);
+    if (pl.v == null) return pl.lateV != null ? `${esc(daysTxt(pl.lateV))}<small class="ctx">${esc(lateOnlyTxt(pl.lateFilings))}</small>` : '<span class="muted">—</span>';
     return `${esc(daysTxt(pl.v))}<small class="ctx">${esc(pl.fund ? L('after\u00a0Q\u2011end', 'بعد نهاية الربع') : L('after the trade', 'بعد الصفقة'))}</small>`;
   };
   // PS-4 Filers with fewer than MIN_HOLDINGS held names but >= 3 disclosures filed in the last 30 days.
@@ -1059,7 +1078,7 @@
     const thin = p.holdings < MIN_HOLDINGS, fund = p.rows.length > 0 && p.rows.every(is13F);
     const fc = followCells(p, fund), kpis = (thin ? [fc.cell4] : [...fc.cells, fc.cell4]);
     const { hs } = holdingFacts(p), g0 = filingGroups(p.rows)[0];
-    const top = hs.slice(0, 3).map((h) => `<div class="holding" tabindex="0" role="link" data-open-stock="${esc(h.tk)}"><span><b dir="ltr">${esc(h.tk)}</b>${badge(h.label)}</span><span class="mono">${esc(numIso(h.wv))}<small class="ctx">${esc(h.f13 ? L('of screened positions', 'من المراكز المفحوصة') : h.wc)}</small></span><span class="mono">${arrowPct(h.sp)}<small class="ctx">${esc(h.sp == null ? L('prices pending', 'بانتظار السعر') : L('since public', 'منذ النشر'))}</small></span></div>`).join('');
+    const top = hs.slice(0, 3).map((h) => `<div class="holding" tabindex="0" role="link" data-open-stock="${esc(h.tk)}"><span><b dir="ltr">${esc(h.tk)}</b>${badge(h.label)}</span><span class="mono">${esc(h.wv)}<small class="ctx">${esc(h.f13 ? L('of screened positions', 'من المراكز المفحوصة') : h.wc)}</small></span><span class="mono">${arrowPct(h.sp)}<small class="ctx">${esc(h.sp == null ? L('prices pending', 'بانتظار السعر') : L('since public', 'منذ النشر'))}</small></span></div>`).join('');
     return `<aside class="card panel"><div class="panel-head">${pAvatar(p)}<div><div class="eyebrow">${L('Selected investor', 'المستثمر المختار')}</div><h2>${esc(p.name)}</h2>${sharePill(p)}</div></div>
       <div class="hero">${retTag(p.ret)}${thinIdxNote(p) ? `<small class="ctx">${esc(thinIdxNote(p))}</small>` : ''}<small class="ctx">${esc(L('equal-weight index of passing names', 'مؤشر بأوزان متساوية للأسهم المتوافقة'))}</small></div>
       <div class="kpirow two">${kpis.map((c) => `<div class="kpi"><b>${c.v}</b><span>${esc(c.l)}</span>${c.s ? `<small class="ctx">${esc(c.s)}</small>` : ''}</div>`).join('')}</div>
@@ -1147,15 +1166,21 @@
 
   // Time to publish for one filer: median lag over its non-late rows (13F: days after quarter end).
   // One function for the profile strip, the /portfolios column, panel and the "lag" sort.
+  // Late PTRs stay out of the median; when every known lag is late, lateV / lateFilings say so instead of a bare "—".
   function pubLag(p) {
     const lags = p.rows.filter((r) => !isLatePtr(r)).map(lagOf).filter((x) => x != null), m = med(lags);
-    return { v: m == null ? null : Math.round(m), min: lags.length ? Math.min(...lags) : null, max: lags.length ? Math.max(...lags) : null, fund: p.rows.length > 0 && p.rows.every(is13F) };
+    const late = p.rows.filter((r) => isLatePtr(r) && lagOf(r) != null), lm = med(late.map(lagOf));
+    return { v: m == null ? null : Math.round(m), min: lags.length ? Math.min(...lags) : null, max: lags.length ? Math.max(...lags) : null, fund: p.rows.length > 0 && p.rows.every(is13F),
+      lateV: lm == null ? null : Math.round(lm), lateFilings: new Set(late.map((r) => r[FIELD.filedDate])).size };
   }
+  // "late filing · left out of medians" (used when a filer has only late PTRs).
+  const lateOnlyTxt = (n) => L(`late ${n === 1 ? 'filing' : 'filings'} · left out of medians`, n === 1 ? 'إفصاح متأخر · لا يدخل في الوسيط' : 'إفصاحات متأخرة · لا تدخل في الوسيط');
   // PF-1 cell data, shared by the profile strip and the /portfolios side panel so both print the same
   // numbers. Each cell: { l: label text, v: value (escaped HTML), s: sub-line text }.
   function followCells(p, fund) {
     const fs = followStats(p.rows), pl = pubLag(p), lagMin = pl.min, lagMax = pl.max;
-    const cell4 = { l: L('Time to publish (median)', 'المدة حتى النشر (الوسيط)'), v: pl.v == null ? '—' : esc(daysTxt(pl.v)),
+    const cell4 = pl.v == null && pl.lateV != null ? { l: L('Time to publish (median)', 'المدة حتى النشر (الوسيط)'), v: esc(daysTxt(pl.lateV)), s: lateOnlyTxt(pl.lateFilings) }
+      : { l: L('Time to publish (median)', 'المدة حتى النشر (الوسيط)'), v: pl.v == null ? '—' : esc(daysTxt(pl.v)),
       s: fund ? L(`after quarter end${lagMin !== lagMax ? ` · range ${dayRange(lagMin, lagMax)}` : ''} · 13F deadline 45 days`, `بعد نهاية الربع${lagMin !== lagMax ? ` · المدى ${dayRange(lagMin, lagMax)}` : ''} · مهلة نموذج 13F ‏45 يومًا`)
         : lagMin == null ? '' : lagMin === lagMax ? L('after the trade', 'بعد الصفقة') : L(`range ${dayRange(lagMin, lagMax)}`, `المدى ${dayRange(lagMin, lagMax)}`) };
     const why = fs.n === 0 ? (fs.pending ? L('prices pending', 'بانتظار بيانات السعر') : L('no priced positions in passing names', 'لا توجد مراكز مسعّرة في الأسهم المتوافقة'))
@@ -1231,9 +1256,9 @@
     const ptrW = hs.filter((h) => !h.f13).map(pct), flat = ptrW.length === 1 || (ptrW.length > 1 && Math.max(...ptrW) - Math.min(...ptrW) <= 1); // one name or near-equal ranges: a % adds nothing
     hs.forEach((h) => {
       const r = h.row;
-      if (h.f13) { h.wv = weightsKnown ? pct(h) + '%' : '—'; h.wc = [h.known ? amountText(r) : valueNote(r), weightsKnown ? L('of screened positions shown', 'من المراكز المفحوصة المعروضة') : ''].filter(Boolean).join(' · '); }
-      else if (!weightsKnown || flat) { h.wv = h.range || '—'; h.wc = L('disclosed range', 'نطاق الإفصاح'); }
-      else { h.wv = '≈' + pct(h) + '%'; h.wc = [L('est. from ranges', 'تقدير من نطاقات الإفصاح'), h.range].filter(Boolean).join(' · '); }
+      if (h.f13) { h.wv = weightsKnown ? numIso(pct(h) + '%') : '—'; h.wc = [h.known ? amountText(r) : valueNote(r), weightsKnown ? L('of screened positions shown', 'من المراكز المفحوصة المعروضة') : ''].filter(Boolean).join(' · '); }
+      else if (!weightsKnown || flat) { h.wv = h.range || '—'; /* fmtRange / fmtLoHi already isolate the numbers */ h.wc = L('disclosed range', 'نطاق الإفصاح'); }
+      else { h.wv = numIso('≈' + pct(h) + '%'); h.wc = [L('est. from ranges', 'تقدير من نطاقات الإفصاح'), h.range].filter(Boolean).join(' · '); }
     });
     return { hs, weightsKnown, flat };
   }
@@ -1244,12 +1269,12 @@
     const row = (h) => {
       const r = h.row, dt = dayMonth(fDisclosed(r)) || '—', fd = dayMonth(r[FIELD.filedDate]) || '—';
       const when = h.f13 ? L(`held at ${dt} quarter end`, `مركز قائم بنهاية الربع (${dt})`) : L(`bought ${dt} · public ${fd}`, `تاريخ الصفقة ${dt} · تاريخ النشر ${fd}`);
-      const hiTxt = !h.pc ? '' : Math.abs(h.pc.fromHi) < 0.05 ? L(`at its ${h.pc.win >= W52 ? '52w' : h.pc.win + '-day'} high`, `عند أعلى سعر في ${h.pc.win >= W52 ? '52 أسبوعًا' : bidi(h.pc.win) + ' يومًا'}`)
-        : L(`${Math.abs(h.pc.fromHi).toFixed(1)}% below ${h.pc.win >= W52 ? '52w' : h.pc.win + '-day'} high`, `أقل من أعلى سعر في ${h.pc.win >= W52 ? '52 أسبوعًا' : bidi(h.pc.win) + ' يومًا'} بـ${bidi(Math.abs(h.pc.fromHi).toFixed(1) + '%')}`);
+      const hiTxt = !h.pc ? '' : Math.abs(h.pc.fromHi) < 0.05 ? L(`at its ${h.pc.full ? '52w' : h.pc.win + '-day'} high`, `عند أعلى سعر في ${h.pc.full ? '52 أسبوعًا' : bidi(h.pc.win) + ' يومًا'}`)
+        : L(`${Math.abs(h.pc.fromHi).toFixed(1)}% below ${h.pc.full ? '52w' : h.pc.win + '-day'} high`, `أقل من أعلى سعر في ${h.pc.full ? '52 أسبوعًا' : bidi(h.pc.win) + ' يومًا'} بـ${bidi(Math.abs(h.pc.fromHi).toFixed(1) + '%')}`);
       const ctx = `${esc(L('since public', 'منذ النشر'))} ${h.sp == null ? esc(L('pending', 'بانتظار السعر')) : arrowPct(h.sp)}${hiTxt ? ' · ' + esc(hiTxt) : ''}`;
       const times = h.nBuy >= 2 && !h.f13 ? `<span class="chip">${esc(L(`Bought ${h.nBuy}×`, h.nBuy === 2 ? 'اشتراه مرتين' : `اشتراه ${bidi(h.nBuy)} ${arCount(h.nBuy, 'مرات', 'مرة')}`))}</span>` : '';
       const wv = h.wv, wc = h.wc;
-      return `<div class="holding pf-hold" tabindex="0" role="link" data-open-stock="${esc(h.tk)}"><span><b dir="ltr">${esc(h.tk)}</b>${badge(h.label)}${times}</span><span class="muted">${esc(coName(r.company) || '')} · ${esc(when)}<small class="ctx">${ctx}</small></span><span class="mono">${esc(numIso(wv))}${wc ? `<small class="ctx">${esc(wc)}</small>` : ''}</span></div>`;
+      return `<div class="holding pf-hold" tabindex="0" role="link" data-open-stock="${esc(h.tk)}"><span><b dir="ltr">${esc(h.tk)}</b>${badge(h.label)}${times}</span><span class="muted">${esc(coName(r.company) || '')} · ${esc(when)}<small class="ctx">${ctx}</small></span><span class="mono">${esc(wv)}${wc ? `<small class="ctx">${esc(wc)}</small>` : ''}</span></div>`;
     };
     const top = hs.slice(0, 10), rest = hs.slice(10);
     const fundNote = hs.some((h) => h.f13) ? `<p class="footnote">${esc(L('Showing screened positions only; other reported positions await AAOIFI screening.', 'نعرض المراكز المفحوصة فقط؛ بقية المراكز المعلنة بانتظار الفحص الشرعي.'))}</p>` : '';
@@ -1268,7 +1293,7 @@
     const row = (h) => { const r = h.row, sp = perfOf(r, 'sincePublic');
       return `<div class="holding pf-exit" tabindex="0" role="link" data-open-stock="${esc(h.tk)}"><span><b dir="ltr">${esc(h.tk)}</b>${badge(h.label)}</span><span class="muted">${esc(coName(r.company) || '')} · ${esc(is13F(r) ? actionText(r) : L('sold', 'تاريخ البيع'))} ${esc(dayMonth(fDisclosed(r)) || '—')} · ${esc(amountText(r))}${lateChip(r)}</span><span class="mono">${sp == null ? '<span class="return muted">—</span>' : arrowPct(sp)}<small class="ctx">${esc(sp == null ? L('prices pending', 'بانتظار بيانات السعر') : L('since sale went public', 'منذ نشر إفصاح البيع'))}</small></span></div>`; };
     return `<section class="card block"><h2>${L('After they sold', 'بعد البيع')}</h2>${summary}<div class="holdings">${ex.slice(0, 5).map(row).join('')}</div>
-      ${ex.length > 5 ? more(L(`Show all ${ex.length} exits`, `عرض جميع عمليات البيع (${ex.length})`), `<div class="holdings">${ex.slice(5).map(row).join('')}</div>`) : ''}</section>`;
+      ${ex.length > 5 ? more(L(`Show all ${ex.length} exits`, `عرض كل الأسهم التي باعها (${ex.length})`), `<div class="holdings">${ex.slice(5).map(row).join('')}</div>`) : ''}</section>`;
   }
 
   // PF-6 Can I hold it? Held names only: the pass count, why the rest fail, and any passing name near a limit.
@@ -1305,7 +1330,7 @@
     if (!p) return emptyCard(L('Portfolio not found', 'المحفظة غير موجودة'), L('It may not be in the current disclosure window.', 'قد لا تكون ضمن فترة الإفصاحات الحالية.'), `<a class="btn btn-primary" href="/portfolios" data-nav="portfolios">${L('Explore portfolios', 'استكشف المحافظ')}</a>`);
     const fund = p.rows.length > 0 && p.rows.every(is13F);
     const thin = p.holdings < MIN_HOLDINGS;
-    const idxN = idxCount(p), indicative = idxN < MIN_HOLDINGS || idxN / Math.max(1, p.holdings) < 0.5;
+    const { n: idxN, indicative } = idxBasis(p);
     const marks = p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, h: is13F(r), label: r.ticker }));
     // PF-0 basis line: what the hero number is (and is not), and how many names back it.
     const priced = p.ret && p.ret.val != null && !p.ret.indicative && !p.ret.stale;
@@ -1347,10 +1372,10 @@
   // ST-1 Price context strip: last close, distance from the 52-week high, vs the 50/200-day averages.
   function priceStrip(tk) {
     const pc = priceCtx(tk);
-    if (!pc) return `<p class="muted px-pending">${esc(L('Prices pending', 'الأسعار غير متاحة بعد'))}</p>`;
+    if (!pc) return `<p class="muted px-pending">${esc(S.pricesLive && histOf(tk).length >= PX_MIN ? L('Price facts pending · too few recent daily closes', 'الحقائق السعرية غير متاحة بعد · أسعار الإغلاق اليومية الحديثة غير كافية') : L('Prices pending', 'الأسعار غير متاحة بعد'))}</p>`;
     const tfRet = seriesReturn(sliceTf(histOf(tk)).map((p) => +p.c));
     const stale = pc.stale ? ` <span class="chip">${esc(L(`as of ${dayMonth(pc.asOf)} · stale`, `حتى ${dayMonth(pc.asOf)} · غير محدّث`))}</span>` : '';
-    const full = pc.win >= W52;
+    const full = pc.full;
     const cells = [
       stat(esc(L('Last close', 'آخر إغلاق')), esc(numIso(usd(pc.last))), `${esc(dayMonth(pc.asOf))} · ${esc(tfPriceLabel())} ${arrowPct(tfRet)}${stale}`),
       stat(esc(full ? L('From 52-week high', 'عن أعلى سعر في 52 أسبوعًا') : L(`From ${pc.win}-day high`, `عن أعلى سعر في ${pc.win} يومًا`)), esc(signedPct(pc.fromHi)),
@@ -1368,7 +1393,9 @@
     const pRet = fullHist.length >= 2 ? seriesReturn(shist.map((p) => +p.c)) : null;
     const marks = rows.map((r) => ({ d: fDisclosed(r), side: r.side, h: is13F(r), label: r.actor }));
     const empty = fullHist.length >= 2 ? L('No prices in this period — try a longer timeframe', 'لا تتوفر أسعار لهذه الفترة — جرّب فترة أطول') : L(`No cached price history for ${tk} yet — the chart appears once our price provider covers it`, `لا يتوفر سجل أسعار محفوظ لـ ${tk} بعد — يظهر الرسم عند توفر البيانات من مزوّد الأسعار`);
-    return `<section class="card block"><div class="section-title"><h2>${L('Price & disclosed activity', 'السعر والتداولات المعلنة')}</h2>${seg(['1M', '3M', '6M', '1Y', 'ALL'])}</div>
+    // Embedded sample data / sample prices are never presented as the live close: the chip says so in the card.
+    const pend = fullHist.length >= 2 && (!S.live || !S.pricesLive) ? `<span class="chip">${esc(!S.live ? dataLabel() : L('Sample prices · live prices pending', 'أسعار نموذجية · الأسعار الفعلية غير متاحة بعد'))}</span>` : '';
+    return `<section class="card block"><div class="section-title"><h2>${L('Price & disclosed activity', 'السعر والتداولات المعلنة')}</h2><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${seg(['1M', '3M', '6M', '1Y', 'ALL'])}${pend}</div></div>
       ${fullHist.length >= 2 ? `<div class="px-head">${pctTag(pRet, tfPriceLabel())}</div>` : ''}
       ${chartFrame(chart(shist, { markers: marks, axis: true, empty: esc(empty) }), rows.length ? tradeLegend() : '')}</section>`;
   }
@@ -1507,7 +1534,7 @@
   const fromHiCell = (tk) => {
     const pc = priceCtx(tk); if (!pc) return `<span class="muted">—</span><small class="ctx">${esc(L('prices pending', 'بانتظار بيانات السعر'))}</small>`;
     const v = Math.abs(pc.fromHi) < 0.05 ? '0.0%' : `−${Math.abs(pc.fromHi).toFixed(1)}%`;
-    return `${esc(LANG === 'ar' ? bidi(v) : v)}${pc.win < W52 ? `<small class="ctx">${esc(L(`${pc.win}-day high`, `أعلى سعر في ${bidi(pc.win)} يومًا`))}</small>` : ''}`;
+    return `${esc(LANG === 'ar' ? bidi(v) : v)}${!pc.full ? `<small class="ctx">${esc(L(`${pc.win}-day high`, `أعلى سعر في ${bidi(pc.win)} يومًا`))}</small>` : ''}`;
   };
   // Small "Price · tf" cell: the shared spark chart plus the price change over the active timeframe.
   const stockPxCell = (tk) => {
@@ -1634,20 +1661,28 @@
   /* ---- Following (featured-investor cards for what you follow). */
   // FO-1 stock card line: "Price · 1M ▲4.2% · 4.5% below 52w high · latest filing Sep 30" (price facts from cached closes).
   const followPxLine = (tk, r) => {
-    const pc = priceCtx(tk), filed = esc(L(`latest filing ${dayMonth(r[FIELD.filedDate]) || '—'}`, `أحدث إفصاح ${dayMonth(r[FIELD.filedDate]) || '—'}`));
+    const pc = priceCtx(tk), filed = r ? esc(L(`latest filing ${dayMonth(r[FIELD.filedDate]) || '—'}`, `أحدث إفصاح ${dayMonth(r[FIELD.filedDate]) || '—'}`)) : esc(L('no screened disclosures', 'لا إفصاحات مفحوصة'));
     if (!pc) return `${esc(L('Prices pending', 'بانتظار بيانات السعر'))} · ${filed}`;
-    const hi = Math.abs(pc.fromHi) < 0.05 ? L(pc.win < W52 ? `at its ${pc.win}-day high` : 'at its 52w high', pc.win < W52 ? `عند أعلى سعر في ${bidi(pc.win)} يومًا` : 'عند أعلى سعر في 52 أسبوعًا')
-      : L(`${Math.abs(pc.fromHi).toFixed(1)}% below ${pc.win < W52 ? `${pc.win}-day` : '52w'} high`, `دون أعلى سعر في ${pc.win < W52 ? `${bidi(pc.win)} يومًا` : '52 أسبوعًا'} بـ${bidi(Math.abs(pc.fromHi).toFixed(1) + '%')}`);
+    const hi = Math.abs(pc.fromHi) < 0.05 ? L(!pc.full ? `at its ${pc.win}-day high` : 'at its 52w high', !pc.full ? `عند أعلى سعر في ${bidi(pc.win)} يومًا` : 'عند أعلى سعر في 52 أسبوعًا')
+      : L(`${Math.abs(pc.fromHi).toFixed(1)}% below ${!pc.full ? `${pc.win}-day` : '52w'} high`, `دون أعلى سعر في ${!pc.full ? `${bidi(pc.win)} يومًا` : '52 أسبوعًا'} بـ${bidi(Math.abs(pc.fromHi).toFixed(1) + '%')}`);
     const stale = pc.stale ? ` · ${esc(L(`as of ${dayMonth(pc.asOf)} · stale`, `حتى ${dayMonth(pc.asOf)} · غير محدّث`))}` : '';
     return `${esc(L('Price · 1M', 'السعر · شهر'))} ${arrowPct(pc.r1m)}${stale} · ${esc(hi)} · ${filed}`;
   };
   function pageFollowing() {
     const ports = eligible().filter((p) => S.follows.has(p.name));
-    const stocks = [...S.follows].filter((id) => !ports.some((p) => p.name === id) && S.rows.some((r) => r.ticker === id));
+    // Stocks: screened disclosures, or cached prices only (the ST-6 price-only page is followable too).
+    const stocks = [...S.follows].filter((id) => !ports.some((p) => p.name === id) && (S.rows.some((r) => r.ticker === id) || histOf(id).length >= 2));
+    // Anything else you follow (a filer now under MIN_HOLDINGS or out of the window): listed so it can be unfollowed.
+    const other = [...S.follows].filter((id) => !ports.some((p) => p.name === id) && !stocks.includes(id));
+    const stockCard = (tk) => {
+      const r = S.rows.filter((x) => x.ticker === tk).sort(byFiled)[0];
+      return `<div class="signal-card" tabindex="0" role="link" data-open-stock="${esc(tk)}">${badge(r ? r.label : 'unscreened')}<h3 dir="ltr">${esc(tk)}</h3><p>${esc(r ? coName(r.company) : L("No screened disclosures in Mizan's window", 'لا توجد إفصاحات مفحوصة ضمن الفترة المتاحة'))}</p><p class="fo-px">${followPxLine(tk, r)}</p></div>`;
+    };
     return pageHead(L('Watchlist', 'قائمة المتابعة'), L('The people and names you follow.', 'المحافظ والأسهم التي تتابعها.'), L('Open any profile to see what changed since you last looked.', 'اعرض التفاصيل لمتابعة آخر التغيّرات.')) +
       (ports.length ? `<section><div class="section-title"><h2>${L('Portfolios', 'المحافظ')}</h2></div><div class="discovery">${ports.map(investorCard).join('')}</div></section>` : '') +
-      (stocks.length ? `<section><div class="section-title"><h2>${L('Stocks', 'الأسهم')}</h2></div><div class="grid three">${stocks.map((tk) => { const r = S.rows.filter((x) => x.ticker === tk).sort(byFiled)[0]; return `<div class="signal-card" tabindex="0" role="link" data-open-stock="${esc(tk)}">${badge(r.label)}<h3 dir="ltr">${esc(tk)}</h3><p>${esc(coName(r.company))}</p><p class="fo-px">${followPxLine(tk, r)}</p></div>`; }).join('')}</div></section>` : '') +
-      (!ports.length && !stocks.length ? emptyCard(L("You're not following anyone yet", 'قائمة متابعاتك فارغة'), L('Follow a portfolio or stock to keep it here.', 'تابع محفظة أو سهمًا ليظهر هنا.'), `<a class="btn btn-primary" href="/portfolios" data-nav="portfolios">${L('Explore portfolios', 'استكشف المحافظ')}</a>`) : '');
+      (stocks.length ? `<section><div class="section-title"><h2>${L('Stocks', 'الأسهم')}</h2></div><div class="grid three">${stocks.map(stockCard).join('')}</div></section>` : '') +
+      (other.length ? `<section class="card block fo-other"><h2>${L('Not shown right now', 'غير معروض حاليًا')}</h2><p class="muted pf-read">${esc(L(`Not in Mizan's current window, or under ${MIN_HOLDINGS} held names.`, `خارج الفترة المتاحة في ميزان، أو أسهمه المملوكة أقل من ${MIN_HOLDINGS}.`))}</p><div class="holdings">${other.map((id) => `<div class="holding"><span><b>${esc(LANG === 'ar' ? bidi(id) : id)}</b></span><span></span><span><button class="btn btn-secondary" type="button" data-follow="${esc(id)}">${esc(L('Unfollow', 'إلغاء المتابعة'))}</button></span></div>`).join('')}</div></section>` : '') +
+      (!S.follows.size ? emptyCard(L("You're not following anyone yet", 'قائمة متابعاتك فارغة'), L('Follow a portfolio or stock to keep it here.', 'تابع محفظة أو سهمًا ليظهر هنا.'), `<a class="btn btn-primary" href="/portfolios" data-nav="portfolios">${L('Explore portfolios', 'استكشف المحافظ')}</a>`) : '');
   }
 
   /* ---- Account + Methodology (supporting pages, package card blocks). */
@@ -1748,11 +1783,11 @@
     else S.page = ROUTE_TITLES[a] ? a : 'notfound';
   }
   function setPath(path) { history.pushState({}, '', location.protocol === 'file:' ? '#' + path : path); }
-  function go(path) {
+  function go(path, keepQuery) {
     const here = location.protocol === 'file:' ? location.hash.slice(1) : location.pathname;
     if (path !== here) setPath(path); // same page: no extra history entry
     const before = S.page; parsePath();
-    if (S.page !== before) S.query = ''; // each list starts with its own empty search
+    if (S.page !== before && !keepQuery) S.query = ''; // each list starts with its own empty search
     window.scrollTo(0, 0); render();
   }
   window.addEventListener('popstate', () => { parsePath(); render(); });
@@ -1813,14 +1848,14 @@
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       const keepFocus = e.target.id, pos = e.target.selectionStart;
-      if (!['portfolios', 'stocks'].includes(S.page)) go('/portfolios'); else render();
+      if (!['portfolios', 'stocks'].includes(S.page)) go('/portfolios', true); else render(); // carry the typed query over
       const f = document.getElementById(keepFocus); if (f) { f.focus(); try { f.setSelectionRange(pos, pos); } catch (err) { /* type=search */ } }
     }, 160);
   });
 
   function toggleFollow(id) {
     const portfolio = derivePortfolios(S.rows).find((p) => p.name === id);
-    if (portfolio && portfolio.holdings < MIN_HOLDINGS) return; // thin-data gate: not followable
+    if (!S.follows.has(id) && portfolio && portfolio.holdings < MIN_HOLDINGS) return; // thin-data gate: not followable (unfollow always works)
     S.follows.has(id) ? S.follows.delete(id) : S.follows.add(id);
     saveFollows();
   }
