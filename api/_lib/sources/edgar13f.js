@@ -21,7 +21,7 @@
 //   SEC_USER_AGENT          required, e.g. "Mizan Market Intelligence ops@<your-domain>"
 //   SEC13F_TOP_N            positions kept per fund (default 25)
 //   ENABLE_13F=1            turns the source on in api/poll-disclosures.js (off by default)
-//   SEC13F_FUNDS_PER_RUN    max funds INGESTED per poll run (default 2; the per-fund "anything
+//   SEC13F_FUNDS_PER_RUN    max funds INGESTED per poll run (default 1; the per-fund "anything
 //                           new?" check is one small submissions request and always runs)
 //   SEC13F_MAX_AGE_DAYS     ignore filings whose period ended longer ago (default 200)
 //   SEC_MIN_INTERVAL_MS     spacing between SEC requests (default 125 = 8 req/s)
@@ -461,7 +461,7 @@ export async function fundSnapshot(fund, meta, { topN = intEnv("SEC13F_TOP_N", 2
  */
 export async function fetchNew13FDisclosures({ isIngested = async () => false, funds = FUNDS, now = Date.now() } = {}) {
   requireUserAgent();
-  const perRun = intEnv("SEC13F_FUNDS_PER_RUN", 2);
+  const perRun = intEnv("SEC13F_FUNDS_PER_RUN", 1);
   const maxPeriodAgeMs = intEnv("SEC13F_MAX_AGE_DAYS", 200) * 86400000;
   const figiCache = new Map();
   const rows = [];
