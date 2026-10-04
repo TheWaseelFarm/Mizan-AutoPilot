@@ -139,3 +139,10 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 .mz-chart__mk{width:11px;height:11px;border-radius:0;box-shadow:none;border:0}
 .mz-chart__mk[data-side="buy"]{background:var(--blue);clip-path:polygon(50% 0,100% 100%,0 100%)}
 .mz-chart__mk[data-side="sell"]{background:var(--ink);clip-path:polygon(0 0,100% 0,50% 100%)}
+
+/* ---- Revamp shared building blocks (SPEC §2): 4-cell metric strip (2×2 on phones) and the
+   collapsed "more" section. No inline grid styles, so the phone rule always wins. */
+.metric-strip.four{grid-template-columns:repeat(4,1fr)}
+@media(max-width:720px){.metric-strip.four{grid-template-columns:repeat(2,1fr)}}
+details.more>summary{cursor:pointer;color:var(--muted);font-size:13px;padding:10px 0;list-style:none}
+details.more>summary::-webkit-details-marker{display:none}
