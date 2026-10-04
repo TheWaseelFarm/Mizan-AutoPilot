@@ -1,0 +1,232 @@
+{
+ "594918104": {
+  "data": [
+   {
+    "figi": "BBG000BPH459",
+    "name": "MICROSOFT CORP",
+    "ticker": "MSFT",
+    "exchCode": "US",
+    "compositeFIGI": "BBG000BPH459",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG001S5TD05",
+    "securityType2": "Common Stock",
+    "securityDescription": "MSFT"
+   }
+  ]
+ },
+ "812215200": {
+  "data": [
+   {
+    "figi": "BBG01JNDL2R6",
+    "name": "SEAPORT ENTERTAINMENT GROUP",
+    "ticker": "SEG",
+    "exchCode": "US",
+    "compositeFIGI": "BBG01JNDL2R6",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG01JNDL2S5",
+    "securityType2": "Common Stock",
+    "securityDescription": "SEG"
+   }
+  ]
+ },
+ "023135106": {
+  "data": [
+   {
+    "figi": "BBG000BVPV84",
+    "name": "AMAZON.COM INC",
+    "ticker": "AMZN",
+    "exchCode": "US",
+    "compositeFIGI": "BBG000BVPV84",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG001S5PQL7",
+    "securityType2": "Common Stock",
+    "securityDescription": "AMZN"
+   }
+  ]
+ },
+ "11271J107": {
+  "data": [
+   {
+    "figi": "BBG000C9KL89",
+    "name": "BROOKFIELD CORP",
+    "ticker": "BN",
+    "exchCode": "US",
+    "compositeFIGI": "BBG000C9KL89",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG001SF86D7",
+    "securityType2": "Common Stock",
+    "securityDescription": "BN"
+   }
+  ]
+ },
+ "42806J700": {
+  "data": [
+   {
+    "figi": "BBG011N57109",
+    "name": "HERTZ GLOBAL HLDGS INC",
+    "ticker": "HTZ",
+    "exchCode": "US",
+    "compositeFIGI": "BBG011N57109",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG011N571V5",
+    "securityType2": "Common Stock",
+    "securityDescription": "HTZ"
+   }
+  ]
+ },
+ "44267T102": {
+  "data": [
+   {
+    "figi": "BBG01HTMDZ54",
+    "name": "HOWARD HUGHES HOLDINGS INC",
+    "ticker": "HHH",
+    "exchCode": "US",
+    "compositeFIGI": "BBG01HTMDZ54",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG01HTMDZ63",
+    "securityType2": "Common Stock",
+    "securityDescription": "HHH"
+   }
+  ]
+ },
+ "57636Q104": {
+  "data": [
+   {
+    "figi": "BBG000F1ZSQ2",
+    "name": "MASTERCARD INC - A",
+    "ticker": "MA",
+    "exchCode": "US",
+    "compositeFIGI": "BBG000F1ZSQ2",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG001SKNNS6",
+    "securityType2": "Common Stock",
+    "securityDescription": "MA"
+   }
+  ]
+ },
+ "30303M102": {
+  "data": [
+   {
+    "figi": "BBG000MM2P62",
+    "name": "META PLATFORMS INC-CLASS A",
+    "ticker": "META",
+    "exchCode": "US",
+    "compositeFIGI": "BBG000MM2P62",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG001SQCQC5",
+    "securityType2": "Common Stock",
+    "securityDescription": "META"
+   }
+  ]
+ },
+ "64110L106": {
+  "data": [
+   {
+    "figi": "BBG000CL9VN6",
+    "name": "NETFLIX INC",
+    "ticker": "NFLX",
+    "exchCode": "US",
+    "compositeFIGI": "BBG000CL9VN6",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG001SF6L46",
+    "securityType2": "Common Stock",
+    "securityDescription": "NFLX"
+   }
+  ]
+ },
+ "71531T105": {
+  "data": [
+   {
+    "figi": "BBG01LGZK6Q3",
+    "name": "PERSHING SQUARE USA LTD",
+    "ticker": "PSUS",
+    "exchCode": "US",
+    "compositeFIGI": "BBG01LGZK6Q3",
+    "securityType": "Closed-End Fund",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG01LGZK7K7",
+    "securityType2": "Mutual Fund",
+    "securityDescription": "PSUS"
+   }
+  ]
+ },
+ "76131D103": {
+  "data": [
+   {
+    "figi": "BBG0076WG2V1",
+    "name": "RESTAURANT BRANDS INTERN",
+    "ticker": "QSR",
+    "exchCode": "US",
+    "compositeFIGI": "BBG0076WG2V1",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG0076WG2T4",
+    "securityType2": "Common Stock",
+    "securityDescription": "QSR"
+   }
+  ]
+ },
+ "78409V104": {
+  "data": [
+   {
+    "figi": "BBG000BP1Q11",
+    "name": "S&P GLOBAL INC",
+    "ticker": "SPGI",
+    "exchCode": "US",
+    "compositeFIGI": "BBG000BP1Q11",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG001S5T5M8",
+    "securityType2": "Common Stock",
+    "securityDescription": "SPGI"
+   }
+  ]
+ },
+ "90353T100": {
+  "data": [
+   {
+    "figi": "BBG002B04MT8",
+    "name": "UBER TECHNOLOGIES INC",
+    "ticker": "UBER",
+    "exchCode": "US",
+    "compositeFIGI": "BBG002B04MT8",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG002B04MW4",
+    "securityType2": "Common Stock",
+    "securityDescription": "UBER"
+   }
+  ]
+ },
+ "92826C839": {
+  "data": [
+   {
+    "figi": "BBG000PSKYX7",
+    "name": "VISA INC-CLASS A SHARES",
+    "ticker": "V",
+    "exchCode": "US",
+    "compositeFIGI": "BBG000PSKYX7",
+    "securityType": "Common Stock",
+    "marketSector": "Equity",
+    "shareClassFIGI": "BBG001SRCFY3",
+    "securityType2": "Common Stock",
+    "securityDescription": "V"
+   }
+  ]
+ },
+ "G0084W101": {
+  "warning": "No identifier found."
+ },
+ "000000000": {
+  "warning": "No identifier found."
+ }
+}

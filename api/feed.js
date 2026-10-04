@@ -75,12 +75,25 @@ export default async function handler(req, res) {
     // and leaves just the single most-active one visible. Overridable via ?limit (50–1000).
     const limit = Math.min(1000, Math.max(50, parseInt(req.query.limit, 10) || 400));
     const db = supabase();
-    const { data, error } = await db
-      .from("disclosures").select("*")
-      .order("filing_date", { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    let rows = (data || []).map(toClient);
+    // filing_date is TEXT ("Sep 30, 2026"), so ordering by it in SQL is alphabetical. Order by
+    // ingest time instead, and query trades and 13F fund snapshots separately so ~25 rows per
+    // fund can never crowd congressional trades out of the window.
+    const [trades, funds] = await Promise.all([
+      db.from("disclosures").select("*").neq("source", "SEC 13F").order("created_at", { ascending: false }).limit(limit),
+      db.from("disclosures").select("*").eq("source", "SEC 13F").order("created_at", { ascending: false }).limit(1000),
+    ]);
+    if (trades.error) throw trades.error;
+    if (funds.error) throw funds.error;
+    // 13F is a quarterly POSITION SNAPSHOT: keep only each fund's latest reported period, so the
+    // client never sums the same holding across quarters.
+    const latestPeriod = new Map();
+    for (const r of funds.data || []) {
+      const t = Date.parse(r.transaction_date || "");
+      if (isFinite(t) && t > (latestPeriod.get(r.actor) ?? -Infinity)) latestPeriod.set(r.actor, t);
+    }
+    const fundRows = (funds.data || []).filter((r) => Date.parse(r.transaction_date || "") === latestPeriod.get(r.actor));
+    const when = (r) => Date.parse(r.filing_date || "") || 0;
+    let rows = [...(trades.data || []), ...fundRows].sort((a, b) => when(b) - when(a)).map(toClient);
     if (!includeAll) rows = rows.filter(passesGate); // gate ON by default
     if (withPerf) rows = await attachPerformance(db, rows);
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
