@@ -180,3 +180,25 @@ details.more>summary::-webkit-details-marker{display:none}
 .holding.pf-hold > span:first-child .chip{padding:2px 6px;font-size:10px}
 .holding .ctx .return{display:inline}
 @media(max-width:720px){.detail-stat .basis{margin-inline-start:0}.pf-filing .timeline .row{grid-template-columns:56px 1fr}}
+/* ---- /portfolios (SPEC §3.3): column-header context, the panel's 2×2 kpis, top holdings, latest filing,
+   and the unranked recent-activity card. Existing package components only; neutral ink/cobalt. */
+.table th small.ctx{display:block;margin-top:3px;font-size:9px;letter-spacing:0;text-transform:none;font-weight:500}
+.ps-note{margin:0;padding:10px 14px 14px}
+.kpirow.two{grid-template-columns:repeat(2,1fr);gap:4px 14px;margin-top:6px}
+.kpirow.two .kpi span{display:block;margin-top:2px;line-height:1.35}
+.kpirow.two .kpi .ctx{line-height:1.4}
+.panel .hero .ctx{font-size:11px}
+.panel .ps-h{margin:16px 0 2px;font-size:12px;color:var(--muted);font-weight:600}
+.panel .holding{grid-template-columns:minmax(0,1fr) auto auto;align-items:center;padding:8px 0}
+.panel .holding .mono{text-align:end;white-space:nowrap}
+.ps-line{margin:4px 0 0;font-size:12px;line-height:1.55}
+.ps-recent{margin-top:16px}
+.holding.ps-act{grid-template-columns:minmax(180px,.8fr) minmax(0,1.7fr) auto;align-items:center;color:inherit;text-decoration:none}
+.holding.ps-act .avatar{width:32px;height:32px;font-size:11px}
+.holding.ps-act .muted{font-size:13px;line-height:1.5}.holding.ps-act .mono{text-align:end;white-space:nowrap}
+.holding.ps-act:hover b{text-decoration:underline}
+@media(max-width:720px){.holding.ps-act{grid-template-columns:1fr auto}.holding.ps-act .muted{grid-column:1/-1;grid-row:2}}
+.ps-table th,.ps-table td{padding:12px 8px}.ps-table th:first-child,.ps-table td:first-child{padding-inline-start:14px}
+.ps-table .person{gap:9px}.ps-table .person .avatar{width:34px;height:34px;font-size:11px}
+.ps-table .ps-date{white-space:nowrap}.ps-table td small.ctx{white-space:normal}
+.ps-table{min-width:700px}
