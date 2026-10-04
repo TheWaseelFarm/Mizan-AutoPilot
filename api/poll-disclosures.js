@@ -48,6 +48,7 @@ function toRow(r) {
     purchase_price: r.purchasePrice, fallback_price: r.fallbackPrice,
     business: r.business, business_status: r.businessStatus,
     impure_pct: r.impurePct, debt_ratio: r.debtRatio,
+    cash_pct: r.cashPct, // AAOIFI cash + interest-bearing securities screen (was never saved)
     reasoning: r.reasoning, purification: r.purification,
     label: r.label, alert: r.alert, confidence: r.confidence
   };
@@ -64,9 +65,13 @@ async function upsertDisclosure(db, rec) {
   const opts = { onConflict: "dedupe_key", ignoreDuplicates: !rec.__replace };
   const row = toRow(rec);
   let { data, error } = await db.from("disclosures").upsert(row, opts).select("id");
-  if (error && "position_value" in row && /position_value/i.test(error.message || "")) {
-    const { position_value, ...rest } = row;
-    ({ data, error } = await db.from("disclosures").upsert(rest, opts).select("id"));
+  // Tolerate a DB that predates optional columns: retry without whichever one it rejected.
+  for (const col of ["position_value", "cash_pct"]) {
+    if (error && col in row && new RegExp(col, "i").test(error.message || "")) {
+      const { [col]: _drop, ...rest } = row;
+      Object.keys(row).forEach((k) => { if (!(k in rest)) delete row[k]; });
+      ({ data, error } = await db.from("disclosures").upsert(rest, opts).select("id"));
+    }
   }
   return { data, error };
 }

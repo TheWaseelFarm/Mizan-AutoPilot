@@ -23,7 +23,7 @@ function toClient(row) {
     business: row.business, businessStatus: row.business_status,
     // AAOIFI ratio inputs (all vs. market cap). debtRatio kept as the debt alias; cashPct new.
     impurePct: Number(row.impure_pct), debtRatio: Number(row.debt_ratio),
-    cashPct: row.cash_pct == null ? 0 : Number(row.cash_pct),
+    cashPct: row.cash_pct == null ? null : Number(row.cash_pct), // null = not reported (UI shows —); the engine treats null as 0
     reasoning: row.reasoning, purification: row.purification,
     alert: row.alert, confidence: row.confidence
   };

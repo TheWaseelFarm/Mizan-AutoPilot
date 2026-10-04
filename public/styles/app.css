@@ -107,3 +107,10 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 .mixbar .included{background:var(--green)}.mixbar .watch{background:var(--amber)}.mixbar .excluded{background:var(--red)}.mixbar .pending{background:var(--grey)}
 .investor-card .cover.mixed{background:linear-gradient(135deg,#1f2a33,#7d8d99)}
 .avatar[data-tone="mixed"]{--av:#4b5b67}
+
+/* ---- Return is the hero on cards, panel and profile (performance-led hierarchy). */
+.card-return{margin:2px 0 10px}.card-return .return{font:800 26px/1.1 var(--mono)}
+.panel .hero{border:0;background:none;padding:0;border-radius:0;display:block}
+.panel .hero .return{font:800 34px/1.1 var(--mono)}
+.detail-stat .hero-ret .return{font:800 30px/1.1 var(--mono)}
+.detail-stat .hero-ret .ctx{display:block;text-align:inherit}

@@ -9,6 +9,7 @@
 import { requireCron } from "./_lib/cron.js";
 import { supabase } from "./_lib/supabase.js";
 import { classifyAAOIFI } from "./_lib/aaoifi.js";
+import { ratioUpdates } from "./_lib/ratios-sync.js";
 import { screenOnce, usingLiveScreener } from "./_lib/screening/index.js";
 
 const BATCH = 25;
@@ -28,6 +29,17 @@ export default async function handler(req, res) {
       const { data: scr } = await db.from("screenings").select("ticker,fetched_at");
       fetchedAt = new Map((scr || []).map(r => [r.ticker, r.fetched_at]));
     } catch (e) { /* screenings table may not exist yet */ }
+
+    // Backfill: copy cached cash ratios onto stored rows (no provider calls; idempotent).
+    let synced = 0;
+    try {
+      const { data: cache } = await db.from("screenings").select("ticker,payload");
+      const { data: stored } = await db.from("disclosures").select("ticker,cash_pct");
+      for (const u of ratioUpdates(stored, cache)) {
+        const { error: uErr } = await db.from("disclosures").update({ cash_pct: u.cash_pct, label: u.label }).eq("ticker", u.ticker);
+        if (!uErr) synced++;
+      }
+    } catch (e) { /* screenings table or column missing -> skip */ }
 
     const now = Date.now();
     const pending = t => { const f = fetchedAt.get(t); return !f || (now - Date.parse(f)) > GRACE_MS; };
@@ -53,12 +65,18 @@ export default async function handler(req, res) {
             { onConflict: "ticker" }
           );
         } catch (e) { /* best-effort cache write */ }
-        const { error } = await db.from("disclosures").update({
+        const cols = {
           business: payload.business, business_status: payload.businessStatus,
           impure_pct: payload.impurePct, debt_ratio: payload.debtRatio,
+          cash_pct: payload.cashPct,
           reasoning: payload.reasoning, purification: payload.purification,
           label,
-        }).eq("ticker", ticker);
+        };
+        let { error } = await db.from("disclosures").update(cols).eq("ticker", ticker);
+        if (error && /cash_pct/i.test(error.message || "")) { // DB without the column: keep the rest working
+          delete cols.cash_pct;
+          ({ error } = await db.from("disclosures").update(cols).eq("ticker", ticker));
+        }
         if (error) throw error;
         done++;
       } catch (e) {
@@ -67,7 +85,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      done, failed, skipped,
+      done, failed, skipped, syncedCash: synced,
       remaining: Math.max(0, ordered.length - batch.length),
       live: usingLiveScreener(),
     });
