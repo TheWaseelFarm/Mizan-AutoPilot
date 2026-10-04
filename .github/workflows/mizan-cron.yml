@@ -23,7 +23,7 @@ env:
 jobs:
   ingest:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '*/30 * * * *' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Poll disclosures
         # Big-fund (SEC 13F) ingestion screens new tickers, so the first runs after a quarter's
@@ -55,7 +55,7 @@ jobs:
 
   rescreen:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 7 * * *' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Rescreen tickers (Sharia screening)
         run: |
