@@ -925,7 +925,9 @@
     const holdings = {};
     for (const r of p.rows) { const h = holdings[r.ticker] || (holdings[r.ticker] = { ticker: r.ticker, company: r.company, label: r.label, v: 0, known: true, d: null }); h.known = h.known && (r[FIELD.positionValue] != null ? isFinite(+r[FIELD.positionValue]) : hasAmount(r)); h.v += fWeightBasis(r); const dd = fDisclosed(r); if (dd && (!h.d || Date.parse(dd) > Date.parse(h.d))) h.d = dd; }
     const hs = Object.values(holdings).sort((a, b) => b.v - a.v), totalV = hs.reduce((a, h) => a + h.v, 0) || 1, weightsKnown = hs.every((h) => h.known);
-    const weightBasis = p.rows.every((r) => r[FIELD.positionValue] != null) ? L('of portfolio', 'من المحفظة') : L('of disclosed value', 'من القيمة المُفصَح عنها');
+    // 13F snapshots store only each fund's top reported positions, so weights are shares of THOSE, not of the whole book.
+    const is13F = p.rows.every((r) => /13F/i.test(r.source || r.kind || ''));
+    const weightBasis = is13F ? L('of top reported positions', 'من أكبر المراكز المُبلَّغ عنها') : p.rows.every((r) => r[FIELD.positionValue] != null) ? L('of portfolio', 'من المحفظة') : L('of disclosed value', 'من القيمة المُفصَح عنها');
     const thin = p.holdings < MIN_HOLDINGS;
     const idxN = idxCount(p);
     const sides = {}; p.rows.forEach((r) => { const k = sides[r.ticker] || (sides[r.ticker] = new Set()); k.add(String(r.side).toUpperCase() === 'SELL' ? 'S' : 'B'); });
