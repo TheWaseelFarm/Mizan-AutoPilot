@@ -26,10 +26,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Poll disclosures
+        # Big-fund (SEC 13F) ingestion screens new tickers, so the first runs after a quarter's
+        # filings can take a few minutes. A slow or failed poll must never block price refresh.
+        continue-on-error: true
+        timeout-minutes: 8
         run: |
-          resp=$(curl -fsS --max-time 60 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/poll-disclosures")
+          resp=$(curl -fsS --max-time 420 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "$BASE/api/poll-disclosures")
           echo "poll-disclosures -> $resp"
       - name: Refresh prices
+        if: ${{ always() }}
         # Each call refreshes <= 8 tickers (Twelve Data free tier: 8 calls/min, 800/day). Loop one
         # call per minute until nothing is due (a ticker is due when never fetched or last
         # attempted > 20h ago) or the provider rate-limits us. Steady state: the first call
