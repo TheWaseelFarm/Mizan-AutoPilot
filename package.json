@@ -8,7 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node test/aaoifi.test.js && node test/screening.test.js && node test/performance.test.js && node test/trends.test.js && node test/notify.test.js && node test/followers.test.js && node test/auth.test.js",
+    "test": "node test/aaoifi.test.js && node test/screening.test.js && node test/performance.test.js && node test/trends.test.js && node test/notify.test.js && node test/followers.test.js && node test/auth.test.js && node test/pricequeue.test.js",
     "hash": "node scripts/hash.js"
   },
   "dependencies": {
