@@ -12,9 +12,10 @@ import { supabase } from "./_lib/supabase.js";
 import { fetchPrice } from "./_lib/prices/twelvedata.js";
 import { pickBatch } from "./_lib/price-queue.js";
 
-const MAX_TICKERS = 8; // Twelve Data free tier: 8 requests/min. One run (1 call/ticker) stays
-                       // under the per-minute cap; the daily routine calls this several times
-                       // (oldest-first) to cycle every ticker.
+// Tickers per call (one Twelve Data request each). Default 8 = the free tier's per-minute cap.
+// On a paid plan set PRICE_BATCH_SIZE in Vercel (e.g. 60 on "Grow", 377 req/min) to refresh much
+// more per call. Capped at 120 so one call stays well inside the serverless time limit.
+const MAX_TICKERS = Math.min(120, Math.max(1, parseInt(process.env.PRICE_BATCH_SIZE, 10) || 8));
 
 // Record a failed attempt: bump updated_at only (an upsert of just these columns leaves any cached
 // history/quote intact). Best-effort — never throws.
