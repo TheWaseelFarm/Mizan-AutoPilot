@@ -146,3 +146,21 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 @media(max-width:720px){.metric-strip.four{grid-template-columns:repeat(2,1fr)}}
 details.more>summary{cursor:pointer;color:var(--muted);font-size:13px;padding:10px 0;list-style:none}
 details.more>summary::-webkit-details-marker{display:none}
+
+/* ---- /stock (SPEC §3.1): price-context strip caption, two-column fact rows, trade → public → now rows. */
+.px-pending{margin:0 0 16px}.px-note{margin:-8px 0 16px}
+.px-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}.px-head .return{font-size:20px}
+.metric small .return,.ctx .return{font-size:inherit;font-weight:700}
+.metric small .return{display:inline}.metric small .chip{display:inline-flex} /* the package's `.metric span` is a block label */
+.metric small .chip{padding:2px 6px;font-size:10px;margin-inline-start:4px}
+.holding.kv{grid-template-columns:minmax(0,1fr) auto;align-items:start}.holding.kv > span:first-child{display:block}
+.holding.kv .mono{text-align:end;white-space:nowrap}
+.holding.trade{grid-template-columns:minmax(150px,.8fr) minmax(0,1.7fr) auto;align-items:start}
+.holding.trade > .muted .ctx{font-size:11px;line-height:1.5}
+.holding.trade .mono{text-align:end;white-space:nowrap}
+.chip.near{padding:1px 6px;font-size:10px;margin-inline-start:4px}
+.sides-read{margin:10px 0 0;line-height:1.6}
+.status-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.status-cause{margin:0 0 8px;font-weight:600;line-height:1.5}
+.status-purify{margin:10px 0 0}.status-foot{margin:10px 0 0}
+@media(max-width:720px){.holding.trade{grid-template-columns:minmax(0,1fr) auto}.holding.trade > span:nth-child(2){grid-column:1/-1;order:3}}
