@@ -31,15 +31,17 @@ export default async function handler(req, res) {
     } catch (e) { /* screenings table may not exist yet */ }
 
     // Backfill: copy cached cash ratios onto stored rows (no provider calls; idempotent).
-    let synced = 0;
+    let synced = 0, syncError = null;
     try {
-      const { data: cache } = await db.from("screenings").select("ticker,payload");
-      const { data: stored } = await db.from("disclosures").select("ticker,cash_pct");
-      for (const u of ratioUpdates(stored, cache)) {
+      const { data: cache, error: cErr } = await db.from("screenings").select("ticker,payload");
+      const { data: stored, error: sErr } = await db.from("disclosures").select("ticker,cash_pct");
+      // A missing column/table must be VISIBLE (it silently disabled the cash screen before).
+      if (cErr || sErr) syncError = String((cErr || sErr).message || "").slice(0, 160);
+      else for (const u of ratioUpdates(stored, cache)) {
         const { error: uErr } = await db.from("disclosures").update({ cash_pct: u.cash_pct, label: u.label }).eq("ticker", u.ticker);
-        if (!uErr) synced++;
+        if (!uErr) synced++; else if (!syncError) syncError = String(uErr.message || "").slice(0, 160);
       }
-    } catch (e) { /* screenings table or column missing -> skip */ }
+    } catch (e) { syncError = String(e.message || e).slice(0, 160); }
 
     const now = Date.now();
     const pending = t => { const f = fetchedAt.get(t); return !f || (now - Date.parse(f)) > GRACE_MS; };
@@ -86,6 +88,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       done, failed, skipped, syncedCash: synced,
+      ...(syncError && { syncError, hint: "run supabase/cash_pct.sql in the Supabase SQL editor (adds the cash_pct column)" }),
       remaining: Math.max(0, ordered.length - batch.length),
       live: usingLiveScreener(),
     });
