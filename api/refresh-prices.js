@@ -1,7 +1,10 @@
 // GET /api/refresh-prices?secret=CRON_SECRET
 // Refreshes cached quotes + daily history (via Twelve Data) for the distinct tickers in
-// `disclosures` that are DUE (never fetched, or last attempted > 20h ago), half never-fetched /
-// half oldest-existing per batch (see _lib/price-queue.js). One API call per ticker; MAX_TICKERS
+// `disclosures` that are DUE — never fetched, or last touched on an earlier UTC day (so at most
+// ONE provider call per ticker per day; no weekend refreshes; tickers that never succeeded retry
+// weekly). Only this cron-protected endpoint ever calls the provider: customer requests
+// (/api/prices, /api/feed) read the cache only, so browsing a stock never spends credits.
+// Half never-fetched / half oldest-existing per batch (see _lib/price-queue.js). One API call per ticker; MAX_TICKERS
 // keeps a run under Twelve Data's free per-minute cap (8/min). A FAILED attempt also touches
 // updated_at (without clobbering cached history), so tickers that always fail (paid-plan or
 // invalid symbols) rotate to the back instead of blocking the queue.
@@ -34,11 +37,13 @@ export default async function handler(req, res) {
     const tickers = [...new Set((discRows || []).map(r => r.ticker).filter(Boolean))];
 
     // Existing cache freshness (missing = never fetched = highest priority).
-    const { data: priceRows, error: pErr } = await db.from("prices").select("ticker,updated_at");
+    const { data: priceRows, error: pErr } = await db.from("prices").select("ticker,updated_at,quote");
     if (pErr) throw pErr;
     const seenAt = new Map((priceRows || []).map(r => [r.ticker, r.updated_at]));
+    // quote is null only on rows created by a failed attempt: the ticker has NEVER succeeded.
+    const failed = new Set((priceRows || []).filter(r => r.quote == null).map(r => r.ticker));
 
-    const { batch, due } = pickBatch(tickers, seenAt, { max: MAX_TICKERS });
+    const { batch, due, weekend } = pickBatch(tickers, seenAt, { max: MAX_TICKERS, failed });
 
     let done = 0, noData = 0, errored = 0, rateLimited = false;
     const sampleErrors = [];
@@ -71,6 +76,7 @@ export default async function handler(req, res) {
       errored,
       rateLimited,
       remaining: Math.max(0, due - batch.length),
+      ...(weekend && { note: "weekend (UTC): cached tickers are not refreshed — markets are closed" }),
       sampleErrors, // first few real FMP messages, for diagnosis
       ...(rateLimited && {
         hint: "Twelve Data rate limit hit (free tier: 8/min, 800/day). The run stops and the " +
