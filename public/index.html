@@ -30,7 +30,8 @@
   </div>
 </div>
 <!-- TradingView Lightweight Charts (open source), pinned by SRI and loaded async: the shared chart()
-     renders its SVG immediately and app.js upgrades detail charts when this arrives. Cached prices only. -->
+     renders its SVG immediately and app.js upgrades every chart (candles, volume, trade markers on detail
+     pages; minimal lines in lists) when this arrives. Keep v4 (v5 changed the markers API). Cached prices only. -->
 <script id="lwjs" async src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" integrity="sha384-stKllnUqA9AD0gsKCuUtf5XlqAW7PwIgDagoNsTWkjkBmJ/GZ/uHTgEBxdLV2VSK" crossorigin="anonymous"></script>
 <script src="./app.js"></script>
 </body>
