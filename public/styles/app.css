@@ -120,7 +120,7 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
    glyphs (letters stretch, pills wrap). Use a proportional Arabic-capable stack there; numerals
    keep tabular alignment. */
 :lang(ar){--font:"Segoe UI","Geeza Pro","SF Arabic","Noto Sans Arabic",Tahoma,system-ui,sans-serif}
-:lang(ar) .status,:lang(ar) .chip,:lang(ar) .eyebrow,:lang(ar) .ctx,:lang(ar) .kpi span,:lang(ar) .mono,:lang(ar) .step-num,:lang(ar) .seg button,:lang(ar) .table th,:lang(ar) .metric small,:lang(ar) .hero-note small,:lang(ar) .event small,:lang(ar) .credit,:lang(ar) .mz-chart__ax,:lang(ar) .mz-chart__todaylab,:lang(ar) .mz-chart-tip,:lang(ar) .brand small{font-family:var(--font);letter-spacing:0;text-transform:none}
+:lang(ar) .status,:lang(ar) .chip,:lang(ar) .eyebrow,:lang(ar) .ctx,:lang(ar) .kpi span,:lang(ar) .mono,:lang(ar) .step-num,:lang(ar) .seg button,:lang(ar) .table th,:lang(ar) .metric small,:lang(ar) .metric b,:lang(ar) .kpi b,:lang(ar) .hero-note small,:lang(ar) .event small,:lang(ar) .credit,:lang(ar) .mz-chart__ax,:lang(ar) .mz-chart__todaylab,:lang(ar) .mz-chart-tip,:lang(ar) .brand small{font-family:var(--font);letter-spacing:0;text-transform:none}
 :lang(ar) .mono,:lang(ar) .return,:lang(ar) .kpi b,:lang(ar) .metric b{font-variant-numeric:tabular-nums}
 /* Empty-chart message follows the page direction (the chart box itself is forced LTR). */
 .mz-chart__empty{direction:inherit;unicode-bidi:plaintext;text-align:center;padding:14px}
@@ -139,3 +139,97 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 .mz-chart__mk{width:11px;height:11px;border-radius:0;box-shadow:none;border:0}
 .mz-chart__mk[data-side="buy"]{background:var(--blue);clip-path:polygon(50% 0,100% 100%,0 100%)}
 .mz-chart__mk[data-side="sell"]{background:var(--ink);clip-path:polygon(0 0,100% 0,50% 100%)}
+
+/* ---- Revamp shared building blocks (SPEC §2): 4-cell metric strip (2×2 on phones) and the
+   collapsed "more" section. No inline grid styles, so the phone rule always wins. */
+.metric-strip.four{grid-template-columns:repeat(4,1fr)}
+@media(max-width:720px){.metric-strip.four{grid-template-columns:repeat(2,1fr)}}
+details.more>summary{cursor:pointer;color:var(--muted);font-size:13px;padding:10px 0;list-style:none}
+details.more>summary::-webkit-details-marker{display:none}
+
+/* ---- /stock (SPEC §3.1): price-context strip caption, two-column fact rows, trade → public → now rows. */
+.px-pending{margin:0 0 16px}.px-note{margin:-8px 0 16px}
+.px-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}.px-head .return{font-size:20px}
+.metric small .return,.ctx .return{font-size:inherit;font-weight:700}
+.metric small .return{display:inline}.metric small .chip{display:inline-flex} /* the package's `.metric span` is a block label */
+.metric small .chip{padding:2px 6px;font-size:10px;margin-inline-start:4px}
+.holding.kv{grid-template-columns:minmax(0,1fr) auto;align-items:start}.holding.kv > span:first-child{display:block}
+.holding.kv .mono{text-align:end;white-space:nowrap}
+.holding.trade{grid-template-columns:minmax(150px,.8fr) minmax(0,1.7fr) auto;align-items:start}
+.holding.trade > .muted .ctx{font-size:11px;line-height:1.5}
+.holding.trade .mono{text-align:end;white-space:nowrap}
+.chip.near{padding:1px 6px;font-size:10px;margin-inline-start:4px}
+.sides-read{margin:10px 0 0;line-height:1.6}
+.status-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.status-cause{margin:0 0 8px;font-weight:600;line-height:1.5}
+.status-purify{margin:10px 0 0}.status-foot{margin:10px 0 0}
+@media(max-width:720px){.holding.trade{grid-template-columns:minmax(0,1fr) auto}.holding.trade > span:nth-child(2){grid-column:1/-1;order:3}}
+
+/* ---- /portfolio (SPEC §3.2): freshness caption + return basis, since-public read, grouped filing,
+   holdings decision facts, held-names screening rows. Existing tokens only. */
+.pf-fresh{margin:10px 0 0;font-size:13px;line-height:1.5}
+.detail-stat .basis{display:block;max-width:300px;margin-top:4px;margin-inline-start:auto;font-size:11px;line-height:1.45}
+.pf-read{margin:-8px 0 18px;font-size:13px;line-height:1.6}
+.card .pf-read{margin:0 0 10px}
+.pf-ghead{margin:0 0 8px;font-weight:600;font-size:13px;line-height:1.5}
+.pf-sub{margin:16px 0 0;font-size:13px}
+.pf-filing details.more>summary{line-height:1.5}
+.pf-filing .timeline .row{grid-template-columns:64px 1fr auto}.pf-filing .timeline .row .muted{font-size:13px;line-height:1.5}
+.pf-pass{margin:0 0 4px;font-size:13px;line-height:1.6}
+.holding.pf-scr{grid-template-columns:1fr;gap:4px}.holding.pf-scr small{line-height:1.5}
+.holding.pf-hold > span:first-child .chip{padding:2px 6px;font-size:10px}
+.holding .ctx .return{display:inline}
+@media(max-width:720px){.detail-stat .basis{margin-inline-start:0}.pf-filing .timeline .row{grid-template-columns:56px 1fr}.pf-filing .timeline .row>.status{grid-column:2;justify-self:start;white-space:nowrap}}
+/* ---- /portfolios (SPEC §3.3): column-header context, the panel's 2×2 kpis, top holdings, latest filing,
+   and the unranked recent-activity card. Existing package components only; neutral ink/cobalt. */
+.table th small.ctx{display:block;margin-top:3px;font-size:9px;letter-spacing:0;text-transform:none;font-weight:500}
+.ps-note{margin:0;padding:10px 14px 14px}
+.kpirow.two{grid-template-columns:repeat(2,1fr);gap:4px 14px;margin-top:6px}
+.kpirow.two .kpi span{display:block;margin-top:2px;line-height:1.35}
+.kpirow.two .kpi .ctx{line-height:1.4}
+.panel .hero .ctx{font-size:11px}
+.panel .ps-h{margin:16px 0 2px;font-size:12px;color:var(--muted);font-weight:600}
+.panel .holding{grid-template-columns:minmax(0,1fr) auto auto;align-items:center;padding:8px 0}
+.panel .holding .mono{text-align:end;white-space:nowrap}
+.ps-line{margin:4px 0 0;font-size:12px;line-height:1.55}
+.ps-recent{margin-top:16px}
+.holding.ps-act{grid-template-columns:minmax(180px,.8fr) minmax(0,1.7fr) auto;align-items:center;color:inherit;text-decoration:none}
+.holding.ps-act .avatar{width:32px;height:32px;font-size:11px}
+.holding.ps-act .muted{font-size:13px;line-height:1.5}.holding.ps-act .mono{text-align:end;white-space:nowrap}
+.holding.ps-act:hover b{text-decoration:underline}
+@media(max-width:720px){.holding.ps-act{grid-template-columns:1fr auto}.holding.ps-act .muted{grid-column:1/-1;grid-row:2}}
+.ps-table th,.ps-table td{padding:12px 8px}.ps-table th:first-child,.ps-table td:first-child{padding-inline-start:14px}
+.ps-table .person{gap:9px}.ps-table .person .avatar{width:34px;height:34px;font-size:11px}
+.ps-table .ps-date{white-space:nowrap}.ps-table td small.ctx{white-space:normal}
+.ps-table{min-width:700px}
+/* /stocks (SPEC §3.4): filer counts and since-public lead; the price column is small and last. */
+.ss-table th,.ss-table td{padding:12px 8px}.ss-table th:first-child,.ss-table td:first-child{padding-inline-start:14px}
+.ss-table .person{gap:9px}.ss-table .person .avatar{width:34px;height:34px;font-size:11px}
+.ss-table td small.ctx{white-space:normal}.ss-table .ss-date,.ss-table .ss-sides{white-space:nowrap}
+.ss-table .ss-px{display:flex;align-items:center;gap:8px}.ss-table .ss-px .mz-chart--spark{width:72px}
+.ss-table .ss-px .return{font-size:12px}
+.ss-table{min-width:760px}
+/* /alerts (SPEC §3.5 AL-1): one row per filing; the trades sit in an expander with their pills.
+   /following (FO-1): one price line on stock cards. Neutral ink/cobalt only. */
+.alerts .timeline .row.al-row{align-items:start}
+.al-row .person strong small{display:block;margin-top:3px;font-weight:500}
+.al-row .person small + small{margin-top:2px}
+.al-row details.more{margin-inline-start:55px}
+.al-row details.more>summary{padding:8px 0 0}
+.al-trades{display:grid;gap:0;margin-top:6px}
+.al-trade{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 0;border-top:1px solid var(--line);font-size:12px;line-height:1.5;cursor:pointer}
+.al-trade .status{padding:3px 7px;font-size:10px}.al-trade .return{font-size:12px}.al-trade .chip{padding:2px 6px;font-size:10px}
+.al-since{display:flex;flex-direction:column;align-items:flex-end;text-align:end;max-width:180px}
+.al-since .ctx{display:block;font-size:11px;line-height:1.4;color:var(--muted);margin-top:2px}
+.al-sub{margin:22px 0 10px;font-size:15px}
+.signal-card .fo-px{margin-top:6px;line-height:1.5}.signal-card .fo-px .return{font-size:12px}
+@media(max-width:720px){.al-row details.more{margin-inline-start:0}.al-since{grid-column:1/-1;align-items:flex-start;text-align:start;max-width:none}}
+/* Copy sweep (SPEC §7 phone check): /portfolio holdings + exits rows stack at ≤720px (ticker + figure on
+   row 1, the facts full width on row 2) instead of squeezing three columns into 390px. */
+@media(max-width:720px){.holding.pf-hold,.holding.pf-exit{grid-template-columns:minmax(0,1fr) auto}.holding.pf-hold > span:nth-child(2),.holding.pf-exit > span:nth-child(2){grid-column:1/-1;order:3}}
+.mz-footer{margin-top:24px}
+/* Review fixes: verdict pills in holdings / exits rows stay one line (rule 1: compact tag); on desktop the
+   ticker + pill + chip column keeps its natural width instead of breaking "يحتاج تطهيرًا" in two. */
+.holding .status{white-space:nowrap}
+@media(min-width:721px){.holding.pf-hold>span:first-child,.holding.pf-exit>span:first-child{min-width:max-content}}
+.fo-other{margin-top:24px}.fo-other .holding{grid-template-columns:1fr auto auto}
