@@ -5,14 +5,34 @@
 //
 // ONE call per ticker: a single `time_series` request returns the daily history AND its
 // latest close (used as the informational "quote" — a filing-lagged app needs no intraday).
-// Returns { quote, history:[{d,c}] ascending } or null for a genuine no-data ticker.
+// Returns { quote, history:[{d,o,h,l,c,v}] ascending } or null for a genuine no-data ticker.
+// Each point: d = 'YYYY-MM-DD', c = close (always present). o/h/l (open/high/low) are stored
+// together or not at all (a candle needs all three, and must bracket open and close), v = volume
+// (integer) only when numeric. Prices are rounded to at most 4 decimals. The SAME single API call
+// already carries OHLCV, so storing it costs no extra credits. Every consumer reads .d/.c;
+// rows cached before OHLCV was kept have only {d,c} and gain o/h/l/v on their next daily refresh.
 // Throws a RATE_LIMIT error on HTTP 429 / credit exhaustion so the caller aborts the batch.
 const HOST = "https://api.twelvedata.com";
 const OUTPUTSIZE = 400; // ~400 trading days (> 1Y), covers every UI interval
 
 class RateLimitError extends Error { constructor(m) { super(m); this.code = "RATE_LIMIT"; } }
 
-const num = (v) => (v == null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
+const num = (v) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+const r4 = (x) => Math.round(x * 1e4) / 1e4;
+
+// One Twelve Data `values` row -> { d, o?, h?, l?, c, v? } or null (no date / no close).
+export function toPoint(r) {
+  const d = String(r?.datetime || "").slice(0, 10), c = num(r?.close);
+  if (!d || c == null) return null;
+  const o = num(r?.open), h = num(r?.high), l = num(r?.low), v = num(r?.volume);
+  const p = { d };
+  if (o != null && h != null && l != null && l <= Math.min(o, c) && h >= Math.max(o, c)) {
+    p.o = r4(o); p.h = r4(h); p.l = r4(l);
+  }
+  p.c = r4(c);
+  if (v != null && v >= 0) p.v = Math.round(v);
+  return p;
+}
 
 // Returns { quote, history } or null when the ticker genuinely has no data. ONE API call.
 export async function fetchPrice(ticker) {
@@ -46,8 +66,8 @@ export async function fetchPrice(ticker) {
 
   const values = Array.isArray(data?.values) ? data.values : [];
   const history = values
-    .map((r) => ({ d: String(r?.datetime || "").slice(0, 10), c: num(r?.close) }))
-    .filter((p) => p.d && p.c != null)
+    .map(toPoint)
+    .filter(Boolean)
     .sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
 
   if (!history.length) return null;

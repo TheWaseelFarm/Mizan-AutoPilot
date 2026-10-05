@@ -1,5 +1,7 @@
 // GET /api/prices -> cached price data ONLY (never calls FMP from a user request).
-// Shape: { "NVDA": { quote:Number|null, history:[{d,c}], updatedAt }, ... }
+// Shape: { "NVDA": { quote:Number|null, history:[{d,o?,h?,l?,c,v?}], updatedAt }, ... }
+// History is returned as stored: d + close always; open/high/low/volume where the provider gave them
+// (see _lib/prices/twelvedata.js — rows cached before OHLCV was kept have only {d,c}).
 // If the cache table doesn't exist yet (or errors), returns {} so the UI shows "Price pending".
 import { supabase } from "./_lib/supabase.js";
 
