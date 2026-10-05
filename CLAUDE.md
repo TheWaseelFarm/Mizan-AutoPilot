@@ -15,9 +15,14 @@ It is **intelligence, not advice** — never a brokerage, copy-trading, or a fat
 1. **Performance-led hierarchy.** The disclosed return is the hero; Sharia
    compliance is a compact tag + filter that is *always shown* but never the
    loudest thing on screen.
-2. **Semantic colour reservation.** Teal / amber / coral (the `--mz-*compliant*`
-   hues) are RESERVED for the Sharia verdict. Performance and **all charts** use
-   cobalt / ink only — a chart must never read as a verdict.
+2. **Semantic colour reservation.** The verdict hues — teal / amber / coral, i.e.
+   `--green` #2f7a58 / `--amber` / `--red` #b5524d and their `-soft` variants in
+   `public/styles/tokens.css` — are RESERVED for the Sharia verdict and must
+   **never** be used in a chart. **Charts** use vivid *market* green / red
+   (`--mz-chart-up` #12a150 / `--mz-chart-down` #e5383b in `public/styles/app.css`)
+   for price direction and buy / sell — deliberately brighter, distinct hues from the
+   verdict tokens (owner decision 2026-10-05). Non-chart performance numbers stay
+   cobalt / ink. A chart must never read as a verdict.
 3. **AAOIFI 30/30/5** is the screen (see `api/_lib/aaoifi.js`). Interest-bearing
    debt < 30% of market cap, cash + interest-bearing securities < 30%,
    non-permissible income < 5% of revenue. 33% is the S&P/MSCI index
@@ -58,17 +63,31 @@ static image, never a second renderer. All charts behave identically:
 - **Cards / sparks** — minimal LW line (no grid/axes/legend/zoom), crosshair
   drives the shared tooltip; mounted lazily (IntersectionObserver).
 - **Trade markers (detail charts)** — one per (trade date, side) at the **trade
-  date**: ▲ bought (cobalt, below), ▼ sold (ink, above), ● 13F "held at quarter
-  end" (never "bought"). Trades outside the series are not drawn (snap ≤ 4 days).
+  date**: ▲ bought (market green, below), ▼ sold (market red, above), ● 13F "held
+  at quarter end" (cobalt — neither buy nor sell; never "bought"). Trades outside the series are not drawn (snap ≤ 4 days).
   Marker text only where it fits (newest first, else "×N"). Hovering or tapping
   within ~10–16px of a marker opens the tooltip: per (side, trade date, public
   date) one head line with the **trade date and public (filing) date** + lag, then
   one line of names + amounts (4, 2 on phones, then "+N"); pinned above the chart
   on phones. One legend line under the chart (`tradeLegend(series, marks)`) counts
   buys / sells / 13F positions in the period with their date ranges.
+- **Detail-chart extras (thinkorswim-like)** — Hi / Lo tags ("Hi 603.88" / "أعلى
+  603.88") at the highest high / lowest low of the bars on screen (closes on a line,
+  index value without $), recomputed on pan / zoom / timeframe / resize and never
+  covering a trade marker (markers win; the tag moves or hides); very light vertical
+  gridlines on the time ticks (months); last-value tag on the price axis + crosshair
+  axis labels.
 - **Respects the active timeframe** (1W … All) via `sliceTf()` reading `S.tf`.
-- **Neutral styling** — cobalt / ink only (up candle + buy = cobalt, down + sell =
-  ink); never a verdict hue. Colours are read from CSS vars.
+- **Market colours (owner decision 2026-10-05)** — `--mz-chart-up` #12a150 /
+  `--mz-chart-down` #e5383b, read from CSS vars (`getComputedStyle`) in JS and used
+  as `var(...)` in the SVG fallback: candles + wicks + borders up green / down red,
+  volume the same at 0.45 alpha; a line / area (portfolio index, cards, sparks,
+  closes-only stock charts, SVG fallback) is green when the series on screen ends
+  ≥ its start, red when lower, with the area fading to transparent; buy ▲ green,
+  sell ▼ red, 13F ● cobalt; legend change values green / red. The last-value tag is
+  the line's hue (candles: vs prior close, like the legend). The verdict tokens
+  (`--green` / `--amber` / `--red`, teal / amber / coral) are **never** used in a
+  chart; crosshair, grid, text, watermark and Hi / Lo tags stay ink / muted.
 - **Graceful empty state** — under 2 points renders `.mz-chart__empty`
   ("Pending" / "—"), never a broken axis.
 
@@ -76,6 +95,16 @@ Variants are size-only via the `cls` option: `mz-chart--full` (detail pages,
 300px / 240px phone), `mz-chart--card` (cards, 64px), `mz-chart--spark` (table
 rows, 44px). To add a chart anywhere, call `chart(sliceTf(series), { cls,
 markers, title })` — do not write a new renderer.
+
+## Navigation
+`go(path)` is the only way pages change: it saves the leaving page's `scrollY` into
+its history entry (`replaceState`) and pushes `{from, fromLabel}`; `popstate`
+re-renders and restores that scroll. `/stock/:t` and `/portfolio/:id` open with a
+back link (`backLink()`, `.mz-back`, `data-back`): "← Back to {page}" →
+`history.back()`, or on a deep link the parent list ("← Stocks" / "← Portfolios").
+Every in-page link to a page carries `data-nav` / `data-open-stock` /
+`data-open-portfolio` (handled by the delegated click listener) — never a bare
+`<a href>` that reloads the app.
 
 ## Global consistency rule (STANDING — applies to every task)
 Any change the owner requests applies to **every instance of that pattern across the

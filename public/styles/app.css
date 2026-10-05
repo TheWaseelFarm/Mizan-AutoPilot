@@ -42,7 +42,11 @@ button.chip{cursor:pointer;color:var(--ink)}.chip.on{background:var(--ink);borde
 .detail-stat b{color:var(--ink)}
 .seg button{cursor:pointer}
 
-/* ---- Shared interactive chart (chart() in app.js) inside the package chart frame. */
+/* ---- Shared interactive chart (chart() in app.js) inside the package chart frame.
+   Chart hues (owner decision 2026-10-05): vivid MARKET green / red for price direction and buy / sell.
+   Deliberately brighter and distinct from the Sharia verdict tokens (--green #2f7a58, --red #b5524d,
+   --amber), which stay reserved for Mizan Status and are never used in a chart. 13F = cobalt. */
+:root{--mz-chart-up:#12a150;--mz-chart-down:#e5383b}
 .chart-live{height:auto;min-height:0;padding:14px;margin-top:4px}.chart-live:before{display:none}
 .mz-chart{position:relative;width:100%;display:block;direction:ltr;touch-action:pan-y;cursor:crosshair}
 .mz-chart svg{width:100%;height:100%;display:block;overflow:visible}
@@ -59,16 +63,20 @@ button.chip{cursor:pointer;color:var(--ink)}.chip.on{background:var(--ink);borde
 .mz-lw-legend.is-band{right:0;top:0;font-size:10px;line-height:1.4}
 .mz-lw-legend b{color:var(--ink);font-weight:700}
 .mz-lw-legend i{font-style:normal;color:var(--ink)}
-.mz-lw-legend .up{color:var(--blue)}.mz-lw-legend .down{color:var(--ink)}
+.mz-lw-legend .up{color:var(--mz-chart-up)}.mz-lw-legend .down{color:var(--mz-chart-down)}
 .mz-lw-legend small{color:var(--muted);font-size:10px}
 .mz-lw-reset{pointer-events:auto;flex:0 0 auto;margin-inline-start:auto;padding:1px 7px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:600 10px/1.5 var(--font);cursor:pointer}
 .mz-lw-reset[hidden]{display:none}
+/* High / low of the bars on screen (detail charts), thinkorswim style: neutral ink text on a soft chip. */
+.mz-lw-hl{position:absolute;z-index:2;padding:0 4px;border-radius:4px;background:rgba(255,255,255,.86);color:var(--ink);font:600 10px/16px var(--mono);white-space:nowrap;pointer-events:none}
+.mz-lw-hl[hidden]{display:none}
+.mz-lw-hl span{color:var(--muted);font-weight:500}
+:lang(ar) .mz-lw-hl{font-family:var(--font);font-variant-numeric:tabular-nums}
 .mz-chart__cx{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:0;pointer-events:none}
-.mz-chart__dot{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 2px #fff;transform:translate(-3.5px,-3.5px);opacity:0;pointer-events:none}
+.mz-chart__dot{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--mz-chart-color,var(--blue));box-shadow:0 0 0 2px #fff;transform:translate(-3.5px,-3.5px);opacity:0;pointer-events:none}
 .mz-chart.is-active .mz-chart__cx,.mz-chart.is-active .mz-chart__dot{opacity:1}
 .mz-chart__mk{position:absolute;width:9px;height:9px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px #fff}
-.mz-chart__mk[data-side="buy"]{background:var(--blue)}.mz-chart__mk[data-side="sell"]{background:#fff;border:1.6px solid var(--ink)}
-.mz-chart__today{position:absolute;width:9px;height:9px;transform:translate(-50%,-50%);border-radius:50%;background:var(--blue);pointer-events:none}
+.mz-chart__today{position:absolute;width:9px;height:9px;transform:translate(-50%,-50%);border-radius:50%;background:var(--mz-chart-color,var(--blue));pointer-events:none}
 .mz-chart__todaylab{position:absolute;top:4px;right:6px;padding:1px 6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font:500 10px var(--mono);pointer-events:none}
 .mz-chart__ax{position:absolute;bottom:1px;padding:0 3px;color:var(--muted);font:500 10px var(--mono);pointer-events:none}
 .mz-chart__ax--start{left:1px}.mz-chart__ax--end{right:1px}
@@ -79,7 +87,7 @@ button.chip{cursor:pointer;color:var(--ink)}.chip.on{background:var(--ink);borde
 .mz-chart-tip.is-multi{white-space:pre-wrap;width:max-content;max-width:min(92vw,440px);text-align:start;line-height:1.55;font-weight:500}
 .chart-legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;color:var(--muted);font-size:11px;line-height:1.5}
 .chart-legend .tl-head{font-weight:600}
-.chart-legend .tl-B,.chart-legend .tl-H{color:var(--blue)}.chart-legend .tl-S{color:var(--ink)}
+.chart-legend .tl-B{color:var(--mz-chart-up)}.chart-legend .tl-H{color:var(--blue)}.chart-legend .tl-S{color:var(--mz-chart-down)}
 /* Lightweight Charts attribution (text link instead of the in-canvas logo). */
 .mz-lw-credit{font-size:10px;color:var(--muted)}
 .chart-legend .mz-lw-credit{margin-inline-start:auto}
@@ -158,10 +166,12 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 .hero-note > div{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px}
 /* Phone alert rows: tags on top, text + time on one line. */
 @media(max-width:720px){.alerts .timeline .row{grid-template-columns:1fr auto;gap:8px}.alert-tags{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}}
-/* Fallback (SVG) chart markers match the legend and the Lightweight Charts arrows: ▲ buy, ▼ sell. */
+/* Fallback (SVG) chart markers match the legend and the Lightweight Charts arrows: ▲ buy (market green),
+   ▼ sell (market red), ● 13F held at quarter end (cobalt). */
 .mz-chart__mk{width:11px;height:11px;border-radius:0;box-shadow:none;border:0}
-.mz-chart__mk[data-side="buy"]{background:var(--blue);clip-path:polygon(50% 0,100% 100%,0 100%)}
-.mz-chart__mk[data-side="sell"]{background:var(--ink);clip-path:polygon(0 0,100% 0,50% 100%)}
+.mz-chart__mk[data-side="buy"]{background:var(--mz-chart-up);clip-path:polygon(50% 0,100% 100%,0 100%)}
+.mz-chart__mk[data-side="sell"]{background:var(--mz-chart-down);clip-path:polygon(0 0,100% 0,50% 100%)}
+.mz-chart__mk[data-side="held"]{width:9px;height:9px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 2px #fff}
 
 /* ---- Revamp shared building blocks (SPEC §2): 4-cell metric strip (2×2 on phones) and the
    collapsed "more" section. No inline grid styles, so the phone rule always wins. */
@@ -256,3 +266,7 @@ details.more>summary::-webkit-details-marker{display:none}
 .holding .status{white-space:nowrap}
 @media(min-width:721px){.holding.pf-hold>span:first-child,.holding.pf-exit>span:first-child{min-width:max-content}}
 .fo-other{margin-top:24px}.fo-other .holding{grid-template-columns:1fr auto auto}
+/* In-page back link on /stock and /portfolio (phone web views have no browser back button). */
+.mz-back{display:inline-flex;align-items:center;gap:4px;min-height:32px;margin:-8px 0 8px;padding:0 2px;color:var(--muted);font-size:13px;font-weight:500;text-decoration:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mz-back:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+@media(max-width:720px){.mz-back{min-height:40px;margin:-6px 0 4px;font-size:14px}}

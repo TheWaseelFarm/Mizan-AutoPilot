@@ -643,13 +643,14 @@
   // Shared copper/ink performance palette; status colors remain a separate compact signal.
   const latestFiling = (rows) => rows.map((r) => r[FIELD.filedDate]).filter((d) => d && isFinite(Date.parse(d))).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
 
-  // Trade direction — NEUTRAL (cobalt buy / ink sell). Verdict hues (green/amber/red) are reserved
-  // for the Sharia label only, so buy/sell must never borrow them.
+  // Trade direction: in charts, market green buy / market red sell (--mz-chart-up / --mz-chart-down,
+  // owner decision 2026-10-05). The verdict hues (--green / --amber / --red) are reserved for the
+  // Sharia label only, so buy/sell must never borrow them.
 
   /* ============ ONE shared, interactive chart component — used by EVERY chart ============
      Global consistency rule (CLAUDE.md): every chart in the app is this component. Same
      behavior everywhere — scrub (touch/pointer) reveals value + date, respects the active
-     timeframe (1W…All), neutral cobalt/ink only (never a verdict hue), graceful empty state.
+     timeframe (1W…All), market green/red by direction (never a verdict hue), graceful empty state.
      chart() renders the SVG layer; mountTradeCharts() (below) upgrades it in place to
      TradingView Lightweight Charts and falls back to this SVG on any failure. */
   const chartPath = (v, W, H, mn, mx) => { const r = (mx - mn) || 1; return v.map((y, i) => `${(i / (v.length - 1) * W).toFixed(2)},${(H - (y - mn) / r * H).toFixed(2)}`).join(' '); };
@@ -740,8 +741,9 @@
   // THE shared chart. `hist` = [{d,c}] (price points may also carry o/h/l/v via FIELD.price*).
   // opts: { cls, compare:[{d,c}], empty, unit:'index'|'price', title (watermark, e.g. the ticker),
   //   markers:[{d (TRADE date), side, h (13F), label, pub (public / filing date), amt (amount text)}]
-  //   (disclosed trades pinned on the line — cobalt buy / ink sell),
-  //   color: optional CSS color (Portfolios sign palette), area/valueAxis: optional detail styling,
+  //   (disclosed trades pinned on the line — market-green ▲ buy / market-red ▼ sell / cobalt ● 13F),
+  //   color: optional CSS color override (default: market green when the series ends >= its start,
+  //   market red when lower — --mz-chart-up / --mz-chart-down, never a verdict hue), area/valueAxis: optional detail styling,
   //   today: string (a value label shown top-end, e.g. "$146 · today") }.
   // Marker codes: B = disclosed buy, H = 13F holding at quarter end (never "bought"), S = sale.
   const markCode = (m) => String(m.side).toUpperCase() === 'SELL' ? 'S' : m.h ? 'H' : 'B';
@@ -838,8 +840,10 @@
     if (data.length < 2) return `<div class="mz-chart ${cls} mz-chart__empty" style="height:${h}px">${opts.empty || '—'}</div>`;
     const closes = data.map((p) => +p.c), mn = Math.min(...closes), mx = Math.max(...closes), rng = (mx - mn) || 1;
     const W = 320, H = 100, sw = cls === 'mz-chart--full' ? 1.7 : 1.4;
-    const line = `<polyline points="${chartPath(closes, W, H, mn, mx)}" fill="none" stroke="${esc(opts.color || 'var(--blue)')}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-    const area = opts.area ? `<polygon points="0,${H} ${chartPath(closes, W, H, mn, mx)} ${W},${H}" fill="${esc(opts.color || 'var(--blue)')}" opacity="0.08"/>` : '';
+    // Direction colour over the series on screen (it is already sliced to the active timeframe).
+    const color = opts.color || (closes[closes.length - 1] >= closes[0] ? 'var(--mz-chart-up)' : 'var(--mz-chart-down)');
+    const line = `<polyline points="${chartPath(closes, W, H, mn, mx)}" fill="none" stroke="${esc(color)}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+    const area = opts.area ? `<polygon points="0,${H} ${chartPath(closes, W, H, mn, mx)} ${W},${H}" fill="${esc(color)}" opacity="0.08"/>` : '';
     const valueAxis = opts.valueAxis ? `<span class="mz-chart__value-axis">${[mx, (mn + mx) / 2, mn].map((v) => `<span>${(v / closes[0] * 100 - 100).toFixed(0)}%</span>`).join('')}</span>` : '';
     let cmp = '';
     if (opts.compare) { const c2 = (opts.compare || []).filter((p) => p && isFinite(+p.c)).map((p) => +p.c); if (c2.length >= 2) cmp = `<polyline points="${chartPath(c2, W, H, mn, mx)}" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="3 3"/>`; }
@@ -848,7 +852,7 @@
     let markers = '', marksAttr = '';
     const inView = marksInView(data, opts.markers);
     if (inView.length) {
-      markers = inView.map((m) => { const p = at(m.i); return `<span class="mz-chart__mk" data-side="${m.code === 'S' ? 'sell' : 'buy'}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${esc(markWord(m.code) + (m.label ? ' ' + (LANG === 'ar' ? bidi(m.label) : m.label) : '') + ' · ' + shortDate(m.d) + (m.pub ? ` · ${L('public', 'أُعلن في')} ${shortDate(m.pub)}` : ''))}"></span>`; }).join('');
+      markers = inView.map((m) => { const p = at(m.i); return `<span class="mz-chart__mk" data-side="${m.code === 'S' ? 'sell' : m.code === 'H' ? 'held' : 'buy'}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${esc(markWord(m.code) + (m.label ? ' ' + (LANG === 'ar' ? bidi(m.label) : m.label) : '') + ' · ' + shortDate(m.d) + (m.pub ? ` · ${L('public', 'أُعلن في')} ${shortDate(m.pub)}` : ''))}"></span>`; }).join('');
       // Every pinned trade with its trade date, side, label, public date, amount and snapped bar:
       // the scrub tooltip and the Lightweight Charts markers read the SAME list.
       marksAttr = ` data-marks="${esc(JSON.stringify(inView.map((m) => [m.d, m.code, m.label, m.pub, m.amt, m.bar, m.f13 ? 1 : 0])))}"`;
@@ -868,7 +872,7 @@
       : '';
     const series = esc(JSON.stringify(data.map((p) => [p.d, +p.c])));
     const unit = opts.unit === 'index' ? 'index' : 'price';
-    return `<div class="mz-chart ${cls}" tabindex="0" role="img" aria-label="${esc(LANG === 'ar' ? 'حركة الأداء — اسحب لعرض التاريخ والقيمة' : 'Performance history — scrub for date and value')}" data-series="${series}" data-unit="${unit}" data-min="${mn}" data-max="${mx}"${marksAttr}${ohlcAttr}${titleAttr} style="height:${h}px;--mz-chart-color:${esc(opts.color || 'var(--blue)')}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${area}${cmp}${line}</svg>${valueAxis}${markers}${todayDot}${todayLab}${axisEls}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
+    return `<div class="mz-chart ${cls}" tabindex="0" role="img" aria-label="${esc(LANG === 'ar' ? 'حركة الأداء — اسحب لعرض التاريخ والقيمة' : 'Performance history — scrub for date and value')}" data-series="${series}" data-unit="${unit}" data-min="${mn}" data-max="${mx}"${marksAttr}${ohlcAttr}${titleAttr} style="height:${h}px;--mz-chart-color:${esc(color)}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${area}${cmp}${line}</svg>${valueAxis}${markers}${todayDot}${todayLab}${axisEls}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
   }
 
   // Interactive scrub — ONE handler drives every chart (touch + pointer). Registered once.
@@ -1840,11 +1844,14 @@
                 crosshair with axis labels, dated time axis, ticker watermark, drag-to-pan, pinch /
                 axis-drag zoom (the mouse wheel keeps scrolling the page, a vertical swipe keeps
                 scrolling it on phones), double-click or ↺ resets to the padded fit; disclosed trades as
-                markers at their TRADE date (hover / tap near one) with trade + public dates in the tooltip.
+                markers at their TRADE date (hover / tap near one) with trade + public dates in the tooltip,
+                Hi / Lo tags on the bars on screen, light month gridlines, last-value tag on the price axis.
        card / spark -> a minimal line (no grid, axes, legend or zoom) whose crosshair drives the shared
                 tooltip; mounted lazily as it scrolls into view.
-     Cobalt / ink only — never a verdict hue. Every re-render removes the previous instances and the
-     observer first. Any failure restores the SVG chart + scrub exactly as rendered. */
+     Colours (owner decision 2026-10-05): market green / red (--mz-chart-up / --mz-chart-down) for price
+     direction (candles, volume, a line by its end vs its start) and buy / sell markers; 13F = cobalt.
+     NEVER the Sharia verdict tokens (--green / --amber / --red). Every re-render removes the previous
+     instances and the observer first. Any failure restores the SVG chart + scrub exactly as rendered. */
   let LW_CHARTS = [], LW_IO = null;
   const LW_KEYS = new WeakMap(); // mounted chart element -> keyboard scrub (data-series index)
   document.getElementById('lwjs')?.addEventListener('load', () => { if (!S.loading) mountTradeCharts(); });
@@ -1869,7 +1876,8 @@
     unmountTradeCharts();
     const LW = window.LightweightCharts; if (!LW || !LW.createChart) return;
     const css = getComputedStyle(document.documentElement), v = (n, f) => (css.getPropertyValue(n) || '').trim() || f;
-    const th = { blue: v('--blue', '#3c6f96'), ink: v('--ink', '#17201b'), muted: v('--muted', '#6f786f'), line: v('--line', '#dde2dc'), font: v('--font', 'system-ui') };
+    const th = { blue: v('--blue', '#3c6f96'), ink: v('--ink', '#17201b'), muted: v('--muted', '#6f786f'), line: v('--line', '#dde2dc'), font: v('--font', 'system-ui'),
+      up: v('--mz-chart-up', '#12a150'), down: v('--mz-chart-down', '#e5383b') };
     const lazy = [];
     document.querySelectorAll('.mz-chart[data-series]').forEach((el) => {
       const full = el.classList.contains('mz-chart--full');
@@ -1923,6 +1931,9 @@
     const p = document.createElement('p'); p.className = 'credit mz-lw-credit'; p.innerHTML = a;
     const foot = main.querySelector('.mz-footer'); if (foot) foot.before(p); else main.appendChild(p);
   }
+  // A line's colour: market green when the series on screen (already sliced to the timeframe) ends at or
+  // above its start, market red when lower. Never a verdict hue.
+  const dirColor = (rows, th) => (rows[rows.length - 1].c >= rows[0].c ? th.up : th.down);
   // Index in `rows` for a data-series index (keyboard scrub).
   const rowOf = (rows, di) => { const k = rows.findIndex((r) => r.k >= di); return k < 0 ? rows.length - 1 : k; };
   // The LW pane box (inside any padding of the chart element): LW coordinates are relative to it.
@@ -1938,8 +1949,9 @@
       crosshair: { mode: LW.CrosshairMode.Magnet, vertLine: { color: rgba(th.ink, 0.25), width: 1, style: LW.LineStyle.Solid, labelVisible: false }, horzLine: { visible: false, labelVisible: false } },
       handleScroll: false, handleScale: false,
     });
-    // Same weight as the SVG spark (1.4px): a thin cobalt line, no baseline, no axis.
-    const s = c.addLineSeries({ color: th.blue, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, baseLineVisible: false, crosshairMarkerRadius: 3, crosshairMarkerBorderColor: th.blue, crosshairMarkerBackgroundColor: th.blue });
+    // Same weight as the SVG spark (1.4px): a thin line, market green if the period ends >= its start, else red.
+    const col = dirColor(rows, th);
+    const s = c.addLineSeries({ color: col, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, baseLineVisible: false, crosshairMarkerRadius: 3, crosshairMarkerBorderColor: col, crosshairMarkerBackgroundColor: col });
     s.setData(rows.map((r) => ({ time: r.time, value: r.c })));
     c.timeScale().fitContent();
     const byTime = new Map(rows.map((r, k) => [r.time, k]));
@@ -1965,12 +1977,13 @@
       autoSize: true,
       // No in-canvas logo (it covered the first bars / volume); the text credit is under the chart (lwCredit).
       layout: { background: { type: 'solid', color: 'transparent' }, textColor: th.muted, fontFamily: th.font, fontSize: 11, attributionLogo: false },
-      grid: { vertLines: { color: rgba(th.line, 0.55) }, horzLines: { color: rgba(th.line, 0.9) } },
+      // Vertical lines sit on the time ticks (months on 6M / 1Y), very light, so months read like thinkorswim.
+      grid: { vertLines: { visible: true, color: rgba(th.line, 0.5) }, horzLines: { visible: true, color: rgba(th.line, 0.9) } },
       rightPriceScale: { borderVisible: false, scaleMargins: { top: narrow ? 0.1 : 0.16, bottom: hasVol ? 0.24 : 0.08 } },
       // Edges are NOT pinned: fit() leaves room before the first and after the last bar so a trade
       // marker (and its text) on either end is drawn whole.
       timeScale: { borderColor: th.line, timeVisible: false, fixLeftEdge: false, fixRightEdge: false, minBarSpacing: 0.05, tickMarkFormatter: lwTick },
-      crosshair: { mode: LW.CrosshairMode.Normal, vertLine: { color: rgba(th.ink, 0.35), labelBackgroundColor: th.ink }, horzLine: { color: rgba(th.ink, 0.35), labelBackgroundColor: th.ink } },
+      crosshair: { mode: LW.CrosshairMode.Normal, vertLine: { color: rgba(th.ink, 0.35), labelVisible: true, labelBackgroundColor: th.ink }, horzLine: { color: rgba(th.ink, 0.35), labelVisible: true, labelBackgroundColor: th.ink } },
       // Drag pans, pinch / axis-drag zooms. The wheel and vertical swipes stay with the page.
       handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: { time: true, price: true }, axisDoubleClickReset: { time: false, price: true } },
@@ -1980,37 +1993,46 @@
     });
     let s;
     if (candles) {
-      s = c.addCandlestickSeries({ upColor: th.blue, downColor: th.ink, borderUpColor: th.blue, borderDownColor: th.ink, wickUpColor: th.blue, wickDownColor: th.ink, priceLineVisible: false, lastValueVisible: true });
+      // Market green up / red down on body, border and wick.
+      s = c.addCandlestickSeries({ upColor: th.up, downColor: th.down, borderUpColor: th.up, borderDownColor: th.down, wickUpColor: th.up, wickDownColor: th.down, priceLineVisible: false, lastValueVisible: false });
       s.setData(bars.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
+      // Last-value tag on the price axis coloured like the legend's "change vs prior close" (a candle's own
+      // colour is close vs OPEN, which can disagree): an invisible close line that only carries the tag.
+      const tagCol = last > 0 && rows[last].c < rows[last - 1].c ? th.down : th.up;
+      const tag = c.addLineSeries({ color: tagCol, lineVisible: false, lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, autoscaleInfoProvider: () => null });
+      tag.setData(rows.map((r) => ({ time: r.time, value: r.c })));
       if (hasVol) {
         const vs = c.addHistogramSeries({ priceScaleId: 'mz-vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
         c.priceScale('mz-vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });
-        vs.setData(bars.filter((b) => b.v != null && isFinite(b.v)).map((b) => ({ time: b.time, value: +b.v, color: b.close >= b.open ? rgba(th.blue, 0.35) : rgba(th.ink, 0.22) })));
+        vs.setData(bars.filter((b) => b.v != null && isFinite(b.v)).map((b) => ({ time: b.time, value: +b.v, color: b.close >= b.open ? rgba(th.up, 0.45) : rgba(th.down, 0.45) })));
       }
     } else {
-      s = c.addAreaSeries({ lineColor: th.blue, topColor: rgba(th.blue, 0.18), bottomColor: rgba(th.blue, 0), lineWidth: 2, priceLineVisible: false, lastValueVisible: true, crosshairMarkerBorderColor: '#fff', crosshairMarkerBackgroundColor: th.blue });
+      // Line + fading area in the period's direction hue; the last-value tag on the axis takes the same hue.
+      const col = dirColor(rows, th);
+      s = c.addAreaSeries({ lineColor: col, topColor: rgba(col, 0.2), bottomColor: rgba(col, 0), lineWidth: 2, priceLineVisible: false, lastValueVisible: true, crosshairMarkerBorderColor: '#fff', crosshairMarkerBackgroundColor: col });
       s.setData(rows.map((r) => ({ time: r.time, value: r.c })));
     }
     const byTime = new Map(rows.map((r, k) => [r.time, k]));
     // Disclosed trades: one marker per (trade day, side) at the TRADE date — ▲ bought below the bar
-    // (cobalt), ▼ sold above it (ink), ● 13F held at quarter end (cobalt, never "bought").
+    // (market green), ▼ sold above it (market red), ● 13F held at quarter end (cobalt: neither buy nor sell).
     const ms = (marks || []).map(markFromAttr).filter((m) => byTime.has(m.bar));
     const groups = new Map();
     ms.forEach((m) => { const k = m.bar + m.code; (groups.get(k) || groups.set(k, []).get(k)).push(m); });
     const word = { B: L('Bought', 'شراء'), S: L('Sold', 'بيع'), H: '13F' };
     const mk = [...groups.entries()].map(([id, g]) => {
       const code = g[0].code, n = g.length;
-      return { time: g[0].bar, id, position: code === 'S' ? 'aboveBar' : 'belowBar', color: code === 'S' ? th.ink : th.blue, shape: code === 'S' ? 'arrowDown' : code === 'H' ? 'circle' : 'arrowUp', size: 1,
+      return { time: g[0].bar, id, position: code === 'S' ? 'aboveBar' : 'belowBar', color: code === 'S' ? th.down : code === 'H' ? th.blue : th.up, shape: code === 'S' ? 'arrowDown' : code === 'H' ? 'circle' : 'arrowUp', size: 1,
         label: word[code] + (n > 1 ? ` ×${n}` : ''), short: n > 1 ? `×${n}` : '', k: byTime.get(g[0].bar) };
     }).sort((a, b) => a.k - b.k);
     // Marker text where it fits: newest trades first, each label placed only if it stays inside the
     // plot and does not overprint a label already placed on the same side; a crowded marker falls back
     // to its count ("×3"). Zooming in brings the full "Bought ×3" back. Recomputed on every range change.
     const meas = (() => { let cx = null; try { cx = document.createElement('canvas').getContext('2d'); } catch (e) { /* no canvas */ } return (t) => { if (!cx) return 7 * t.length; cx.font = `11px ${th.font}`; return cx.measureText(t).width; }; })();
-    let texted = null;
+    let texted = null, markBoxes = [];
     // Boxes are approximate pane px: every marker's arrow is an obstacle, and a placed label becomes one.
+    // The final boxes (arrows + placed texts) are kept in markBoxes so the Hi / Lo tags never cover a trade.
     const applyMarkers = () => {
-      if (!mk.length) return;
+      if (!mk.length) { markBoxes = []; return; }
       const ts = c.timeScale(), W = ts.width() || el.clientWidth, on = new Map();
       const pos = mk.map((m) => {
         const x = ts.logicalToCoordinate(m.k), b = candles ? bars[m.k] : null, up = m.position === 'aboveBar';
@@ -2027,6 +2049,7 @@
           boxes.push({ id: m.id + '#t', r }); on.set(m.id, t); break;
         }
       });
+      markBoxes = boxes.map((o) => o.r);
       const key = [...on].map((e) => e.join(':')).join('|'); if (key === texted) return; texted = key;
       s.setMarkers(mk.map(({ time, id, position, color, shape, size }) => ({ time, id, position, color, shape, size, ...(on.has(id) ? { text: on.get(id) } : {}) })));
     };
@@ -2054,6 +2077,50 @@
       vals.innerHTML = h;
     };
     paint(last);
+    // Hi / Lo of the bars on screen (thinkorswim style): highest high / lowest low (closes on a line chart),
+    // neutral ink text, beside the extreme bar. Trade markers take priority: a tag never covers a marker
+    // (or its text, or the legend); it moves to its next spot, else hides. Recomputed on pan / zoom /
+    // timeframe (a new chart) / resize / axis drag.
+    const hiTag = document.createElement('span'), loTag = document.createElement('span');
+    hiTag.className = loTag.className = 'mz-lw-hl'; hiTag.dataset.hl = 'hi'; loTag.dataset.hl = 'lo'; hiTag.hidden = loTag.hidden = true;
+    hiTag.dir = loTag.dir = LANG === 'ar' ? 'rtl' : 'ltr';
+    el.append(hiTag, loTag);
+    const hiOf = (k) => (candles ? bars[k].high : rows[k].c), loOf = (k) => (candles ? bars[k].low : rows[k].c);
+    const hlNum = (x) => (idx ? (+x).toFixed(2) : num2(x)); // the index carries no $
+    const placeHiLo = () => {
+      if (!el.isConnected) return;
+      const ts = c.timeScale(), vr = ts.getVisibleLogicalRange();
+      const a = vr ? Math.max(0, Math.ceil(vr.from)) : 0, b = vr ? Math.min(last, Math.floor(vr.to)) : -1;
+      if (a > b) { hiTag.hidden = loTag.hidden = true; return; }
+      let hi = a, lo = a;
+      for (let k = a + 1; k <= b; k++) { if (hiOf(k) > hiOf(hi)) hi = k; if (loOf(k) < loOf(lo)) lo = k; }
+      const pane = lwRect(el), er = el.getBoundingClientRect(), ox = pane.left - er.left, oy = pane.top - er.top;
+      const W = ts.width() || el.clientWidth, PH = pane.height - ((typeof ts.height === 'function' && ts.height()) || 26);
+      const rel = (n) => { if (!n || n.hidden) return null; const q = n.getBoundingClientRect(); return q.width ? [q.left - pane.left, q.right - pane.left, q.top - pane.top, q.bottom - pane.top] : null; };
+      const obst = [...markBoxes, rel(vals), rel(reset)].filter(Boolean);
+      const put = (tag, k, v, up) => {
+        tag.innerHTML = `<span>${esc(up ? L('Hi', 'أعلى') : L('Lo', 'أدنى'))}</span> ${esc(LANG === 'ar' ? bidi(hlNum(v)) : hlNum(v))}`;
+        tag.hidden = false;
+        const x = ts.logicalToCoordinate(k), y = s.priceToCoordinate(v), w = tag.offsetWidth, h = tag.offsetHeight || 16;
+        if (x == null || y == null) { tag.hidden = true; return null; }
+        // Beside the extreme bar, mostly above the high / below the low; toward the plot's centre first.
+        const top = up ? y - h + 4 : y - 4, R = [x + 6, x + 6 + w, top, top + h], Lf = [x - 6 - w, x - 6, top, top + h];
+        const far = up ? y - h - 34 : y + 34; // clear of a trade arrow + its text on that bar
+        const sh = (r, dx) => [r[0] + dx, r[1] + dx, r[2], r[3]];
+        const cands = [...(x > W / 2 ? [Lf, R] : [R, Lf]), [x - w / 2, x + w / 2, far, far + h], [x + 6, x + 6 + w, far, far + h], [x - 6 - w, x - 6, far, far + h],
+          ...[24, 48].flatMap((d) => (x > W / 2 ? [sh(Lf, -d), sh(R, d)] : [sh(R, d), sh(Lf, -d)]))]; // a crowded bar: a little further out, same level
+        const q = cands.find((r) => r[0] >= 2 && r[1] <= W - 2 && r[2] >= 0 && r[3] <= PH && !obst.some((o) => r[0] < o[1] && r[1] > o[0] && r[2] < o[3] && r[3] > o[2]));
+        if (!q) { tag.hidden = true; return null; }
+        tag.style.left = (ox + q[0]).toFixed(1) + 'px'; tag.style.top = (oy + q[2]).toFixed(1) + 'px';
+        tag.dataset.t = rows[k].time; tag.dataset.v = String(v);
+        return q;
+      };
+      const qh = put(hiTag, hi, hiOf(hi), true); if (qh) obst.push(qh);
+      put(loTag, lo, loOf(lo), false);
+    };
+    // After LW has re-laid out the price scale for the new range (its own frame), then place the tags.
+    let hlRaf = 0;
+    const schedHL = () => { cancelAnimationFrame(hlRaf); hlRaf = requestAnimationFrame(() => { hlRaf = requestAnimationFrame(() => { try { placeHiLo(); } catch (e) { hiTag.hidden = loTag.hidden = true; } }); }); };
     // Phones: the legend would cover the plot, so it sits in its own band above it (same chart height).
     if (narrow) { lg.classList.add('is-band'); const lh = Math.ceil(lg.offsetHeight) + 4, base = el.clientHeight; lg.style.minHeight = lh - 4 + 'px'; el.style.paddingTop = lh + 'px'; el.style.height = base + lh + 'px'; }
     // Trades on a bar, and the marker group nearest to x (px in the pane) within `tol` px — a long range
@@ -2109,39 +2176,72 @@
     fit();
     c.timeScale().subscribeVisibleLogicalRangeChange((r) => {
       reset.hidden = !r || !fitR || (Math.abs(r.from - fitR.from) < 1 && Math.abs(r.to - fitR.to) < 1);
-      applyMarkers();
+      applyMarkers(); schedHL();
     });
-    applyMarkers();
+    applyMarkers(); schedHL();
+    if (typeof c.timeScale().subscribeSizeChange === 'function') c.timeScale().subscribeSizeChange(schedHL);
+    el.addEventListener('pointerup', schedHL); el.addEventListener('touchend', schedHL, { passive: true }); // price-axis drag
   }
 
   /* ---- Routing + render. Existing routes keep working (/portfolios, /stocks, /portfolio/:id,
      /stock/:t, /following, /alerts, /account); "/" is now Discover. */
-  function parsePath() {
-    const seg0 = (location.protocol === 'file:' ? location.hash.slice(1) : location.pathname).replace(/^\/+|\/+$/g, '').split('/');
+  // One route parser for the address bar and for a stored "came from" path: { page, id }.
+  function routeOf(path) {
+    const seg0 = String(path || '').replace(/^\/+|\/+$/g, '').split('/');
     const a = (seg0[0] || 'discover').toLowerCase();
     let id = seg0[1] || null; try { id = id && decodeURIComponent(id); } catch (e) { /* keep the raw segment */ }
     if (a === 'stock' && id) id = id.toUpperCase();
-    S.id = id;
-    if (a === 'portfolio' && S.id) S.page = 'portfolio';
-    else if (a === 'stock' && S.id) S.page = 'stock';
-    else S.page = ROUTE_TITLES[a] ? a : 'notfound';
+    return { page: a === 'portfolio' && id ? 'portfolio' : a === 'stock' && id ? 'stock' : ROUTE_TITLES[a] ? a : 'notfound', id };
   }
-  function setPath(path) { history.pushState({}, '', location.protocol === 'file:' ? '#' + path : path); }
+  const herePath = () => (location.protocol === 'file:' ? location.hash.slice(1) || '/' : location.pathname);
+  const hrefOf = (path) => (location.protocol === 'file:' ? '#' + path : path);
+  function parsePath() { const r = routeOf(herePath()); S.page = r.page; S.id = r.id; }
+  // The human name of a page, in the current language: the filer's name, the ticker, or the list's nav title.
+  function routeLabel(path) {
+    const r = routeOf(path);
+    if (r.page === 'portfolio' || r.page === 'stock') return r.id;
+    return ROUTE_TITLES[r.page] ? L(...ROUTE_TITLES[r.page]) : '';
+  }
+  // History: the page we leave keeps its scroll position (replaceState on ITS entry); the new entry
+  // records where it came from, so /stock and /portfolio can offer "← Back to …" (phone web views
+  // have no browser back button). Back (in-page or browser) restores that scroll position.
+  if ('scrollRestoration' in history) { try { history.scrollRestoration = 'manual'; } catch (e) { /* read-only */ } }
+  function setPath(path, state) { history.pushState(state || {}, '', hrefOf(path)); }
   function go(path, keepQuery) {
-    const here = location.protocol === 'file:' ? location.hash.slice(1) : location.pathname;
-    if (path !== here) setPath(path); // same page: no extra history entry
+    const here = herePath();
+    if (path !== here) { // same page: no extra history entry
+      try { history.replaceState({ ...(history.state || {}), scrollY: window.scrollY }, ''); } catch (e) { /* rate-limited */ }
+      setPath(path, { from: here, fromLabel: routeLabel(here) });
+    }
     const before = S.page; parsePath();
     if (S.page !== before && !keepQuery) S.query = ''; // each list starts with its own empty search
     window.scrollTo(0, 0); render();
   }
-  window.addEventListener('popstate', () => { parsePath(); render(); });
+  window.addEventListener('popstate', () => {
+    parsePath(); render();
+    const y = (history.state && +history.state.scrollY) || 0;
+    window.scrollTo(0, y); requestAnimationFrame(() => window.scrollTo(0, y));
+  });
+  // "← Back to Gilbert Cisneros" when we came from another page (history.back() keeps its scroll);
+  // on a deep link / shared URL / fresh load, "← Portfolios" / "← Stocks" goes to the parent list.
+  function backLink() {
+    const st = history.state || {}, from = typeof st.from === 'string' && st.from !== herePath() ? st.from : null;
+    const iso = (x) => (LANG === 'ar' && /[A-Za-z0-9]/.test(x) ? bidi(x) : x);
+    const arrow = LANG === 'ar' ? '→' : '←';
+    if (from) {
+      const lab = routeLabel(from) || st.fromLabel || L('previous page', 'الصفحة السابقة');
+      return `<a class="mz-back" href="${esc(hrefOf(from))}" data-back="history">${arrow} ${esc(L(`Back to ${lab}`, `العودة إلى ${iso(lab)}`))}</a>`;
+    }
+    const parent = S.page === 'stock' ? 'stocks' : 'portfolios';
+    return `<a class="mz-back" href="${esc(hrefOf('/' + parent))}" data-back="/${parent}">${arrow} ${esc(L(...ROUTE_TITLES[parent]))}</a>`;
+  }
 
   function render() {
     renderShell();
     const main = document.getElementById('main');
     if (S.loading) { main.innerHTML = `<div class="card empty" role="status"><h3>${L('Reading disclosures…', 'جارٍ قراءة الإفصاحات…')}</h3><p>${L('Preparing the evidence for your workspace.', 'جارٍ تحميل بيانات المحافظ والأسهم.')}</p></div>`; return; }
     const pages = { notfound: () => emptyCard(L('Page not found', 'الصفحة غير موجودة'), L('Check the address, or start from Discover.', 'تحقق من العنوان أو ابدأ من صفحة اكتشف.'), `<a class="btn btn-primary" href="/" data-nav="discover">${L('Discover', 'اكتشف')}</a>`), discover: pageDiscover, portfolios: pagePortfolios, portfolio: () => pagePortfolio(S.id), stocks: pageStocks, stock: () => pageStock(S.id), alerts: pageAlerts, following: pageFollowing, account: pageAccount, methodology: pageMethodology };
-    main.innerHTML = (pages[S.page] || pageDiscover)() + pageFooter();
+    main.innerHTML = (S.page === 'stock' || S.page === 'portfolio' ? backLink() : '') + (pages[S.page] || pageDiscover)() + pageFooter();
     if (S.page === 'stock') ensureOhlc(S.id);
     mountTradeCharts();
   }
@@ -2157,8 +2257,11 @@
   const openPortfolio = (name) => go('/portfolio/' + encodeURIComponent(name));
   const openStock = (tk) => go('/stock/' + encodeURIComponent(tk));
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-nav],[data-open-portfolio],[data-open-stock],[data-star],[data-follow],[data-tf],[data-lang],[data-fc],[data-alert],[data-select],#langToggle,#kbdBtn,#topFollow,#myImportBtn,#mySampleBtn,#myClearBtn');
+    const el = e.target.closest('[data-nav],[data-open-portfolio],[data-open-stock],[data-back],[data-star],[data-follow],[data-tf],[data-lang],[data-fc],[data-alert],[data-select],#langToggle,#kbdBtn,#topFollow,#myImportBtn,#mySampleBtn,#myClearBtn');
     if (!el) return;
+    // A modified click on a real link (new tab / window) keeps the browser's own behaviour.
+    if (el.tagName === 'A' && el.getAttribute('href') && el.getAttribute('href') !== '#' && (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1)) return;
+    if (el.dataset.back) { e.preventDefault(); if (el.dataset.back === 'history' && history.state && history.state.from) history.back(); else go(el.dataset.back === 'history' ? '/' : el.dataset.back); return; }
     if (el.id === 'langToggle') { e.preventDefault(); setLang(LANG === 'en' ? 'ar' : 'en'); render(); return; }
     if (el.id === 'kbdBtn') { document.getElementById('search').focus(); return; }
     if (el.id === 'topFollow') { if (el.dataset.followId) { toggleFollow(el.dataset.followId); render(); } else go('/portfolios'); return; }
