@@ -29,24 +29,42 @@ It is **intelligence, not advice** — never a brokerage, copy-trading, or a fat
    signal tags so a user can judge a setup at a glance.
 
 ## Global consistency rule — charts
-**Every chart in the app is the ONE shared interactive component** — the
-`chart()` function in `public/app.js` (styled by `.mz-chart*` in
-`public/index.html`). No chart may be a static image or a non-interactive SVG.
-All charts behave identically:
+**Every chart in the app is the ONE shared interactive component** — `chart()` in
+`public/app.js` (styled by `.mz-chart*` / `.mz-lw-*` in `public/styles/app.css`),
+upgraded in place by `mountTradeCharts()` to **TradingView Lightweight Charts
+4.2.3** (`#lwjs` in `index.html`; keep v4 — v5 changed the markers API). Never a
+static image, never a second renderer. All charts behave identically:
 
-- **Interactive scrub** — one global pointer + touch handler (`chartScrub`)
-  drives every `.mz-chart[data-series]`. Dragging/hovering reveals the value +
-  date at that point via a single floating tooltip (`.mz-chart-tip`), a
-  crosshair (`.mz-chart__cx`) and a dot (`.mz-chart__dot`).
+- **Two layers, one component.** `chart()` always renders the SVG chart + global
+  scrub (`chartScrub`, `.mz-chart-tip`) and embeds what LW needs (`data-series`,
+  `data-ohlc`, `data-marks`, `data-title`). LW mounts on EVERY size; if the library
+  is missing/offline/throws, the SVG + scrub stay exactly as rendered (jsdom QA
+  runs this path). Every re-render `remove()`s old instances and the observer.
+- **Detail charts (`mz-chart--full`)** — candlesticks + volume **only from real
+  cached OHLC** (every point has o/h/l; never flat candles made from closes),
+  otherwise an area line; the portfolio index is always a line. TradingView-style
+  legend (date · O H L C · change vs prior close), crosshair with axis labels,
+  dated LTR time axis (also in Arabic), ticker watermark; drag pans, pinch /
+  axis-drag zooms, the wheel and vertical swipes keep scrolling the page,
+  double-click or ↺ resets.
+- **Cards / sparks** — minimal LW line (no grid/axes/legend/zoom), crosshair
+  drives the shared tooltip; mounted lazily (IntersectionObserver).
+- **Trade markers (detail charts)** — one per (trade date, side) at the **trade
+  date**: ▲ bought (cobalt, below), ▼ sold (ink, above), ● 13F "held at quarter
+  end" (never "bought"). Trades outside the series are not drawn (snap ≤ 4 days).
+  The tooltip lists each trade's **trade date and public (filing) date** + lag +
+  amount; one legend line under the chart (`tradeLegend(series, marks)`) counts
+  buys / sells / 13F positions in the period with their date ranges.
 - **Respects the active timeframe** (1W … All) via `sliceTf()` reading `S.tf`.
-- **Neutral styling** — cobalt line, ink dashed compare line; never a verdict hue.
+- **Neutral styling** — cobalt / ink only (up candle + buy = cobalt, down + sell =
+  ink); never a verdict hue. Colours are read from CSS vars.
 - **Graceful empty state** — under 2 points renders `.mz-chart__empty`
   ("Pending" / "—"), never a broken axis.
 
-Variants are size-only via the `cls` option: `mz-chart--full` (detail drawers,
-120px), `mz-chart--card` (mobile cards, 40px), `mz-chart--spark` (table rows,
-28px). To add a chart anywhere, call `chart(sliceTf(series), { cls })` — do not
-write a new renderer.
+Variants are size-only via the `cls` option: `mz-chart--full` (detail pages,
+300px / 240px phone), `mz-chart--card` (cards, 64px), `mz-chart--spark` (table
+rows, 44px). To add a chart anywhere, call `chart(sliceTf(series), { cls,
+markers, title })` — do not write a new renderer.
 
 ## Global consistency rule (STANDING — applies to every task)
 Any change the owner requests applies to **every instance of that pattern across the

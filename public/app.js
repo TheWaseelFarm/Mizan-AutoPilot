@@ -117,7 +117,9 @@
     positionValue: 'positionValue', // filer's disclosed position size (basis for %-of-position)
     disclosedDate: 'transactionDate', // when the trade happened / was disclosed ("disclosed Jun 2")
     filedDate: 'filingDate',        // when it was filed (drives the filing-lag figure)
-    priceHistory: 'history',        // S.prices[TICKER][FIELD.priceHistory] = [{ d, c }]
+    priceHistory: 'history',        // S.prices[TICKER][FIELD.priceHistory] = [{ d, o?, h?, l?, c, v? }] — d + close always;
+                                    // open/high/low/volume from the same Twelve Data call (older cached rows: { d, c } only)
+    priceOpen: 'o', priceHigh: 'h', priceLow: 'l', priceVolume: 'v', // candles only when EVERY point has o/h/l
     bioguide: 'bioguideId',         // TODO: Congress member id (Quiver "BioGuideID") -> official public-domain portrait
     screenedAt: 'screenedAt',       // TODO(api): screenings.fetched_at — until present, omit the date (never print a fake one)
   };
@@ -630,7 +632,9 @@
   /* ============ ONE shared, interactive chart component — used by EVERY chart ============
      Global consistency rule (CLAUDE.md): every chart in the app is this component. Same
      behavior everywhere — scrub (touch/pointer) reveals value + date, respects the active
-     timeframe (1W…All), neutral cobalt/ink only (never a verdict hue), graceful empty state. */
+     timeframe (1W…All), neutral cobalt/ink only (never a verdict hue), graceful empty state.
+     chart() renders the SVG layer; mountTradeCharts() (below) upgrades it in place to
+     TradingView Lightweight Charts and falls back to this SVG on any failure. */
   const chartPath = (v, W, H, mn, mx) => { const r = (mx - mn) || 1; return v.map((y, i) => `${(i / (v.length - 1) * W).toFixed(2)},${(H - (y - mn) / r * H).toFixed(2)}`).join(' '); };
   const histOf = (ticker) => ((S.prices[ticker] && S.prices[ticker][FIELD.priceHistory]) || []).filter((p) => p && isFinite(+p.c));
   const TF_DAYS_ALL = { '1W': 7, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '3Y': 1095, '5Y': 1825, ALL: Infinity };
@@ -716,13 +720,78 @@
     return out;
   }
 
-  // THE shared chart. `hist` = [{d,c}]. opts: { cls, compare:[{d,c}], empty,
-  //   markers:[{d,side,label}] (disclosed trades pinned on the line — cobalt buy / ink sell),
+  // THE shared chart. `hist` = [{d,c}] (price points may also carry o/h/l/v via FIELD.price*).
+  // opts: { cls, compare:[{d,c}], empty, unit:'index'|'price', title (watermark, e.g. the ticker),
+  //   markers:[{d (TRADE date), side, h (13F), label, pub (public / filing date), amt (amount text)}]
+  //   (disclosed trades pinned on the line — cobalt buy / ink sell),
   //   color: optional CSS color (Portfolios sign palette), area/valueAxis: optional detail styling,
   //   today: string (a value label shown top-end, e.g. "$146 · today") }.
   // Marker codes: B = disclosed buy, H = 13F holding at quarter end (never "bought"), S = sale.
   const markCode = (m) => String(m.side).toUpperCase() === 'SELL' ? 'S' : m.h ? 'H' : 'B';
   const markWord = (c) => c === 'S' ? L('Sold', 'بيع') : c === 'H' ? L('Held at quarter end', 'مركز بنهاية الربع') : L('Bought', 'شراء');
+  const MARK_SYM = { B: '▲', H: '●', S: '▼' };
+  const isNum = (x) => x != null && x !== '' && isFinite(+x);
+  // Disclosed trades that belong on THIS series: the trade date must fall inside the series (± SNAP_DAYS)
+  // and within SNAP_DAYS of a bar, so a 2024 trade is never snapped onto the first bar of a 1M chart.
+  // Returns [{ d, code, f13, label, pub, amt, bar, i }] — d / pub / bar are 'YYYY-MM-DD', i = bar index.
+  const SNAP_DAYS = 4;
+  function marksInView(data, markers) {
+    if (!markers || !markers.length || !data || data.length < 2) return [];
+    const DAY = 864e5, ts = data.map((p) => Date.parse(isoDay(p.d) || p.d));
+    const lo = ts[0] - SNAP_DAYS * DAY, hi = ts[ts.length - 1] + SNAP_DAYS * DAY, out = [];
+    for (const m of markers) {
+      const d = m && m.d ? isoDay(m.d) : null; if (!d) continue;
+      const t0 = Date.parse(d); if (!isFinite(t0) || t0 < lo || t0 > hi) continue;
+      let bi = -1, bd = Infinity;
+      for (let i = 0; i < ts.length; i++) { const dd = Math.abs(ts[i] - t0); if (dd < bd) { bd = dd; bi = i; } }
+      if (bi < 0 || bd > SNAP_DAYS * DAY) continue;
+      out.push({ d, code: markCode(m), f13: !!m.h, label: m.label || '', pub: (m.pub && isoDay(m.pub)) || '', amt: m.amt && m.amt !== '—' ? String(m.amt) : '', bar: isoDay(data[bi].d) || String(data[bi].d), i: bi });
+    }
+    return out;
+  }
+  const markFromAttr = ([d, code, label, pub, amt, bar, f13]) => ({ d, code, label, pub, amt, bar, f13: !!f13 });
+  // A trade's own dates, named for what they are: "NVDA · Bought Jun 30 · public Jul 3 (3 days) · $15K–$50K".
+  const tipDay = (iso) => !iso ? '—' : String(iso).slice(0, 4) === String(new Date().getFullYear()) ? dayMonth(iso) : shortDate(iso);
+  function tradeLine(m) {
+    const when = tipDay(m.d), who = m.label ? (LANG === 'ar' ? bidi(m.label) : m.label) : '';
+    const act = m.code === 'H' ? L(`held at quarter end (${when})`, `مركز قائم بنهاية الربع (${when})`)
+      : m.code === 'S' ? (m.f13 ? L(`reported sale, quarter end ${when}`, `بيع معلن، نهاية الربع ${when}`) : L(`Sold ${when}`, `بيع في ${when}`))
+      : L(`Bought ${when}`, `شراء في ${when}`);
+    const lag = m.pub ? daysBetween(m.d, m.pub) : null;
+    const pub = !m.pub ? L('public date pending', 'تاريخ الإعلان غير متاح')
+      : lag == null ? L(`public ${tipDay(m.pub)}`, `أُعلن في ${tipDay(m.pub)}`)
+      : lag === 0 ? L(`public ${tipDay(m.pub)} (same day)`, `أُعلن في ${tipDay(m.pub)} (في اليوم نفسه)`)
+      : L(`public ${tipDay(m.pub)} (${daysEn(lag)})`, `أُعلن في ${tipDay(m.pub)} (بعد ${daysAr(lag)})`);
+    return [who, act, pub, m.amt].filter(Boolean).join(' · ');
+  }
+  // Tooltip lines for the trades pinned on one bar: per side, up to 4 names, then "+N".
+  function tradeTipLines(ms) {
+    const out = [];
+    for (const code of ['B', 'H', 'S']) {
+      const g = (ms || []).filter((m) => m.code === code); if (!g.length) continue;
+      g.slice(0, 4).forEach((m) => out.push(`${MARK_SYM[code]} ${tradeLine(m)}`));
+      if (g.length > 4) out.push(`${MARK_SYM[code]} +${g.length - 4} ${L('more', 'أخرى')}`);
+    }
+    return out;
+  }
+  // Same count wording as the filing cards ("3 buys, 1 sell" / "شراء: 3 · بيع: 1").
+  const tradeCount = (code, n) => code === 'S' ? L(plural(n, 'sell', 'sells'), `بيع: ${bidi(n)}`)
+    : code === 'H' ? L(`${plural(n, 'position')} held at quarter end`, `مراكز قائمة بنهاية الربع: ${bidi(n)}`)
+    : L(plural(n, 'buy', 'buys'), `شراء: ${bidi(n)}`);
+  // ONE line under a detail chart: purchases / 13F positions / sales pinned in the period on screen,
+  // with their real counts and trade-date ranges (same in-view rule as the markers). '' with no trades.
+  function tradeLegend(hist, markers) {
+    const data = (hist || []).filter((p) => p && isFinite(+p.c));
+    if (!markers || !markers.length || data.length < 2) return '';
+    const ms = marksInView(data, markers);
+    if (!ms.length) return `<span>${esc(L('No disclosed trades in this period — try a longer timeframe', 'لا توجد صفقات معلنة في هذه الفترة — جرّب فترة أطول'))}</span>`;
+    const parts = ['B', 'H', 'S'].map((code) => {
+      const g = ms.filter((m) => m.code === code); if (!g.length) return '';
+      const ds = g.map((m) => m.d).sort(), a = ds[0], b = ds[ds.length - 1];
+      return `<span><b class="tl-${code}">${MARK_SYM[code]}</b> ${esc(tradeCount(code, g.length))} (${esc(a === b ? tipDay(a) : `${tipDay(a)} – ${tipDay(b)}`)})</span>`;
+    }).join('');
+    return `<span class="tl-head">${esc(L('Trade dates in this period:', 'تواريخ الصفقات في هذه الفترة:'))}</span>${parts}`;
+  }
   function chart(hist, opts) {
     opts = opts || {};
     const cls = opts.cls || 'mz-chart--full';
@@ -739,14 +808,18 @@
     // % positions (the SVG is stretched to fill, so a data point maps to left = i/(n-1), top = 1-(c-mn)/rng).
     const at = (i) => ({ x: (i / (data.length - 1) * 100), y: ((1 - (closes[i] - mn) / rng) * 100) });
     let markers = '', marksAttr = '';
-    if (opts.markers && opts.markers.length) {
-      const span0 = Date.parse(data[0].d) - 4 * 864e5, span1 = Date.parse(data[data.length - 1].d) + 4 * 864e5;
-      const nearest = (d) => { const t0 = Date.parse(d); if (!isFinite(t0) || t0 < span0 || t0 > span1) return -1; let bi = -1, bd = Infinity; for (let i = 0; i < data.length; i++) { const dd = Math.abs(Date.parse(data[i].d) - t0); if (dd < bd) { bd = dd; bi = i; } } return bi; };
-      const valid = opts.markers.filter((m) => m && m.d);
-      markers = valid.map((m) => { const i = nearest(m.d); if (i < 0) return ''; const p = at(i); const code = markCode(m); return `<span class="mz-chart__mk" data-side="${code === 'S' ? 'sell' : 'buy'}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${esc(markWord(code) + (m.label ? ' ' + m.label : '') + ' · ' + shortDate(m.d))}"></span>`; }).join('');
-      // Encode markers so the scrub tooltip can reveal WHAT was traded when it passes over a dot.
-      marksAttr = ` data-marks="${esc(JSON.stringify(valid.map((m) => [m.d, markCode(m), m.label || ''])))}"`;
+    const inView = marksInView(data, opts.markers);
+    if (inView.length) {
+      markers = inView.map((m) => { const p = at(m.i); return `<span class="mz-chart__mk" data-side="${m.code === 'S' ? 'sell' : 'buy'}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%" title="${esc(markWord(m.code) + (m.label ? ' ' + (LANG === 'ar' ? bidi(m.label) : m.label) : '') + ' · ' + shortDate(m.d) + (m.pub ? ` · ${L('public', 'أُعلن في')} ${shortDate(m.pub)}` : ''))}"></span>`; }).join('');
+      // Every pinned trade with its trade date, side, label, public date, amount and snapped bar:
+      // the scrub tooltip and the Lightweight Charts markers read the SAME list.
+      marksAttr = ` data-marks="${esc(JSON.stringify(inView.map((m) => [m.d, m.code, m.label, m.pub, m.amt, m.bar, m.f13 ? 1 : 0])))}"`;
     }
+    // Real OHLC(V) for candles — only on detail price charts and only when EVERY point has o/h/l
+    // (never fabricated from closes; a portfolio index has none).
+    const ohlc = cls === 'mz-chart--full' && opts.unit !== 'index' && data.every((p) => isNum(p[FIELD.priceOpen]) && isNum(p[FIELD.priceHigh]) && isNum(p[FIELD.priceLow]));
+    const ohlcAttr = ohlc ? ` data-ohlc="${esc(JSON.stringify(data.map((p) => [+p[FIELD.priceOpen], +p[FIELD.priceHigh], +p[FIELD.priceLow], isNum(p[FIELD.priceVolume]) ? +p[FIELD.priceVolume] : null])))}"` : '';
+    const titleAttr = opts.title ? ` data-title="${esc(opts.title)}"` : '';
     // "Today" endpoint dot (detail charts) + optional value label so the line's end reads as now.
     const lastP = at(data.length - 1);
     const todayDot = cls === 'mz-chart--full' ? `<span class="mz-chart__today" style="left:${lastP.x.toFixed(2)}%;top:${lastP.y.toFixed(2)}%"></span>` : '';
@@ -757,12 +830,23 @@
       : '';
     const series = esc(JSON.stringify(data.map((p) => [p.d, +p.c])));
     const unit = opts.unit === 'index' ? 'index' : 'price';
-    return `<div class="mz-chart ${cls}" tabindex="0" role="img" aria-label="${esc(LANG === 'ar' ? 'حركة الأداء — اسحب لعرض التاريخ والقيمة' : 'Performance history — scrub for date and value')}" data-series="${series}" data-unit="${unit}" data-min="${mn}" data-max="${mx}"${marksAttr} style="height:${h}px;--mz-chart-color:${esc(opts.color || 'var(--blue)')}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${area}${cmp}${line}</svg>${valueAxis}${markers}${todayDot}${todayLab}${axisEls}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
+    return `<div class="mz-chart ${cls}" tabindex="0" role="img" aria-label="${esc(LANG === 'ar' ? 'حركة الأداء — اسحب لعرض التاريخ والقيمة' : 'Performance history — scrub for date and value')}" data-series="${series}" data-unit="${unit}" data-min="${mn}" data-max="${mx}"${marksAttr}${ohlcAttr}${titleAttr} style="height:${h}px;--mz-chart-color:${esc(opts.color || 'var(--blue)')}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${area}${cmp}${line}</svg>${valueAxis}${markers}${todayDot}${todayLab}${axisEls}<span class="mz-chart__cx"></span><span class="mz-chart__dot"></span></div>`;
   }
 
   // Interactive scrub — ONE handler drives every chart (touch + pointer). Registered once.
   const chartTip = (() => { const el = document.createElement('div'); el.className = 'mz-chart-tip'; el.id = 'chartTooltip'; el.setAttribute('role', 'tooltip'); document.body.appendChild(el); return el; })();
   function chartHideTip() { if (!chartTip.classList.contains('is-on')) return; chartTip.classList.remove('is-on'); document.querySelectorAll('.mz-chart.is-active').forEach((c) => c.classList.remove('is-active')); }
+  // The value line of the tooltip: "$142.70" / "104.31 · index".
+  const tipVal = (c, unit) => unit === 'index' ? c.toFixed(2) + (LANG === 'ar' ? ' · مؤشر' : ' · index') : LANG === 'ar' ? '⁦$' + c.toFixed(2) + '⁩' : '$' + c.toFixed(2);
+  // Show the shared tooltip at viewport point (x, y): a head line plus optional trade lines.
+  function showTip(head, lines, x, y) {
+    chartTip.textContent = [head, ...(lines || [])].filter(Boolean).join('\n');
+    chartTip.classList.toggle('is-multi', !!(lines && lines.length));
+    chartTip.classList.add('is-on');
+    const r = chartTip.getBoundingClientRect(), half = r.width / 2;
+    chartTip.style.left = Math.max(half + 8, Math.min(window.innerWidth - half - 8, x)) + 'px';
+    chartTip.style.top = Math.max(r.height + 16, y) + 'px';
+  }
   function chartScrub(clientX, target) {
     if (target && target.closest && target.closest('.mz-chart--lw')) return; // LW crosshair drives the tip
     const el = target && target.closest && target.closest('.mz-chart[data-series]');
@@ -777,21 +861,14 @@
     const cx = el.querySelector('.mz-chart__cx'), dot = el.querySelector('.mz-chart__dot');
     if (cx) cx.style.left = px + 'px';
     if (dot) { dot.style.left = px + 'px'; dot.style.top = py + 'px'; }
-    // If a disclosed-trade marker sits at this point, reveal WHAT was traded.
-    let extra = '';
+    // Disclosed trades pinned on this point: what was traded, its trade date and its public date.
+    let lines = [];
     if (el.dataset.marks) {
-      try {
-        const near = JSON.parse(el.dataset.marks).find((m) => { const mt = Date.parse(m[0]); let bi = 0, bd = Infinity; for (let k = 0; k < n; k++) { const dd = Math.abs(Date.parse(data[k][0]) - mt); if (dd < bd) { bd = dd; bi = k; } } return bi === i; });
-        if (near) extra = ` · ${(near[1] === 'S' ? '▼ ' : '▲ ') + markWord(near[1])}${near[2] ? ' ' + (LANG === 'ar' ? '\u2066' + near[2] + '\u2069' : near[2]) : ''}`;
-      } catch (e) { /* ignore */ }
+      try { const bar = isoDay(d); lines = tradeTipLines(JSON.parse(el.dataset.marks).map(markFromAttr).filter((m) => m.bar === bar)); } catch (e) { /* ignore */ }
     }
-    chartTip.textContent = `${el.dataset.unit === 'index' ? c.toFixed(2) + (LANG === 'ar' ? ' · مؤشر' : ' · index') : LANG === 'ar' ? '\u2066$' + c.toFixed(2) + '\u2069' : '$' + c.toFixed(2)} · ${shortDate(d)}${extra}`;
-    chartTip.classList.add('is-on');
-    const halfTip = chartTip.getBoundingClientRect().width / 2;
-    chartTip.style.left = Math.max(halfTip + 8, Math.min(window.innerWidth - halfTip - 8, rect.left + px)) + 'px';
-    chartTip.style.top = Math.max(chartTip.getBoundingClientRect().height + 16, rect.top + py) + 'px';
+    showTip(`${tipVal(c, el.dataset.unit)} · ${shortDate(d)}`, lines, rect.left + px, rect.top + py);
   }
-  // Keyboard access uses the same scrub calculation and tooltip as pointer/touch.
+  // Keyboard access uses the same scrub calculation and tooltip as pointer/touch (LW charts too).
   document.addEventListener('keydown', (e) => {
     const el = e.target.closest && e.target.closest('.mz-chart[data-series]');
     if (!el || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
@@ -801,6 +878,7 @@
     const next = e.key === 'Home' ? 0 : e.key === 'End' ? last : Math.max(0, Math.min(last, current + (e.key === 'ArrowRight' ? 1 : -1)));
     el.dataset.scrubIndex = next;
     el.setAttribute('aria-describedby', 'chartTooltip');
+    const lw = LW_KEYS.get(el); if (lw) { lw(next); return; }
     const rect = el.getBoundingClientRect();
     chartScrub(rect.left + next / last * rect.width, el);
   });
@@ -953,7 +1031,6 @@
   // ONE footer per page (SPEC §4), appended by render(); the portrait credit only where portraits lead (Discover / Methodology / Account).
   const pageFooter = () => `<p class="footnote mz-footer">${esc(t('g.disclaimer'))}</p>` + (['discover', 'methodology', 'account'].includes(S.page) ? `<p class="credit">${L('Portraits: Wikimedia Commons / U.S. Congress (public domain), where available.', 'الصور: ويكيميديا كومنز / الكونغرس الأمريكي (ضمن الملكية العامة) عند توفرها.')}</p>` : '');
   const chartFrame = (html, legend) => `<div class="chart-placeholder chart-live">${html}</div>${legend ? `<div class="chart-legend">${legend}</div>` : ''}`;
-  const tradeLegend = () => `<span><b style="color:var(--blue)">▲</b> ${L('Disclosed buy or 13F holding', 'شراء معلن أو مركز 13F')}</span><span><b style="color:var(--ink)">▼</b> ${L('Disclosed sale', 'بيع معلن')}</span>`;
   const emptyCard = (title, body, cta) => `<div class="card empty"><h3>${esc(title)}</h3><p>${esc(body)}</p>${cta || ''}</div>`;
   const pageHead = (eyebrow, h1, sub, end) => `<div class="pagehead"><div><div class="eyebrow">${esc(eyebrow)}</div><h1>${esc(h1)}</h1><p>${esc(sub)}</p></div>${end || ''}</div>`;
 
@@ -1331,7 +1408,8 @@
     const fund = p.rows.length > 0 && p.rows.every(is13F);
     const thin = p.holdings < MIN_HOLDINGS;
     const { n: idxN, indicative } = idxBasis(p);
-    const marks = p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, h: is13F(r), label: r.ticker }));
+    const marks = p.rows.map((r) => ({ d: fDisclosed(r), side: r.side, h: is13F(r), label: r.ticker, pub: r[FIELD.filedDate], amt: amountText(r) }));
+    const idxHist = thin ? [] : sliceTf(portfolioIndexHist(p.rows));
     // PF-0 basis line: what the hero number is (and is not), and how many names back it.
     const priced = p.ret && p.ret.val != null && !p.ret.indicative && !p.ret.stale;
     const basis = thin || !priced ? '' : `<small class="muted basis">${esc(L("Equal-weight index of passing names · not the investor's actual P&L", 'مؤشر بأوزان متساوية للأسهم المتوافقة · لا يمثل ربح المستثمر الفعلي'))}</small>
@@ -1341,7 +1419,7 @@
         <div class="detail-stat"><span class="muted">${L('Return', 'العائد')}</span><b class="hero-ret">${thin ? '<span class="return muted">—</span>' : retTag(p.ret)}</b>${basis}</div></div>
       ${sincePublicStrip(p, fund, thin)}
       <div class="detail-grid"><div class="grid">
-        ${thin ? `<section class="card block"><h2>${L('Activity only', 'النشاط فقط')}</h2><p class="muted" style="line-height:1.6">${esc(L(`Fewer than ${MIN_HOLDINGS} distinct disclosed names, so this filer is not ranked, followable or shown as a portfolio return. The disclosures below are the evidence.`, `عدد الأسهم المعلنة أقل من ${MIN_HOLDINGS}. لذلك لا يظهر المستثمر في الترتيب، ولا يمكن متابعته، ولا نعرض عائد محفظته. يمكنك مراجعة إفصاحاته أدناه.`))}</p></section>` : `<section class="card block"><div class="section-title"><h2>${L('Portfolio movement', 'حركة المحفظة')}</h2>${seg(['1M', '3M', '6M', '1Y', 'ALL'])}</div><div style="display:flex;align-items:baseline;gap:10px">${retTag(p.ret)}${thinIdxNote(p) ? `<span class="chip">${esc(L(`Based on ${idxN} of ${p.holdings} names — indicative only`, `الأسهم المستخدمة لحساب العائد: ${idxN} من ${p.holdings} — تقديري فقط`))}</span>` : ''}</div>${chartFrame(chart(sliceTf(portfolioIndexHist(p.rows)), { unit: 'index', markers: marks, axis: true, empty: esc(idxN ? L('No prices in this period — try a longer timeframe', 'لا تتوفر أسعار لهذه الفترة — جرّب فترة أطول') : L('No cached prices yet for the passing names in this portfolio', 'أسعار الأسهم المتوافقة في هذه المحفظة غير متاحة بعد')) }), tradeLegend())}<p class="footnote">${esc(L(`Equal-weight index (start = 100) of ${idxN} of ${p.holdings} held names with prices; Excluded names left out.`, `مؤشر بأوزان متساوية (يبدأ من 100) لـ${idxN} من ${p.holdings} من الأسهم المملوكة التي لها أسعار؛ تُستبعد الأسهم غير المتوافقة.`))}</p></section>`}
+        ${thin ? `<section class="card block"><h2>${L('Activity only', 'النشاط فقط')}</h2><p class="muted" style="line-height:1.6">${esc(L(`Fewer than ${MIN_HOLDINGS} distinct disclosed names, so this filer is not ranked, followable or shown as a portfolio return. The disclosures below are the evidence.`, `عدد الأسهم المعلنة أقل من ${MIN_HOLDINGS}. لذلك لا يظهر المستثمر في الترتيب، ولا يمكن متابعته، ولا نعرض عائد محفظته. يمكنك مراجعة إفصاحاته أدناه.`))}</p></section>` : `<section class="card block"><div class="section-title"><h2>${L('Portfolio movement', 'حركة المحفظة')}</h2>${seg(['1M', '3M', '6M', '1Y', 'ALL'])}</div><div style="display:flex;align-items:baseline;gap:10px">${retTag(p.ret)}${thinIdxNote(p) ? `<span class="chip">${esc(L(`Based on ${idxN} of ${p.holdings} names — indicative only`, `الأسهم المستخدمة لحساب العائد: ${idxN} من ${p.holdings} — تقديري فقط`))}</span>` : ''}</div>${chartFrame(chart(idxHist, { unit: 'index', markers: marks, axis: true, empty: esc(idxN ? L('No prices in this period — try a longer timeframe', 'لا تتوفر أسعار لهذه الفترة — جرّب فترة أطول') : L('No cached prices yet for the passing names in this portfolio', 'أسعار الأسهم المتوافقة في هذه المحفظة غير متاحة بعد')) }), tradeLegend(idxHist, marks))}<p class="footnote">${esc(L(`Equal-weight index (start = 100) of ${idxN} of ${p.holdings} held names with prices; Excluded names left out.`, `مؤشر بأوزان متساوية (يبدأ من 100) لـ${idxN} من ${p.holdings} من الأسهم المملوكة التي لها أسعار؛ تُستبعد الأسهم غير المتوافقة.`))}</p></section>`}
         ${holdingsCard(p)}
         ${exitsCard(p)}
       </div><aside class="grid">
@@ -1391,13 +1469,13 @@
   function priceChartCard(tk, rows) {
     const fullHist = histOf(tk), shist = sliceTf(fullHist);
     const pRet = fullHist.length >= 2 ? seriesReturn(shist.map((p) => +p.c)) : null;
-    const marks = rows.map((r) => ({ d: fDisclosed(r), side: r.side, h: is13F(r), label: r.actor }));
+    const marks = rows.map((r) => ({ d: fDisclosed(r), side: r.side, h: is13F(r), label: r.actor, pub: r[FIELD.filedDate], amt: amountText(r) }));
     const empty = fullHist.length >= 2 ? L('No prices in this period — try a longer timeframe', 'لا تتوفر أسعار لهذه الفترة — جرّب فترة أطول') : L(`No cached price history for ${tk} yet — the chart appears once our price provider covers it`, `لا يتوفر سجل أسعار محفوظ لـ ${tk} بعد — يظهر الرسم عند توفر البيانات من مزوّد الأسعار`);
     // Embedded sample data / sample prices are never presented as the live close: the chip says so in the card.
     const pend = fullHist.length >= 2 && (!S.live || !S.pricesLive) ? `<span class="chip">${esc(!S.live ? dataLabel() : L('Sample prices · live prices pending', 'أسعار نموذجية · الأسعار الفعلية غير متاحة بعد'))}</span>` : '';
     return `<section class="card block"><div class="section-title"><h2>${L('Price & disclosed activity', 'السعر والتداولات المعلنة')}</h2><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${seg(['1M', '3M', '6M', '1Y', 'ALL'])}${pend}</div></div>
       ${fullHist.length >= 2 ? `<div class="px-head">${pctTag(pRet, tfPriceLabel())}</div>` : ''}
-      ${chartFrame(chart(shist, { markers: marks, axis: true, empty: esc(empty) }), rows.length ? tradeLegend() : '')}</section>`;
+      ${chartFrame(chart(shist, { markers: marks, axis: true, title: tk, empty: esc(empty) }), tradeLegend(shist, marks))}</section>`;
   }
 
   // ST-3 Who holds it · who sold — counted by filer (each filer's latest row decides), never by dollars.
@@ -1712,62 +1790,211 @@
         <aside class="grid"><section class="card block"><h2>${L('Status states', 'نتائج الفحص')}</h2><div class="holdings">${[['clean', L('Passes every screen.', 'يجتاز فحص النشاط والنسب المالية.')], ['purify', L('Passes, with a small purification obligation.', 'يجتاز الفحص، مع تطهير توزيعات الأرباح.')], ['fail', L('Fails a screen — shown for awareness only.', 'لا يجتاز الفحص. يظهر للاطلاع فقط.')], ['unscreened', L('Not screened yet — never shown as included.', 'لم يُفحص بعد — لا نعدّه متوافقًا قبل اكتمال الفحص.')]].map(([k, d]) => `<div class="holding"><span>${badge(k)}</span><span class="muted">${d}</span><span></span></div>`).join('')}</div></section></aside></div>`;
   }
 
-  /* ---- Lightweight Charts ("trade graph") upgrade of the shared chart(). Detail charts mount
-     TradingView's open-source renderer on the SAME cached series, with disclosed buys/sells as
-     markers. Cobalt/ink only. Without the library (offline) the SVG chart + scrub stay as-is. */
-  let LW_CHARTS = [];
+  /* ---- TradingView Lightweight Charts upgrade of the shared chart() — EVERY chart size.
+     chart() always renders the SVG chart (offline / library missing / jsdom) and embeds what LW needs:
+     data-series [[d,c]], data-ohlc [[o,h,l,v]] (only when EVERY point has real o/h/l), data-marks
+     (trade date, side, label, public date, amount, snapped bar) and data-title (watermark). Here:
+       full  -> candlesticks + volume (real OHLC only) or an area line (old closes-only cache, and the
+                portfolio index — always a line), TradingView-style legend (date · O H L C · change),
+                crosshair with axis labels, dated time axis, ticker watermark, drag-to-pan, pinch /
+                axis-drag zoom (the mouse wheel keeps scrolling the page, a vertical swipe keeps
+                scrolling it on phones), double-click or ↺ resets; disclosed trades as markers at their
+                TRADE date with trade + public dates in the tooltip.
+       card / spark -> a minimal line (no grid, axes, legend or zoom) whose crosshair drives the shared
+                tooltip; mounted lazily as it scrolls into view.
+     Cobalt / ink only — never a verdict hue. Every re-render removes the previous instances and the
+     observer first. Any failure restores the SVG chart + scrub exactly as rendered. */
+  let LW_CHARTS = [], LW_IO = null;
+  const LW_KEYS = new WeakMap(); // mounted chart element -> keyboard scrub (data-series index)
   document.getElementById('lwjs')?.addEventListener('load', () => { if (!S.loading) mountTradeCharts(); });
-  const rgba = (hex, a) => { const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(String(hex).trim()); return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : `rgba(60,111,150,${a})`; };
+  const rgba = (c, a) => { const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(String(c).trim()); return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : c; };
+  // LW hands back the time we gave it ('YYYY-MM-DD'); accept a BusinessDay / timestamp too.
+  const lwDay = (t) => typeof t === 'string' ? t.slice(0, 10) : t && typeof t === 'object' ? `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}` : typeof t === 'number' ? new Date(t * 1000).toISOString().slice(0, 10) : '';
+  // Time-axis ticks, TradingView style: the year at a year start, the month at a month start, else the day.
+  const lwTick = (t, type) => {
+    const ms = Date.parse(lwDay(t)); if (!isFinite(ms)) return null;
+    const x = new Date(ms);
+    return type === 0 ? String(x.getUTCFullYear()) : type === 1 ? x.toLocaleDateString(LANG === 'ar' ? 'ar-u-nu-latn' : 'en-US', { month: 'short', timeZone: 'UTC' }) : String(x.getUTCDate());
+  };
+  const num2 = (x) => (+x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const volText = (v) => { const p = moneyParts(v, false); return LANG === 'ar' ? `${bidi(p.num)}${p.ar ? ' ' + p.ar : ''}` : p.num + p.en; };
+  function unmountTradeCharts() {
+    if (LW_IO) { LW_IO.disconnect(); LW_IO = null; }
+    LW_CHARTS.forEach((m) => { try { m.chart.remove(); } catch (e) { /* already detached */ } if (m.el.isConnected) m.restore(); });
+    LW_CHARTS = [];
+  }
   function mountTradeCharts() {
-    LW_CHARTS.forEach((c) => { try { c.remove(); } catch (e) { /* already detached */ } }); LW_CHARTS = [];
+    unmountTradeCharts();
     const LW = window.LightweightCharts; if (!LW || !LW.createChart) return;
     const css = getComputedStyle(document.documentElement), v = (n, f) => (css.getPropertyValue(n) || '').trim() || f;
-    const blue = v('--blue', '#3c6f96'), ink = v('--ink', '#17201b'), muted = v('--muted', '#6f786f'), line = v('--line', '#dde2dc');
-    document.querySelectorAll('.mz-chart--full[data-series]').forEach((el) => {
-      let data, marks = [];
-      try { data = JSON.parse(el.dataset.series); marks = el.dataset.marks ? JSON.parse(el.dataset.marks) : []; } catch (e) { return; }
-      const seen = new Set();
-      const pts = data.map(([d, c]) => ({ time: String(d).slice(0, 10), value: +c })).filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.time) && isFinite(p.value) && !seen.has(p.time) && seen.add(p.time)).sort((a, b) => (a.time < b.time ? -1 : 1));
-      if (pts.length < 2) return;
-      const unit = el.dataset.unit, svgFallback = el.innerHTML, series = el.dataset.series;
-      el.removeAttribute('data-series'); el.innerHTML = ''; el.classList.add('mz-chart--lw'); el.style.height = '';
-      try {
-      const c = LW.createChart(el, {
-        autoSize: true,
-        layout: { background: { type: 'solid', color: 'transparent' }, textColor: muted, fontFamily: v('--font', 'system-ui'), fontSize: 11 },
-        grid: { vertLines: { visible: false }, horzLines: { color: line } },
-        rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false, ...(LANG === 'ar' ? { tickMarkFormatter: (d) => dayMonth(typeof d === 'object' ? `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}` : typeof d === 'number' ? new Date(d * 1000).toISOString() : d) } : {}) },
-        crosshair: { mode: LW.CrosshairMode.Magnet },
-        handleScroll: false, handleScale: false,
-        localization: { ...(LANG === 'ar' ? { locale: 'ar-u-nu-latn', timeFormatter: (d) => shortDate(typeof d === 'object' ? `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}` : typeof d === 'number' ? new Date(d * 1000).toISOString() : d) } : {}), priceFormatter: (x) => unit === 'index' ? x.toFixed(1) : '$' + x.toFixed(2) },
-      });
-      const s = c.addAreaSeries({ lineColor: blue, topColor: rgba(blue, 0.2), bottomColor: rgba(blue, 0), lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
-      s.setData(pts);
-      const lo = Date.parse(pts[0].time) - 4 * 864e5, hi = Date.parse(pts[pts.length - 1].time) + 4 * 864e5;
-      const near = (d) => { const tt = Date.parse(d); if (!isFinite(tt) || tt < lo || tt > hi) return null; let best = null, bd = Infinity; for (const p of pts) { const dd = Math.abs(Date.parse(p.time) - tt); if (dd < bd) { bd = dd; best = p.time; } } return best; };
-      // Group trades by (date, side): one arrow each, no inline text (19 labels on one week were
-      // unreadable). What was traded shows in the shared tooltip when the crosshair reaches it.
-      const groups = new Map();
-      marks.forEach(([d, side, label]) => { const time = near(d); if (!time) return; const k = time + side; const g = groups.get(k) || { time, side, labels: [] }; if (label && !g.labels.includes(label)) g.labels.push(label); groups.set(k, g); });
-      const mk = [...groups.values()].map((g) => ({ time: g.time, position: g.side === 'S' ? 'aboveBar' : 'belowBar', color: g.side === 'S' ? ink : blue, shape: g.side === 'S' ? 'arrowDown' : 'arrowUp', size: 1 }))
-        .sort((a, b) => (a.time < b.time ? -1 : 1));
-      if (mk.length) s.setMarkers(mk);
-      c.subscribeCrosshairMove((prm) => {
-        const tm = prm && prm.time, b = tm && groups.get(tm + 'B'), hd = tm && groups.get(tm + 'H'), sl = tm && groups.get(tm + 'S');
-        if (!tm || !prm.point || (!b && !hd && !sl)) { chartHideTip(); return; }
-        const list = (g, word) => g ? `${word} ${LANG === 'ar' ? g.labels.slice(0, 4).map((d) => '\u2066' + d + '\u2069').join('، ') : g.labels.slice(0, 4).join(', ')}${g.labels.length > 4 ? ` +${g.labels.length - 4}` : ''}` : '';
-        chartTip.textContent = [list(b, '▲ ' + markWord('B')), list(hd, '▲ ' + markWord('H')), list(sl, '▼ ' + markWord('S'))].filter(Boolean).join(' · ') + ' · ' + shortDate(tm);
-        chartTip.classList.add('is-on');
-        const rect = el.getBoundingClientRect(), half = chartTip.getBoundingClientRect().width / 2;
-        chartTip.style.left = Math.max(half + 8, Math.min(window.innerWidth - half - 8, rect.left + prm.point.x)) + 'px';
-        chartTip.style.top = Math.max(chartTip.getBoundingClientRect().height + 16, rect.top + prm.point.y) + 'px';
-      });
-      c.timeScale().fitContent();
-      LW_CHARTS.push(c);
-      } catch (err) { // never leave a blank frame: restore the shared SVG chart + scrub
-        el.innerHTML = svgFallback; el.dataset.series = series; el.classList.remove('mz-chart--lw');
-      }
+    const th = { blue: v('--blue', '#3c6f96'), ink: v('--ink', '#17201b'), muted: v('--muted', '#6f786f'), line: v('--line', '#dde2dc'), font: v('--font', 'system-ui') };
+    const lazy = [];
+    document.querySelectorAll('.mz-chart[data-series]').forEach((el) => {
+      if (el.classList.contains('mz-chart--full') || typeof IntersectionObserver !== 'function') mountChart(el, LW, th); else lazy.push(el);
     });
+    if (!lazy.length) return;
+    // Lists can carry ~50 sparks: mount each only as it nears the viewport.
+    const io = LW_IO = new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (!e.isIntersecting || LW_IO !== io) return;
+      io.unobserve(e.target); mountChart(e.target, LW, th);
+    }), { rootMargin: '160px 0px' });
+    lazy.forEach((el) => io.observe(el));
+  }
+  function mountChart(el, LW, th) {
+    if (!el.isConnected || el.classList.contains('mz-chart--lw')) return;
+    let data, ohlc = null, marks = [];
+    try { data = JSON.parse(el.dataset.series); ohlc = el.dataset.ohlc ? JSON.parse(el.dataset.ohlc) : null; marks = el.dataset.marks ? JSON.parse(el.dataset.marks) : []; } catch (e) { return; }
+    // LW needs unique, ascending days. k = the point's index in data-series (and data-ohlc).
+    const seen = new Set(), rows = [];
+    data.forEach(([d, c], k) => { const time = isoDay(d); if (!time || !isFinite(+c) || seen.has(time)) return; seen.add(time); rows.push({ time, c: +c, k }); });
+    rows.sort((a, b) => (a.time < b.time ? -1 : 1));
+    if (rows.length < 2) return;
+    const full = el.classList.contains('mz-chart--full');
+    const svg = el.innerHTML, height = el.style.height, role = el.getAttribute('role');
+    const restore = () => { el.innerHTML = svg; el.style.height = height; el.style.paddingTop = ''; el.classList.remove('mz-chart--lw'); if (role) el.setAttribute('role', role); LW_KEYS.delete(el); };
+    el.innerHTML = ''; el.classList.add('mz-chart--lw');
+    const box = {};
+    try {
+      if (full) mountFull(el, LW, th, rows, ohlc, marks, box); else mountMini(el, LW, th, rows, box);
+      LW_CHARTS.push({ chart: box.c, el, restore });
+    } catch (err) { // never leave a blank frame: restore the shared SVG chart + scrub
+      if (box.c) { try { box.c.remove(); } catch (e) { /* ignore */ } }
+      restore();
+    }
+  }
+  // Index in `rows` for a data-series index (keyboard scrub).
+  const rowOf = (rows, di) => { const k = rows.findIndex((r) => r.k >= di); return k < 0 ? rows.length - 1 : k; };
+  function mountMini(el, LW, th, rows, box) {
+    const unit = el.dataset.unit;
+    const c = box.c = LW.createChart(el, {
+      autoSize: true,
+      layout: { background: { type: 'solid', color: 'transparent' }, textColor: th.muted, fontFamily: th.font, attributionLogo: false },
+      grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+      rightPriceScale: { visible: false, scaleMargins: { top: 0.14, bottom: 0.14 } }, leftPriceScale: { visible: false },
+      timeScale: { visible: false, borderVisible: false, fixLeftEdge: true, fixRightEdge: true, minBarSpacing: 0.01 },
+      crosshair: { mode: LW.CrosshairMode.Magnet, vertLine: { color: rgba(th.ink, 0.25), width: 1, style: LW.LineStyle.Solid, labelVisible: false }, horzLine: { visible: false, labelVisible: false } },
+      handleScroll: false, handleScale: false,
+    });
+    const s = c.addLineSeries({ color: th.blue, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerRadius: 3, crosshairMarkerBorderColor: th.blue, crosshairMarkerBackgroundColor: th.blue });
+    s.setData(rows.map((r) => ({ time: r.time, value: r.c })));
+    c.timeScale().fitContent();
+    const byTime = new Map(rows.map((r, k) => [r.time, k]));
+    const tip = (k, x, y) => { const rc = el.getBoundingClientRect(); showTip(`${tipVal(rows[k].c, unit)} · ${shortDate(rows[k].time)}`, null, rc.left + x, rc.top + y); };
+    c.subscribeCrosshairMove((prm) => {
+      const k = prm && prm.time != null ? byTime.get(lwDay(prm.time)) : undefined;
+      if (k == null || !prm.point) { chartHideTip(); return; }
+      tip(k, prm.point.x, s.priceToCoordinate(rows[k].c) ?? prm.point.y);
+    });
+    LW_KEYS.set(el, (di) => { const k = rowOf(rows, di), x = c.timeScale().timeToCoordinate(rows[k].time), y = s.priceToCoordinate(rows[k].c); if (x != null && y != null) tip(k, x, y); });
+  }
+  function mountFull(el, LW, th, rows, ohlc, marks, box) {
+    const idx = el.dataset.unit === 'index', title = el.dataset.title || '', last = rows.length - 1;
+    // Candles only from REAL open/high/low (never flat candles made from closes); the index is a line.
+    const bars = !idx && Array.isArray(ohlc) ? rows.map((r) => { const q = ohlc[r.k]; return q ? { time: r.time, open: +q[0], high: +q[1], low: +q[2], close: r.c, v: q[3] } : null; }) : null;
+    const candles = !!bars && bars.every((b) => b && isFinite(b.open) && isFinite(b.high) && isFinite(b.low));
+    const hasVol = candles && bars.some((b) => b.v != null && isFinite(b.v));
+    el.style.height = ''; el.setAttribute('role', 'group');
+    const narrow = el.clientWidth > 0 && el.clientWidth < 520;
+    const c = box.c = LW.createChart(el, {
+      autoSize: true,
+      layout: { background: { type: 'solid', color: 'transparent' }, textColor: th.muted, fontFamily: th.font, fontSize: 11 },
+      grid: { vertLines: { color: rgba(th.line, 0.55) }, horzLines: { color: rgba(th.line, 0.9) } },
+      rightPriceScale: { borderVisible: false, scaleMargins: { top: narrow ? 0.08 : 0.14, bottom: hasVol ? 0.24 : 0.06 } },
+      timeScale: { borderColor: th.line, timeVisible: false, fixLeftEdge: true, fixRightEdge: true, minBarSpacing: 0.05, tickMarkFormatter: lwTick },
+      crosshair: { mode: LW.CrosshairMode.Normal, vertLine: { color: rgba(th.ink, 0.35), labelBackgroundColor: th.ink }, horzLine: { color: rgba(th.ink, 0.35), labelBackgroundColor: th.ink } },
+      // Drag pans, pinch / axis-drag zooms. The wheel and vertical swipes stay with the page.
+      handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: { time: true, price: true }, axisDoubleClickReset: { time: true, price: true } },
+      kineticScroll: { touch: true, mouse: false },
+      watermark: { visible: !!title, text: title, color: rgba(th.ink, 0.07), fontSize: narrow ? 34 : 48, fontFamily: th.font, horzAlign: 'center', vertAlign: 'center' },
+      localization: { locale: LANG === 'ar' ? 'ar-u-nu-latn' : 'en-US', timeFormatter: (t) => shortDate(lwDay(t)), priceFormatter: (x) => idx ? x.toFixed(1) : '$' + x.toFixed(2) },
+    });
+    let s;
+    if (candles) {
+      s = c.addCandlestickSeries({ upColor: th.blue, downColor: th.ink, borderUpColor: th.blue, borderDownColor: th.ink, wickUpColor: th.blue, wickDownColor: th.ink, priceLineVisible: false, lastValueVisible: true });
+      s.setData(bars.map((b) => ({ time: b.time, open: b.open, high: b.high, low: b.low, close: b.close })));
+      if (hasVol) {
+        const vs = c.addHistogramSeries({ priceScaleId: 'mz-vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
+        c.priceScale('mz-vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 }, visible: false });
+        vs.setData(bars.filter((b) => b.v != null && isFinite(b.v)).map((b) => ({ time: b.time, value: +b.v, color: b.close >= b.open ? rgba(th.blue, 0.35) : rgba(th.ink, 0.22) })));
+      }
+    } else {
+      s = c.addAreaSeries({ lineColor: th.blue, topColor: rgba(th.blue, 0.18), bottomColor: rgba(th.blue, 0), lineWidth: 2, priceLineVisible: false, lastValueVisible: true, crosshairMarkerBorderColor: '#fff', crosshairMarkerBackgroundColor: th.blue });
+      s.setData(rows.map((r) => ({ time: r.time, value: r.c })));
+    }
+    const byTime = new Map(rows.map((r, k) => [r.time, k]));
+    // Disclosed trades: one marker per (trade day, side) at the TRADE date — ▲ bought below the bar
+    // (cobalt), ▼ sold above it (ink), ● 13F held at quarter end (cobalt, never "bought").
+    const ms = (marks || []).map(markFromAttr).filter((m) => byTime.has(m.bar));
+    const groups = new Map();
+    ms.forEach((m) => { const k = m.bar + m.code; (groups.get(k) || groups.set(k, []).get(k)).push(m); });
+    const word = { B: L('Bought', 'شراء'), S: L('Sold', 'بيع'), H: '13F' };
+    const mk = [...groups.entries()].map(([id, g]) => {
+      const code = g[0].code;
+      return { time: g[0].bar, id, position: code === 'S' ? 'aboveBar' : 'belowBar', color: code === 'S' ? th.ink : th.blue, shape: code === 'S' ? 'arrowDown' : code === 'H' ? 'circle' : 'arrowUp', size: 1, label: word[code] + (g.length > 1 ? ` ×${g.length}` : ''), k: byTime.get(g[0].bar) };
+    }).sort((a, b) => a.k - b.k);
+    // Marker text only where it has room at the current zoom (clustered trades would overprint):
+    // zooming in brings the "Bought ×3" labels back. Recomputed when the visible range changes.
+    let texted = null;
+    const applyMarkers = () => {
+      if (!mk.length) return;
+      const gap = Math.max(1, +c.timeScale().options().barSpacing || 6), on = new Set();
+      for (const side of ['aboveBar', 'belowBar']) {
+        const xs = mk.filter((m) => m.position === side);
+        xs.forEach((m, i) => { const l = i ? (m.k - xs[i - 1].k) * gap : Infinity, r = i < xs.length - 1 ? (xs[i + 1].k - m.k) * gap : Infinity; if (Math.min(l, r) >= 7 * m.label.length + 8) on.add(m.id); });
+      }
+      const key = [...on].join('|'); if (key === texted) return; texted = key;
+      s.setMarkers(mk.map(({ time, id, position, color, shape, size, label }) => ({ time, id, position, color, shape, size, ...(on.has(id) ? { text: label } : {}) })));
+    };
+    applyMarkers();
+    // TradingView-style legend: rests on the latest bar, follows the crosshair.
+    const lg = document.createElement('div'); lg.className = 'mz-lw-legend'; lg.dir = LANG === 'ar' ? 'rtl' : 'ltr';
+    const vals = document.createElement('span'); vals.className = 'mz-lw-vals';
+    const reset = document.createElement('button'); reset.type = 'button'; reset.className = 'mz-lw-reset'; reset.hidden = true;
+    reset.textContent = '↺ ' + L('Reset', 'إعادة الضبط'); reset.title = L('Reset zoom (or double-click the chart)', 'إعادة ضبط التكبير (أو انقر مرتين على الرسم)');
+    lg.append(vals, reset); el.appendChild(lg);
+    const iso = (x) => (LANG === 'ar' ? bidi(x) : x);
+    const kv = (lab, x) => `<span>${esc(lab)} <i>${esc(x)}</i></span>`;
+    const paint = (k) => {
+      const r = rows[k], prev = k > 0 ? rows[k - 1].c : null;
+      let h = (title ? `<b>${esc(iso(title))}</b>` : '') + `<span>${esc(shortDate(r.time))}</span>`;
+      if (candles) {
+        const b = bars[k];
+        h += kv(L('O', 'افتتاح'), iso(num2(b.open))) + kv(L('H', 'أعلى'), iso(num2(b.high))) + kv(L('L', 'أدنى'), iso(num2(b.low))) + kv(L('C', 'إغلاق'), iso(num2(b.close)))
+          + (b.v != null && isFinite(b.v) ? kv(L('Vol', 'الحجم'), volText(b.v)) : '');
+      } else h += kv(idx ? L('Index', 'المؤشر') : L('Close', 'إغلاق'), iso(idx ? r.c.toFixed(2) : '$' + num2(r.c)));
+      if (prev) {
+        const ch = r.c - prev, pct = (r.c / prev - 1) * 100, sg = (x) => (x >= 0 ? '+' : '−');
+        const txt = idx ? `${sg(pct)}${Math.abs(pct).toFixed(2)}%` : `${sg(ch)}${num2(Math.abs(ch))} (${sg(pct)}${Math.abs(pct).toFixed(2)}%)`;
+        h += `<span class="${ch >= 0 ? 'up' : 'down'}">${esc(iso(txt))} <small>${esc(idx ? L('vs prior value', 'عن القيمة السابقة') : L('vs prior close', 'عن الإغلاق السابق'))}</small></span>`;
+      }
+      vals.innerHTML = h;
+    };
+    paint(last);
+    // Phones: the legend would cover the plot, so it sits in its own band above it (same chart height).
+    if (narrow) { lg.classList.add('is-band'); const lh = Math.ceil(lg.offsetHeight) + 4, base = el.clientHeight; lg.style.minHeight = lh - 4 + 'px'; el.style.paddingTop = lh + 'px'; el.style.height = base + lh + 'px'; }
+    const tradesAt = (k) => ms.filter((m) => m.bar === rows[k].time);
+    c.subscribeCrosshairMove((prm) => {
+      const k = prm && prm.time != null ? byTime.get(lwDay(prm.time)) : undefined;
+      if (k == null || !prm.point) { paint(last); chartHideTip(); return; }
+      paint(k);
+      const at = tradesAt(k);
+      if (!at.length) { chartHideTip(); return; }
+      const rc = el.getBoundingClientRect();
+      showTip(shortDate(rows[k].time), tradeTipLines(at), rc.left + prm.point.x, rc.top + prm.point.y);
+    });
+    LW_KEYS.set(el, (di) => {
+      const k = rowOf(rows, di), x = c.timeScale().timeToCoordinate(rows[k].time), y = s.priceToCoordinate(rows[k].c);
+      paint(k); if (x == null || y == null) return;
+      const rc = el.getBoundingClientRect();
+      showTip(`${tipVal(rows[k].c, idx ? 'index' : 'price')} · ${shortDate(rows[k].time)}`, tradeTipLines(tradesAt(k)), rc.left + x, rc.top + y);
+    });
+    // Zoom / pan reset: double-click, the ↺ button, or the axes' own double-click.
+    const fit = () => { c.timeScale().fitContent(); c.priceScale('right').applyOptions({ autoScale: true }); };
+    reset.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); fit(); });
+    if (typeof c.subscribeDblClick === 'function') c.subscribeDblClick(fit);
+    fit();
+    c.timeScale().subscribeVisibleLogicalRangeChange((r) => { reset.hidden = !r || (r.from <= 0.5 && r.to >= last - 0.5); applyMarkers(); });
   }
 
   /* ---- Routing + render. Existing routes keep working (/portfolios, /stocks, /portfolio/:id,
