@@ -49,6 +49,9 @@ button.chip{cursor:pointer;color:var(--ink)}.chip.on{background:var(--ink);borde
 .mz-chart--spark{width:96px;height:28px;flex:0 0 auto}.mz-chart--card{height:40px}.mz-chart--full{height:230px}
 /* TradingView Lightweight Charts mount (every size). The canvas keeps an LTR time axis in Arabic too
    (.mz-chart is direction:ltr); the legend text inside it follows the page language via dir. */
+/* LW lays itself out as a <table>: page table styles (.table td borders/padding) must not reach it
+   (they drew a grey "baseline" under every spark in the /stocks table). */
+.mz-chart--lw table,.mz-chart--lw tr,.mz-chart--lw td{border:0!important;padding:0!important;margin:0;background:none!important;box-shadow:none!important}
 .mz-chart--lw.mz-chart--full{height:300px}
 @media(max-width:720px){.mz-chart--lw.mz-chart--full{height:240px}}
 .mz-lw-legend{position:absolute;top:4px;left:8px;right:64px;z-index:3;display:flex;align-items:flex-start;gap:6px;pointer-events:none;color:var(--muted);font:500 11px/1.5 var(--mono)}
@@ -77,6 +80,10 @@ button.chip{cursor:pointer;color:var(--ink)}.chip.on{background:var(--ink);borde
 .chart-legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;color:var(--muted);font-size:11px;line-height:1.5}
 .chart-legend .tl-head{font-weight:600}
 .chart-legend .tl-B,.chart-legend .tl-H{color:var(--blue)}.chart-legend .tl-S{color:var(--ink)}
+/* Lightweight Charts attribution (text link instead of the in-canvas logo). */
+.mz-lw-credit{font-size:10px;color:var(--muted)}
+.chart-legend .mz-lw-credit{margin-inline-start:auto}
+.mz-lw-credit a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .chart-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-inline-end:5px;vertical-align:middle}
 
 /* ---- Arabic (RTL): mirror the package's physical left/right layout. */

@@ -117,8 +117,8 @@
     positionValue: 'positionValue', // filer's disclosed position size (basis for %-of-position)
     disclosedDate: 'transactionDate', // when the trade happened / was disclosed ("disclosed Jun 2")
     filedDate: 'filingDate',        // when it was filed (drives the filing-lag figure)
-    priceHistory: 'history',        // S.prices[TICKER][FIELD.priceHistory] = [{ d, o?, h?, l?, c, v? }] — d + close always;
-                                    // open/high/low/volume from the same Twelve Data call (older cached rows: { d, c } only)
+    priceHistory: 'history',        // S.prices[TICKER][FIELD.priceHistory] = [{ d, c }] from /api/prices (closes only, all tickers);
+                                    // the stock page swaps in [{ d, o?, h?, l?, c, v? }] from OHLC_URL(ticker) (older cached rows: { d, c } only)
     priceOpen: 'o', priceHigh: 'h', priceLow: 'l', priceVolume: 'v', // candles only when EVERY point has o/h/l
     bioguide: 'bioguideId',         // TODO: Congress member id (Quiver "BioGuideID") -> official public-domain portrait
     screenedAt: 'screenedAt',       // TODO(api): screenings.fetched_at — until present, omit the date (never print a fake one)
@@ -574,6 +574,23 @@
     S.loading = false;
     render();
   }
+  // Full OHLCV for ONE ticker, fetched when its stock page opens: /api/prices stays closes-only for
+  // every page load (web + mobile), and only the stock detail chart draws candles. Without cached
+  // open/high/low the chart simply stays a line (never fabricated candles).
+  const OHLC_URL = (tk) => `/api/prices?ticker=${encodeURIComponent(tk)}&ohlc=1`;
+  // While a ticker's OHLCV is in flight its detail chart keeps the SVG layer (no line-then-candles flash).
+  const OHLC_ASKED = new Set(), OHLC_PENDING = new Set();
+  function ensureOhlc(tk) {
+    if (!tk || !S.pricesLive || !S.prices[tk] || OHLC_ASKED.has(tk)) return;
+    OHLC_ASKED.add(tk); OHLC_PENDING.add(tk);
+    const here = () => S.page === 'stock' && S.id === tk;
+    fetch(OHLC_URL(tk), { headers: { accept: 'application/json' } }).then((r) => (r.ok ? r.json() : null)).then((j) => {
+      const h = j && j[tk] && j[tk][FIELD.priceHistory];
+      OHLC_PENDING.delete(tk);
+      if (Array.isArray(h) && h.some((p) => p && isNum(p[FIELD.priceOpen]))) { S.prices[tk] = { ...S.prices[tk], [FIELD.priceHistory]: h }; if (here()) render(); }
+      else if (here()) mountTradeCharts(); // closes only so far: the line chart
+    }).catch(() => { OHLC_PENDING.delete(tk); if (here()) mountTradeCharts(); }); // offline / old API: the line chart
+  }
 
   /* ---------------------------------------------------------------- computed list */
   function currentList() {
@@ -752,8 +769,9 @@
   const markFromAttr = ([d, code, label, pub, amt, bar, f13]) => ({ d, code, label, pub, amt, bar, f13: !!f13 });
   // A trade's own dates, named for what they are: "NVDA · Bought Jun 30 · public Jul 3 (3 days) · $15K–$50K".
   const tipDay = (iso) => !iso ? '—' : String(iso).slice(0, 4) === String(new Date().getFullYear()) ? dayMonth(iso) : shortDate(iso);
-  function tradeLine(m) {
-    const when = tipDay(m.d), who = m.label ? (LANG === 'ar' ? bidi(m.label) : m.label) : '';
+  // "Bought Jun 30 · public Jul 3 (3 days)" — the trade's own dates, shared by every name traded that day.
+  function tradeWhen(m) {
+    const when = tipDay(m.d);
     const act = m.code === 'H' ? L(`held at quarter end (${when})`, `مركز قائم بنهاية الربع (${when})`)
       : m.code === 'S' ? (m.f13 ? L(`reported sale, quarter end ${when}`, `بيع معلن، نهاية الربع ${when}`) : L(`Sold ${when}`, `بيع في ${when}`))
       : L(`Bought ${when}`, `شراء في ${when}`);
@@ -762,15 +780,25 @@
       : lag == null ? L(`public ${tipDay(m.pub)}`, `أُعلن في ${tipDay(m.pub)}`)
       : lag === 0 ? L(`public ${tipDay(m.pub)} (same day)`, `أُعلن في ${tipDay(m.pub)} (في اليوم نفسه)`)
       : L(`public ${tipDay(m.pub)} (${daysEn(lag)})`, `أُعلن في ${tipDay(m.pub)} (بعد ${daysAr(lag)})`);
-    return [who, act, pub, m.amt].filter(Boolean).join(' · ');
+    return `${act} · ${pub}`;
   }
-  // Tooltip lines for the trades pinned on one bar: per side, up to 4 names, then "+N".
-  function tradeTipLines(ms) {
-    const out = [];
+  // Tooltip lines for the trades pinned on one bar, compact: per side and per (trade date, public date)
+  // ONE dated head line ("▲ Bought Jun 16 · public Jul 3 (17 days)") and ONE line of names with their
+  // amounts ("VRSK $1K–$15K · ABT $1K–$15K · +8 more"). Up to 4 names (2 on phones), then "+N".
+  const tipNarrow = () => window.innerWidth < 560;
+  function tradeTipLines(ms, narrow) {
+    const cap = (narrow ?? tipNarrow()) ? 2 : 4, out = [];
     for (const code of ['B', 'H', 'S']) {
-      const g = (ms || []).filter((m) => m.code === code); if (!g.length) continue;
-      g.slice(0, 4).forEach((m) => out.push(`${MARK_SYM[code]} ${tradeLine(m)}`));
-      if (g.length > 4) out.push(`${MARK_SYM[code]} +${g.length - 4} ${L('more', 'أخرى')}`);
+      const by = new Map();
+      (ms || []).filter((m) => m.code === code).forEach((m) => { const k = m.d + '|' + (m.pub || ''); (by.get(k) || by.set(k, []).get(k)).push(m); });
+      for (const g of by.values()) {
+        out.push(`${MARK_SYM[code]} ${tradeWhen(g[0])}`);
+        const names = g.filter((m) => m.label).slice(0, cap).map((m) => [LANG === 'ar' ? bidi(m.label) : m.label, m.amt].filter(Boolean).join(' '));
+        const more = g.filter((m) => m.label).length - names.length;
+        if (more > 0) names.push(`${LANG === 'ar' ? bidi('+' + more) : '+' + more} ${L('more', 'أخرى')}`);
+        if (names.length) out.push(names.join(' · '));
+        else if (g.length === 1 && g[0].amt) out.push(g[0].amt);
+      }
     }
     return out;
   }
@@ -784,7 +812,17 @@
     const data = (hist || []).filter((p) => p && isFinite(+p.c));
     if (!markers || !markers.length || data.length < 2) return '';
     const ms = marksInView(data, markers);
-    if (!ms.length) return `<span>${esc(L('No disclosed trades in this period — try a longer timeframe', 'لا توجد صفقات معلنة في هذه الفترة — جرّب فترة أطول'))}</span>`;
+    if (!ms.length) {
+      // On the longest view there is no longer timeframe to suggest: say why the chart has no markers.
+      if (S.tf === 'ALL' || !TF_DAYS_ALL[S.tf] || TF_DAYS_ALL[S.tf] === Infinity) {
+        const first = isoDay(data[0].d) || data[0].d, ds = markers.map((m) => m && isoDay(m.d)).filter(Boolean);
+        const older = ds.length && ds.every((d) => d < first);
+        return `<span>${esc(older
+          ? L(`These disclosed trades predate the cached price history (it starts ${shortDate(first)})`, `الصفقات المعلنة أقدم من سجل الأسعار المحفوظ (يبدأ في ${shortDate(first)})`)
+          : L(`No disclosed trade falls within the cached price history (${shortDate(first)} – ${shortDate(data[data.length - 1].d)})`, `لا تقع أي صفقة معلنة ضمن فترة الأسعار المحفوظة (${shortDate(first)} – ${shortDate(data[data.length - 1].d)})`))}</span>`;
+      }
+      return `<span>${esc(L('No disclosed trades in this period — try a longer timeframe', 'لا توجد صفقات معلنة في هذه الفترة — جرّب فترة أطول'))}</span>`;
+    }
     const parts = ['B', 'H', 'S'].map((code) => {
       const g = ms.filter((m) => m.code === code); if (!g.length) return '';
       const ds = g.map((m) => m.d).sort(), a = ds[0], b = ds[ds.length - 1];
@@ -839,12 +877,15 @@
   // The value line of the tooltip: "$142.70" / "104.31 · index".
   const tipVal = (c, unit) => unit === 'index' ? c.toFixed(2) + (LANG === 'ar' ? ' · مؤشر' : ' · index') : LANG === 'ar' ? '⁦$' + c.toFixed(2) + '⁩' : '$' + c.toFixed(2);
   // Show the shared tooltip at viewport point (x, y): a head line plus optional trade lines.
-  function showTip(head, lines, x, y) {
+  // `box` (optional {left, right}, viewport px): keep the tip over its own chart, not the side nav.
+  function showTip(head, lines, x, y, box) {
     chartTip.textContent = [head, ...(lines || [])].filter(Boolean).join('\n');
     chartTip.classList.toggle('is-multi', !!(lines && lines.length));
     chartTip.classList.add('is-on');
     const r = chartTip.getBoundingClientRect(), half = r.width / 2;
-    chartTip.style.left = Math.max(half + 8, Math.min(window.innerWidth - half - 8, x)) + 'px';
+    let lo = half + 8, hi = window.innerWidth - half - 8;
+    if (box && box.right - box.left >= r.width) { lo = Math.max(lo, box.left + half); hi = Math.min(hi, box.right - half); }
+    chartTip.style.left = Math.max(lo, Math.min(hi, x)) + 'px';
     chartTip.style.top = Math.max(r.height + 16, y) + 'px';
   }
   function chartScrub(clientX, target) {
@@ -866,7 +907,7 @@
     if (el.dataset.marks) {
       try { const bar = isoDay(d); lines = tradeTipLines(JSON.parse(el.dataset.marks).map(markFromAttr).filter((m) => m.bar === bar)); } catch (e) { /* ignore */ }
     }
-    showTip(`${tipVal(c, el.dataset.unit)} · ${shortDate(d)}`, lines, rect.left + px, rect.top + py);
+    showTip(`${tipVal(c, el.dataset.unit)} · ${shortDate(d)}`, lines, rect.left + px, lines.length && tipNarrow() ? rect.top : rect.top + py, rect);
   }
   // Keyboard access uses the same scrub calculation and tooltip as pointer/touch (LW charts too).
   document.addEventListener('keydown', (e) => {
@@ -1798,8 +1839,8 @@
                 portfolio index — always a line), TradingView-style legend (date · O H L C · change),
                 crosshair with axis labels, dated time axis, ticker watermark, drag-to-pan, pinch /
                 axis-drag zoom (the mouse wheel keeps scrolling the page, a vertical swipe keeps
-                scrolling it on phones), double-click or ↺ resets; disclosed trades as markers at their
-                TRADE date with trade + public dates in the tooltip.
+                scrolling it on phones), double-click or ↺ resets to the padded fit; disclosed trades as
+                markers at their TRADE date (hover / tap near one) with trade + public dates in the tooltip.
        card / spark -> a minimal line (no grid, axes, legend or zoom) whose crosshair drives the shared
                 tooltip; mounted lazily as it scrolls into view.
      Cobalt / ink only — never a verdict hue. Every re-render removes the previous instances and the
@@ -1810,11 +1851,12 @@
   const rgba = (c, a) => { const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(String(c).trim()); return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : c; };
   // LW hands back the time we gave it ('YYYY-MM-DD'); accept a BusinessDay / timestamp too.
   const lwDay = (t) => typeof t === 'string' ? t.slice(0, 10) : t && typeof t === 'object' ? `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}` : typeof t === 'number' ? new Date(t * 1000).toISOString().slice(0, 10) : '';
-  // Time-axis ticks, TradingView style: the year at a year start, the month at a month start, else the day.
+  // Time-axis ticks, TradingView style: the year at a year start, the month at a month start, else
+  // month + day ("Mar 3" / "3 مارس") — a bare "3" is ambiguous once zoomed.
   const lwTick = (t, type) => {
     const ms = Date.parse(lwDay(t)); if (!isFinite(ms)) return null;
-    const x = new Date(ms);
-    return type === 0 ? String(x.getUTCFullYear()) : type === 1 ? x.toLocaleDateString(LANG === 'ar' ? 'ar-u-nu-latn' : 'en-US', { month: 'short', timeZone: 'UTC' }) : String(x.getUTCDate());
+    const x = new Date(ms), loc = LANG === 'ar' ? 'ar-u-nu-latn' : 'en-US';
+    return type === 0 ? String(x.getUTCFullYear()) : type === 1 ? x.toLocaleDateString(loc, { month: 'short', timeZone: 'UTC' }) : x.toLocaleDateString(loc, { month: 'short', day: 'numeric', timeZone: 'UTC' });
   };
   const num2 = (x) => (+x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const volText = (v) => { const p = moneyParts(v, false); return LANG === 'ar' ? `${bidi(p.num)}${p.ar ? ' ' + p.ar : ''}` : p.num + p.en; };
@@ -1830,7 +1872,9 @@
     const th = { blue: v('--blue', '#3c6f96'), ink: v('--ink', '#17201b'), muted: v('--muted', '#6f786f'), line: v('--line', '#dde2dc'), font: v('--font', 'system-ui') };
     const lazy = [];
     document.querySelectorAll('.mz-chart[data-series]').forEach((el) => {
-      if (el.classList.contains('mz-chart--full') || typeof IntersectionObserver !== 'function') mountChart(el, LW, th); else lazy.push(el);
+      const full = el.classList.contains('mz-chart--full');
+      if (full && S.page === 'stock' && OHLC_PENDING.has(S.id)) return; // mounted once its OHLCV arrives (ensureOhlc)
+      if (full || typeof IntersectionObserver !== 'function') mountChart(el, LW, th); else lazy.push(el);
     });
     if (!lazy.length) return;
     // Lists can carry ~50 sparks: mount each only as it nears the viewport.
@@ -1857,29 +1901,49 @@
     try {
       if (full) mountFull(el, LW, th, rows, ohlc, marks, box); else mountMini(el, LW, th, rows, box);
       LW_CHARTS.push({ chart: box.c, el, restore });
+      lwCredit(el);
     } catch (err) { // never leave a blank frame: restore the shared SVG chart + scrub
       if (box.c) { try { box.c.remove(); } catch (e) { /* ignore */ } }
       restore();
     }
   }
+  // Licence attribution (Lightweight Charts NOTICE): one text link per page wherever LW charts are
+  // drawn — in the legend line under a detail chart, else above the page footer (lists). It replaces
+  // the in-canvas logo, which covered data at the bottom-left of the plot.
+  function lwCredit(el) {
+    const main = document.getElementById('main'); if (!main || main.querySelector('.mz-lw-credit')) return;
+    const a = `${esc(L('Charts:', 'الرسوم البيانية:'))} <a href="https://www.tradingview.com/" target="_blank" rel="noopener" dir="ltr">TradingView Lightweight Charts™</a>`;
+    const ph = el.classList.contains('mz-chart--full') && el.closest('.chart-placeholder');
+    if (ph && ph.parentNode) {
+      let lg = ph.nextElementSibling;
+      if (!lg || !lg.classList.contains('chart-legend')) { lg = document.createElement('div'); lg.className = 'chart-legend'; ph.after(lg); }
+      lg.insertAdjacentHTML('beforeend', `<span class="mz-lw-credit">${a}</span>`);
+      return;
+    }
+    const p = document.createElement('p'); p.className = 'credit mz-lw-credit'; p.innerHTML = a;
+    const foot = main.querySelector('.mz-footer'); if (foot) foot.before(p); else main.appendChild(p);
+  }
   // Index in `rows` for a data-series index (keyboard scrub).
   const rowOf = (rows, di) => { const k = rows.findIndex((r) => r.k >= di); return k < 0 ? rows.length - 1 : k; };
+  // The LW pane box (inside any padding of the chart element): LW coordinates are relative to it.
+  const lwRect = (el) => (el.querySelector('.tv-lightweight-charts') || el).getBoundingClientRect();
   function mountMini(el, LW, th, rows, box) {
     const unit = el.dataset.unit;
     const c = box.c = LW.createChart(el, {
       autoSize: true,
       layout: { background: { type: 'solid', color: 'transparent' }, textColor: th.muted, fontFamily: th.font, attributionLogo: false },
       grid: { vertLines: { visible: false }, horzLines: { visible: false } },
-      rightPriceScale: { visible: false, scaleMargins: { top: 0.14, bottom: 0.14 } }, leftPriceScale: { visible: false },
+      rightPriceScale: { visible: false, borderVisible: false, scaleMargins: { top: 0.14, bottom: 0.14 } }, leftPriceScale: { visible: false, borderVisible: false },
       timeScale: { visible: false, borderVisible: false, fixLeftEdge: true, fixRightEdge: true, minBarSpacing: 0.01 },
       crosshair: { mode: LW.CrosshairMode.Magnet, vertLine: { color: rgba(th.ink, 0.25), width: 1, style: LW.LineStyle.Solid, labelVisible: false }, horzLine: { visible: false, labelVisible: false } },
       handleScroll: false, handleScale: false,
     });
-    const s = c.addLineSeries({ color: th.blue, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerRadius: 3, crosshairMarkerBorderColor: th.blue, crosshairMarkerBackgroundColor: th.blue });
+    // Same weight as the SVG spark (1.4px): a thin cobalt line, no baseline, no axis.
+    const s = c.addLineSeries({ color: th.blue, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, baseLineVisible: false, crosshairMarkerRadius: 3, crosshairMarkerBorderColor: th.blue, crosshairMarkerBackgroundColor: th.blue });
     s.setData(rows.map((r) => ({ time: r.time, value: r.c })));
     c.timeScale().fitContent();
     const byTime = new Map(rows.map((r, k) => [r.time, k]));
-    const tip = (k, x, y) => { const rc = el.getBoundingClientRect(); showTip(`${tipVal(rows[k].c, unit)} · ${shortDate(rows[k].time)}`, null, rc.left + x, rc.top + y); };
+    const tip = (k, x, y) => { const rc = lwRect(el); showTip(`${tipVal(rows[k].c, unit)} · ${shortDate(rows[k].time)}`, null, rc.left + x, rc.top + y); };
     c.subscribeCrosshairMove((prm) => {
       const k = prm && prm.time != null ? byTime.get(lwDay(prm.time)) : undefined;
       if (k == null || !prm.point) { chartHideTip(); return; }
@@ -1895,19 +1959,24 @@
     const hasVol = candles && bars.some((b) => b.v != null && isFinite(b.v));
     el.style.height = ''; el.setAttribute('role', 'group');
     const narrow = el.clientWidth > 0 && el.clientWidth < 520;
+    // Phones: whole dollars on the price axis (a "$400.00" axis took ~28% of a 390px chart).
+    const pxFmt = (x) => idx ? x.toFixed(1) : '$' + (narrow && Math.abs(x) >= 100 ? x.toFixed(0) : x.toFixed(2));
     const c = box.c = LW.createChart(el, {
       autoSize: true,
-      layout: { background: { type: 'solid', color: 'transparent' }, textColor: th.muted, fontFamily: th.font, fontSize: 11 },
+      // No in-canvas logo (it covered the first bars / volume); the text credit is under the chart (lwCredit).
+      layout: { background: { type: 'solid', color: 'transparent' }, textColor: th.muted, fontFamily: th.font, fontSize: 11, attributionLogo: false },
       grid: { vertLines: { color: rgba(th.line, 0.55) }, horzLines: { color: rgba(th.line, 0.9) } },
-      rightPriceScale: { borderVisible: false, scaleMargins: { top: narrow ? 0.08 : 0.14, bottom: hasVol ? 0.24 : 0.06 } },
-      timeScale: { borderColor: th.line, timeVisible: false, fixLeftEdge: true, fixRightEdge: true, minBarSpacing: 0.05, tickMarkFormatter: lwTick },
+      rightPriceScale: { borderVisible: false, scaleMargins: { top: narrow ? 0.1 : 0.16, bottom: hasVol ? 0.24 : 0.08 } },
+      // Edges are NOT pinned: fit() leaves room before the first and after the last bar so a trade
+      // marker (and its text) on either end is drawn whole.
+      timeScale: { borderColor: th.line, timeVisible: false, fixLeftEdge: false, fixRightEdge: false, minBarSpacing: 0.05, tickMarkFormatter: lwTick },
       crosshair: { mode: LW.CrosshairMode.Normal, vertLine: { color: rgba(th.ink, 0.35), labelBackgroundColor: th.ink }, horzLine: { color: rgba(th.ink, 0.35), labelBackgroundColor: th.ink } },
       // Drag pans, pinch / axis-drag zooms. The wheel and vertical swipes stay with the page.
       handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
-      handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: { time: true, price: true }, axisDoubleClickReset: { time: true, price: true } },
+      handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: { time: true, price: true }, axisDoubleClickReset: { time: false, price: true } },
       kineticScroll: { touch: true, mouse: false },
       watermark: { visible: !!title, text: title, color: rgba(th.ink, 0.07), fontSize: narrow ? 34 : 48, fontFamily: th.font, horzAlign: 'center', vertAlign: 'center' },
-      localization: { locale: LANG === 'ar' ? 'ar-u-nu-latn' : 'en-US', timeFormatter: (t) => shortDate(lwDay(t)), priceFormatter: (x) => idx ? x.toFixed(1) : '$' + x.toFixed(2) },
+      localization: { locale: LANG === 'ar' ? 'ar-u-nu-latn' : 'en-US', timeFormatter: (t) => shortDate(lwDay(t)), priceFormatter: pxFmt },
     });
     let s;
     if (candles) {
@@ -1930,23 +1999,37 @@
     ms.forEach((m) => { const k = m.bar + m.code; (groups.get(k) || groups.set(k, []).get(k)).push(m); });
     const word = { B: L('Bought', 'شراء'), S: L('Sold', 'بيع'), H: '13F' };
     const mk = [...groups.entries()].map(([id, g]) => {
-      const code = g[0].code;
-      return { time: g[0].bar, id, position: code === 'S' ? 'aboveBar' : 'belowBar', color: code === 'S' ? th.ink : th.blue, shape: code === 'S' ? 'arrowDown' : code === 'H' ? 'circle' : 'arrowUp', size: 1, label: word[code] + (g.length > 1 ? ` ×${g.length}` : ''), k: byTime.get(g[0].bar) };
+      const code = g[0].code, n = g.length;
+      return { time: g[0].bar, id, position: code === 'S' ? 'aboveBar' : 'belowBar', color: code === 'S' ? th.ink : th.blue, shape: code === 'S' ? 'arrowDown' : code === 'H' ? 'circle' : 'arrowUp', size: 1,
+        label: word[code] + (n > 1 ? ` ×${n}` : ''), short: n > 1 ? `×${n}` : '', k: byTime.get(g[0].bar) };
     }).sort((a, b) => a.k - b.k);
-    // Marker text only where it has room at the current zoom (clustered trades would overprint):
-    // zooming in brings the "Bought ×3" labels back. Recomputed when the visible range changes.
+    // Marker text where it fits: newest trades first, each label placed only if it stays inside the
+    // plot and does not overprint a label already placed on the same side; a crowded marker falls back
+    // to its count ("×3"). Zooming in brings the full "Bought ×3" back. Recomputed on every range change.
+    const meas = (() => { let cx = null; try { cx = document.createElement('canvas').getContext('2d'); } catch (e) { /* no canvas */ } return (t) => { if (!cx) return 7 * t.length; cx.font = `11px ${th.font}`; return cx.measureText(t).width; }; })();
     let texted = null;
+    // Boxes are approximate pane px: every marker's arrow is an obstacle, and a placed label becomes one.
     const applyMarkers = () => {
       if (!mk.length) return;
-      const gap = Math.max(1, +c.timeScale().options().barSpacing || 6), on = new Set();
-      for (const side of ['aboveBar', 'belowBar']) {
-        const xs = mk.filter((m) => m.position === side);
-        xs.forEach((m, i) => { const l = i ? (m.k - xs[i - 1].k) * gap : Infinity, r = i < xs.length - 1 ? (xs[i + 1].k - m.k) * gap : Infinity; if (Math.min(l, r) >= 7 * m.label.length + 8) on.add(m.id); });
-      }
-      const key = [...on].join('|'); if (key === texted) return; texted = key;
-      s.setMarkers(mk.map(({ time, id, position, color, shape, size, label }) => ({ time, id, position, color, shape, size, ...(on.has(id) ? { text: label } : {}) })));
+      const ts = c.timeScale(), W = ts.width() || el.clientWidth, on = new Map();
+      const pos = mk.map((m) => {
+        const x = ts.logicalToCoordinate(m.k), b = candles ? bars[m.k] : null, up = m.position === 'aboveBar';
+        const y = s.priceToCoordinate(b ? (up ? b.high : b.low) : rows[m.k].c);
+        return { m, x, y, up, arrow: x == null || y == null ? null : [x - 5, x + 5, up ? y - 18 : y + 2, up ? y - 2 : y + 18] };
+      });
+      const boxes = pos.filter((p) => p.arrow).map((p) => ({ id: p.m.id, r: p.arrow }));
+      const hit = (r, id) => boxes.some((o) => o.id !== id && r[0] < o.r[1] && r[1] > o.r[0] && r[2] < o.r[3] && r[3] > o.r[2]);
+      pos.filter((p) => p.arrow && p.x >= 0 && p.x <= W).sort((a, b) => b.m.k - a.m.k).forEach(({ m, x, y, up }) => {
+        for (const t of [m.label, m.short]) {
+          if (!t) continue;
+          const hw = meas(t) / 2 + 3, r = [x - hw, x + hw, up ? y - 32 : y + 17, up ? y - 17 : y + 32];
+          if (r[0] < 2 || r[1] > W - 2 || r[2] < 0 || hit(r, m.id)) continue;
+          boxes.push({ id: m.id + '#t', r }); on.set(m.id, t); break;
+        }
+      });
+      const key = [...on].map((e) => e.join(':')).join('|'); if (key === texted) return; texted = key;
+      s.setMarkers(mk.map(({ time, id, position, color, shape, size }) => ({ time, id, position, color, shape, size, ...(on.has(id) ? { text: on.get(id) } : {}) })));
     };
-    applyMarkers();
     // TradingView-style legend: rests on the latest bar, follows the crosshair.
     const lg = document.createElement('div'); lg.className = 'mz-lw-legend'; lg.dir = LANG === 'ar' ? 'rtl' : 'ltr';
     const vals = document.createElement('span'); vals.className = 'mz-lw-vals';
@@ -1973,28 +2056,62 @@
     paint(last);
     // Phones: the legend would cover the plot, so it sits in its own band above it (same chart height).
     if (narrow) { lg.classList.add('is-band'); const lh = Math.ceil(lg.offsetHeight) + 4, base = el.clientHeight; lg.style.minHeight = lh - 4 + 'px'; el.style.paddingTop = lh + 'px'; el.style.height = base + lh + 'px'; }
+    // Trades on a bar, and the marker group nearest to x (px in the pane) within `tol` px — a long range
+    // packs 400 bars into ~650px, so the hover / tap target is the ~8px marker, not the 1px bar.
     const tradesAt = (k) => ms.filter((m) => m.bar === rows[k].time);
+    const nearMark = (x, tol) => {
+      const ts = c.timeScale(); let best = null, bd = Infinity;
+      for (const m of mk) { const mx = ts.logicalToCoordinate(m.k); if (mx == null) continue; const d = Math.abs(mx - x); if (d < bd) { bd = d; best = m; } }
+      return best && bd <= tol ? best : null;
+    };
+    const barPx = () => Math.max(1, +c.timeScale().options().barSpacing || 6);
+    // The trade tooltip: dated head + compact trade lines. On phones it is pinned above the chart
+    // (never under the finger, never over the plot); on desktop it sits at the marker, kept over the chart.
+    const tradeTip = (k, lines, x, y) => {
+      const rc = lwRect(el), er = el.getBoundingClientRect(), pin = tipNarrow();
+      showTip(shortDate(rows[k].time), lines, rc.left + x, pin ? er.top : rc.top + y, er);
+    };
     c.subscribeCrosshairMove((prm) => {
       const k = prm && prm.time != null ? byTime.get(lwDay(prm.time)) : undefined;
       if (k == null || !prm.point) { paint(last); chartHideTip(); return; }
       paint(k);
-      const at = tradesAt(k);
+      let at = tradesAt(k), tk = k, x = prm.point.x;
+      if (!at.length) {
+        const m = (prm.hoveredObjectId != null && mk.find((g) => g.id === prm.hoveredObjectId)) || nearMark(prm.point.x, Math.max(10, barPx() / 2 + 6));
+        if (m) { tk = m.k; at = tradesAt(m.k); x = c.timeScale().logicalToCoordinate(m.k) ?? x; }
+      }
       if (!at.length) { chartHideTip(); return; }
-      const rc = el.getBoundingClientRect();
-      showTip(shortDate(rows[k].time), tradeTipLines(at), rc.left + prm.point.x, rc.top + prm.point.y);
+      tradeTip(tk, tradeTipLines(at), x, prm.point.y);
+    });
+    // Touch: a tap on or near a marker opens its trades (a long-press drags the crosshair, as in TradingView).
+    c.subscribeClick((prm) => {
+      if (!prm || !prm.point) return;
+      const m = nearMark(prm.point.x, Math.max(16, barPx() / 2 + 8)); if (!m) return;
+      const x = c.timeScale().logicalToCoordinate(m.k); if (x == null) return;
+      paint(m.k); tradeTip(m.k, tradeTipLines(tradesAt(m.k)), x, s.priceToCoordinate(rows[m.k].c) ?? prm.point.y);
     });
     LW_KEYS.set(el, (di) => {
       const k = rowOf(rows, di), x = c.timeScale().timeToCoordinate(rows[k].time), y = s.priceToCoordinate(rows[k].c);
       paint(k); if (x == null || y == null) return;
-      const rc = el.getBoundingClientRect();
-      showTip(`${tipVal(rows[k].c, idx ? 'index' : 'price')} · ${shortDate(rows[k].time)}`, tradeTipLines(tradesAt(k)), rc.left + x, rc.top + y);
+      const rc = lwRect(el), at = tradesAt(k);
+      showTip(`${tipVal(rows[k].c, idx ? 'index' : 'price')} · ${shortDate(rows[k].time)}`, tradeTipLines(at), rc.left + x, at.length && tipNarrow() ? el.getBoundingClientRect().top : rc.top + y, el.getBoundingClientRect());
     });
-    // Zoom / pan reset: double-click, the ↺ button, or the axes' own double-click.
-    const fit = () => { c.timeScale().fitContent(); c.priceScale('right').applyOptions({ autoScale: true }); };
+    // Fit = every bar plus ~28px of room on each side (markers + their text on the first / last bar).
+    // Zoom / pan reset: double-click on the plot or the ↺ button.
+    let fitR = null;
+    const fit = () => {
+      const w = Math.max(120, c.timeScale().width() || el.clientWidth - 64), pad = Math.max(1.5, 28 * rows.length / Math.max(60, w - 56));
+      fitR = { from: -pad, to: last + pad };
+      c.timeScale().setVisibleLogicalRange(fitR); c.priceScale('right').applyOptions({ autoScale: true });
+    };
     reset.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); fit(); });
     if (typeof c.subscribeDblClick === 'function') c.subscribeDblClick(fit);
     fit();
-    c.timeScale().subscribeVisibleLogicalRangeChange((r) => { reset.hidden = !r || (r.from <= 0.5 && r.to >= last - 0.5); applyMarkers(); });
+    c.timeScale().subscribeVisibleLogicalRangeChange((r) => {
+      reset.hidden = !r || !fitR || (Math.abs(r.from - fitR.from) < 1 && Math.abs(r.to - fitR.to) < 1);
+      applyMarkers();
+    });
+    applyMarkers();
   }
 
   /* ---- Routing + render. Existing routes keep working (/portfolios, /stocks, /portfolio/:id,
@@ -2025,6 +2142,7 @@
     if (S.loading) { main.innerHTML = `<div class="card empty" role="status"><h3>${L('Reading disclosures…', 'جارٍ قراءة الإفصاحات…')}</h3><p>${L('Preparing the evidence for your workspace.', 'جارٍ تحميل بيانات المحافظ والأسهم.')}</p></div>`; return; }
     const pages = { notfound: () => emptyCard(L('Page not found', 'الصفحة غير موجودة'), L('Check the address, or start from Discover.', 'تحقق من العنوان أو ابدأ من صفحة اكتشف.'), `<a class="btn btn-primary" href="/" data-nav="discover">${L('Discover', 'اكتشف')}</a>`), discover: pageDiscover, portfolios: pagePortfolios, portfolio: () => pagePortfolio(S.id), stocks: pageStocks, stock: () => pageStock(S.id), alerts: pageAlerts, following: pageFollowing, account: pageAccount, methodology: pageMethodology };
     main.innerHTML = (pages[S.page] || pageDiscover)() + pageFooter();
+    if (S.page === 'stock') ensureOhlc(S.id);
     mountTradeCharts();
   }
 

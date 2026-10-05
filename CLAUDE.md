@@ -40,9 +40,17 @@ static image, never a second renderer. All charts behave identically:
   `data-ohlc`, `data-marks`, `data-title`). LW mounts on EVERY size; if the library
   is missing/offline/throws, the SVG + scrub stay exactly as rendered (jsdom QA
   runs this path). Every re-render `remove()`s old instances and the observer.
+- **Prices payload.** `/api/prices` returns **closes only** (`{d,c}`) for every
+  ticker (Vercel caps a response at 4.5 MB; `test/prices-shape.test.js` guards
+  it). The stock page fetches its one ticker's OHLCV via
+  `/api/prices?ticker=X&ohlc=1` (`ensureOhlc`) — never put OHLCV back in the
+  all-tickers payload.
 - **Detail charts (`mz-chart--full`)** — candlesticks + volume **only from real
   cached OHLC** (every point has o/h/l; never flat candles made from closes),
-  otherwise an area line; the portfolio index is always a line. TradingView-style
+  otherwise an area line; the portfolio index is always a line. Edges are not
+  pinned: the fit leaves ~28px each side so first/last-bar markers are whole.
+  No in-canvas TradingView logo; the licence credit is a text link
+  (`lwCredit()`, legend line / above the footer). TradingView-style
   legend (date · O H L C · change vs prior close), crosshair with axis labels,
   dated LTR time axis (also in Arabic), ticker watermark; drag pans, pinch /
   axis-drag zooms, the wheel and vertical swipes keep scrolling the page,
@@ -52,8 +60,11 @@ static image, never a second renderer. All charts behave identically:
 - **Trade markers (detail charts)** — one per (trade date, side) at the **trade
   date**: ▲ bought (cobalt, below), ▼ sold (ink, above), ● 13F "held at quarter
   end" (never "bought"). Trades outside the series are not drawn (snap ≤ 4 days).
-  The tooltip lists each trade's **trade date and public (filing) date** + lag +
-  amount; one legend line under the chart (`tradeLegend(series, marks)`) counts
+  Marker text only where it fits (newest first, else "×N"). Hovering or tapping
+  within ~10–16px of a marker opens the tooltip: per (side, trade date, public
+  date) one head line with the **trade date and public (filing) date** + lag, then
+  one line of names + amounts (4, 2 on phones, then "+N"); pinned above the chart
+  on phones. One legend line under the chart (`tradeLegend(series, marks)`) counts
   buys / sells / 13F positions in the period with their date ranges.
 - **Respects the active timeframe** (1W … All) via `sliceTf()` reading `S.tf`.
 - **Neutral styling** — cobalt / ink only (up candle + buy = cobalt, down + sell =
