@@ -50,9 +50,11 @@ static image, never a second renderer. All charts behave identically:
   it). The stock page fetches its one ticker's OHLCV via
   `/api/prices?ticker=X&ohlc=1` (`ensureOhlc`) — never put OHLCV back in the
   all-tickers payload.
-- **Detail charts (`mz-chart--full`)** — candlesticks + volume **only from real
-  cached OHLC** (every point has o/h/l; never flat candles made from closes),
-  otherwise an area line; the portfolio index is always a line. Edges are not
+- **Detail charts (`mz-chart--full`)** — **owner choice 2026-10-06: every chart,
+  stock pages included, is the green/red area line** (`STOCK_CANDLES = false` in
+  `public/app.js`, so `ensureOhlc` is not called). The candle path stays behind
+  that switch: candlesticks + volume **only from real cached OHLC** (every point
+  has o/h/l; never flat candles made from closes). The portfolio index is always a line. Edges are not
   pinned: the fit leaves ~28px each side so first/last-bar markers are whole.
   No in-canvas TradingView logo; the licence credit is a text link
   (`lwCredit()`, legend line / above the footer). TradingView-style

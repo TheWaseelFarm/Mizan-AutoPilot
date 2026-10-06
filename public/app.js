@@ -577,6 +577,9 @@
   // Full OHLCV for ONE ticker, fetched when its stock page opens: /api/prices stays closes-only for
   // every page load (web + mobile), and only the stock detail chart draws candles. Without cached
   // open/high/low the chart simply stays a line (never fabricated candles).
+  // Owner choice (2026-10-06): every chart, stock pages included, is the green/red line style; candles
+  // stay available behind this switch (OHLCV is still stored and served per ticker).
+  const STOCK_CANDLES = false;
   const OHLC_URL = (tk) => `/api/prices?ticker=${encodeURIComponent(tk)}&ohlc=1`;
   // While a ticker's OHLCV is in flight its detail chart keeps the SVG layer (no line-then-candles flash).
   const OHLC_ASKED = new Set(), OHLC_PENDING = new Set();
@@ -2242,7 +2245,7 @@
     if (S.loading) { main.innerHTML = `<div class="card empty" role="status"><h3>${L('Reading disclosures…', 'جارٍ قراءة الإفصاحات…')}</h3><p>${L('Preparing the evidence for your workspace.', 'جارٍ تحميل بيانات المحافظ والأسهم.')}</p></div>`; return; }
     const pages = { notfound: () => emptyCard(L('Page not found', 'الصفحة غير موجودة'), L('Check the address, or start from Discover.', 'تحقق من العنوان أو ابدأ من صفحة اكتشف.'), `<a class="btn btn-primary" href="/" data-nav="discover">${L('Discover', 'اكتشف')}</a>`), discover: pageDiscover, portfolios: pagePortfolios, portfolio: () => pagePortfolio(S.id), stocks: pageStocks, stock: () => pageStock(S.id), alerts: pageAlerts, following: pageFollowing, account: pageAccount, methodology: pageMethodology };
     main.innerHTML = (S.page === 'stock' || S.page === 'portfolio' ? backLink() : '') + (pages[S.page] || pageDiscover)() + pageFooter();
-    if (S.page === 'stock') ensureOhlc(S.id);
+    if (STOCK_CANDLES && S.page === 'stock') ensureOhlc(S.id);
     mountTradeCharts();
   }
 
