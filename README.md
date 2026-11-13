@@ -62,7 +62,8 @@ and `SCREENING_API_KEY` blank for now. Deploy.
 `AUTH_SECRET` must have at least 16 non-padding characters and must not be
 `change-me-random`. An unset or invalid value makes login return 500 and protected
 routes return 401. An unset or blank `CRON_SECRET` makes all cron endpoints return
-503. Changing `AUTH_SECRET` invalidates existing sessions; sign in again.
+503. Changing `AUTH_SECRET`, `ADMIN_USERNAME` or `ADMIN_PASSWORD_HASH` invalidates
+existing sessions; sign in again.
 Keep `AUTH_SALT` identical to the salt used to generate `ADMIN_PASSWORD_HASH`.
 
 Login throttling is best effort per warm serverless instance, not a deployment-wide
