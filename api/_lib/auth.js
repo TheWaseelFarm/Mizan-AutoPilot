@@ -36,6 +36,14 @@ export function checkCredentials(username, password) {
   return okUser && okPass;
 }
 
+// Session tokens are signed with a key bound to the current admin credentials, so changing
+// ADMIN_USERNAME or ADMIN_PASSWORD_HASH logs out every existing session (as does AUTH_SECRET).
+function signingKey(secret) {
+  return crypto.createHmac("sha256", secret)
+    .update(`mizan-session\0${process.env.ADMIN_USERNAME || ""}\0${process.env.ADMIN_PASSWORD_HASH || ""}`)
+    .digest();
+}
+
 export function issueToken(username, ttlHours = 168) {
   const secret = SECRET();
   if (!secret) throw new Error("Auth not configured");
@@ -44,7 +52,7 @@ export function issueToken(username, ttlHours = 168) {
     throw new Error("Invalid token payload");
   }
   const payload = `${username}.${exp}`;
-  const sig = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+  const sig = crypto.createHmac("sha256", signingKey(secret)).update(payload).digest("hex");
   return Buffer.from(`${payload}.${sig}`).toString("base64url");
 }
 
@@ -61,7 +69,7 @@ export function verifyToken(token) {
     const exp = raw.slice(expIndex + 1, sigIndex);
     const sig = raw.slice(sigIndex + 1);
     if (!exp.trim() || !Number.isFinite(Number(exp)) || Date.now() >= Number(exp)) return null;
-    const expected = crypto.createHmac("sha256", secret).update(raw.slice(0, sigIndex)).digest("hex");
+    const expected = crypto.createHmac("sha256", signingKey(secret)).update(raw.slice(0, sigIndex)).digest("hex");
     if (!safeEqualHex(sig, expected)) return null;
     return { username };
   } catch { return null; }

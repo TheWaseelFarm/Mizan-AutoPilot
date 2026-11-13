@@ -44,7 +44,9 @@ function response() {
   };
 }
 function signed(payload) {
-  const sig = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+  const key = crypto.createHmac("sha256", secret)
+    .update(`mizan-session\0${process.env.ADMIN_USERNAME}\0${process.env.ADMIN_PASSWORD_HASH}`).digest();
+  const sig = crypto.createHmac("sha256", key).update(payload).digest("hex");
   return Buffer.from(`${payload}.${sig}`).toString("base64url");
 }
 function request(body, ip = "login-test") {
@@ -74,6 +76,19 @@ await test("invalid auth configuration fails closed", () => {
     assert.equal(verifyToken(token), null);
     assert.equal(requireAuth({ headers: { authorization: `Bearer ${token}` } }), null);
   }
+});
+await test("changing admin credentials invalidates existing sessions", () => {
+  assert.deepEqual(verifyToken(signed(`admin.${Date.now() + 60000}`)), { username: "admin" });
+  const token = issueToken("admin.name");
+  assert.deepEqual(verifyToken(token), { username: "admin.name" });
+  process.env.ADMIN_PASSWORD_HASH = hashPassword("new-password");
+  assert.equal(verifyToken(token), null);
+  assert.deepEqual(verifyToken(issueToken("admin.name")), { username: "admin.name" });
+  const renamed = issueToken("admin.name");
+  process.env.ADMIN_USERNAME = "new.admin";
+  assert.equal(verifyToken(renamed), null);
+  const legacy = crypto.createHmac("sha256", secret).update(`admin.${Date.now() + 60000}`).digest("hex");
+  assert.equal(verifyToken(Buffer.from(`admin.${Date.now() + 60000}.${legacy}`).toString("base64url")), null);
 });
 await test("credential hashing remains compatible", () => {
   assert.equal(hashPassword("password"), crypto.createHash("sha256").update("passwordtest-salt").digest("hex"));
