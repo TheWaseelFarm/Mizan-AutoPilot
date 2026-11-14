@@ -7,10 +7,12 @@ name: Mizān cron
 # (its value MUST equal the CRON_SECRET env var in Vercel).
 # Run any job on demand from the Actions tab (Run workflow).
 
+# Schedule DISABLED (2026-11-14): the Vercel deployment was deleted, so every run would fail.
+# To re-enable after redeploying, restore under `on:`:
+#   schedule:
+#     - cron: '*/30 * * * *'   # ingest: new filings + prices, every 30 min (UTC)
+#     - cron: '0 7 * * *'      # screening: rescreen, daily at 07:00 UTC
 on:
-  schedule:
-    - cron: '*/30 * * * *'   # ingest: new filings + prices, every 30 min (UTC)
-    - cron: '0 7 * * *'      # screening: rescreen, daily at 07:00 UTC
   workflow_dispatch: {}
 
 concurrency:
