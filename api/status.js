@@ -6,6 +6,7 @@
 // Hit it on your phone: https://<app>.vercel.app/api/status
 import { supabase } from "./_lib/supabase.js";
 import { isAuthConfigured } from "./_lib/auth.js";
+import { screeningProvider, usingLiveScreener } from "./_lib/screening/index.js";
 
 const has = (k) => !!(process.env[k] && String(process.env[k]).trim());
 
@@ -17,8 +18,8 @@ export default async function handler(_req, res) {
     fmp: has("FMP_API_KEY"),                 // real disclosures (SEC/Congress) via FMP
     twelvedata: has("TWELVEDATA_API_KEY"),   // real prices (Twelve Data; FMP prices are paywalled)
     quiver: has("QUIVER_API_KEY"),
-    screening: has("SCREENING_API_KEY"),     // real AAOIFI screening (Zoya / Halal Terminal)
-    screeningProvider: process.env.SCREENING_PROVIDER || (has("SCREENING_API_KEY") ? "(configured)" : "mock"),
+    screening: usingLiveScreener(),          // real AAOIFI inputs (Halal Terminal / Zoya / SEC EDGAR)
+    screeningProvider: usingLiveScreener() ? screeningProvider() : "mock",
     cronSecret: has("CRON_SECRET"),
     authSecret: isAuthConfigured(),
   };
@@ -92,7 +93,7 @@ export default async function handler(_req, res) {
     const notes = [];
     if (!realDisclosures) notes.push("No disclosures cached — the app falls back to embedded SAMPLE data. Call /api/poll-disclosures with the header 'Authorization: Bearer <CRON_SECRET>' (needs FMP_API_KEY) to ingest real filings.");
     if (realDisclosures && !realPrices) notes.push("No prices cached — returns show 'indicative' and charts read 'Pending' until /api/refresh-prices is called with the header 'Authorization: Bearer <CRON_SECRET>' (needs FMP_API_KEY).");
-    if (realDisclosures && !config.screening) notes.push("SCREENING_API_KEY unset — verdicts use the MOCK screening adapter. Set the key (Zoya / Halal Terminal) for real AAOIFI ratios, then /api/rescreen.");
+    if (realDisclosures && !config.screening) notes.push("No live screening source — verdicts use the MOCK screening adapter. Set SCREENING_API_KEY (Halal Terminal / Zoya), or SCREENING_PROVIDER=edgar with SEC_USER_AGENT + TWELVEDATA_API_KEY, then /api/rescreen.");
     out.summary = realDisclosures
       ? `Serving REAL data: ${disclosures} disclosures (${screened ?? "?"} screened), ${prices ?? 0} price series cached.`
       : "Not serving real data yet — see notes.";
