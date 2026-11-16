@@ -1,13 +1,16 @@
 // api/_lib/screening/index.js
-// Screening resolver + cache. Picks the live adapter when SCREENING_API_KEY is set,
-// otherwise falls back to the mock adapter so the app keeps working without a key.
+// Screening resolver + cache. Picks the live adapter when its key is set, otherwise falls back
+// to the mock adapter so the app keeps working without a key.
 //
-// Provider is chosen by SCREENING_PROVIDER ("halalterminal" (default) | "zoya"). Halal
-// Terminal is the v1 provider (spec §7); Zoya is kept as an alternative adapter.
+// Provider is chosen by SCREENING_PROVIDER ("halalterminal" (default) | "zoya" | "edgar").
+// Halal Terminal is the v1 provider (spec §7); Zoya is kept as an alternative adapter. Both need
+// SCREENING_API_KEY. "edgar" computes the ratios from the company's own 10-K (SEC EDGAR) and
+// needs SEC_USER_AGENT + TWELVEDATA_API_KEY instead — see ./edgar.js.
 //
 // Every adapter returns RAW inputs (business activity, impure %, debt %, cash %) — NEVER a
 // vendor pass/fail verdict. AAOIFI (api/_lib/aaoifi.js) is the only thing that decides the
 // verdict; it is not touched here.
+import { screen as edgarScreen } from "./edgar.js";
 import { screen as halalTerminalScreen } from "./halalterminal.js";
 import { screen as mockScreen } from "./mock.js";
 import { screen as zoyaScreen } from "./zoya.js";
@@ -16,11 +19,14 @@ const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 
 const LIVE_ADAPTERS = { halalterminal: halalTerminalScreen, zoya: zoyaScreen };
 
-export const usingLiveScreener = () => !!process.env.SCREENING_API_KEY;
+const set = (k) => !!String(process.env[k] || "").trim();
+export const screeningProvider = () => String(process.env.SCREENING_PROVIDER || "halalterminal").toLowerCase();
+const usingEdgar = () => screeningProvider() === "edgar" && set("SEC_USER_AGENT") && set("TWELVEDATA_API_KEY");
+export const usingLiveScreener = () => usingEdgar() || (screeningProvider() !== "edgar" && set("SCREENING_API_KEY"));
 export function activeScreener() {
   if (!usingLiveScreener()) return mockScreen;
-  const provider = String(process.env.SCREENING_PROVIDER || "halalterminal").toLowerCase();
-  return LIVE_ADAPTERS[provider] || halalTerminalScreen;
+  if (usingEdgar()) return edgarScreen;
+  return LIVE_ADAPTERS[screeningProvider()] || halalTerminalScreen;
 }
 
 // Inert "unscreened" payload. Reasoning starts with the "No screening data" marker so
