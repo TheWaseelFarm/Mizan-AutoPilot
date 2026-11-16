@@ -1,4 +1,4 @@
-// GET /api/rescreen?secret=CRON_SECRET
+// GET /api/rescreen   with header  Authorization: Bearer <CRON_SECRET>
 // Backfill: force re-screens the distinct tickers in `disclosures` (e.g. after enabling the
 // Zoya key), refreshing the screenings cache AND each disclosure's stored screening fields
 // + AAOIFI label. Idempotent and batched (<=25/invocation) so it can be called

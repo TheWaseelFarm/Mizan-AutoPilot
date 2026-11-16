@@ -72,7 +72,7 @@ async function run(query = {}) {
     code: undefined, body: undefined,
     status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; },
   };
-  await poll({ method: "GET", headers: {}, query: { secret, ...query } }, res);
+  await poll({ method: "GET", headers: { authorization: `Bearer ${secret}` }, query }, res);
   assert.equal(res.code, 200);
   return res.body;
 }

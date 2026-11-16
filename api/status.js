@@ -90,8 +90,8 @@ export default async function handler(_req, res) {
     out.readiness = { realDisclosures, realPrices, realScreening };
 
     const notes = [];
-    if (!realDisclosures) notes.push("No disclosures cached — the app falls back to embedded SAMPLE data. Run /api/poll-disclosures?secret=CRON_SECRET (needs FMP_API_KEY) to ingest real filings.");
-    if (realDisclosures && !realPrices) notes.push("No prices cached — returns show 'indicative' and charts read 'Pending' until /api/refresh-prices?secret=CRON_SECRET runs (needs FMP_API_KEY).");
+    if (!realDisclosures) notes.push("No disclosures cached — the app falls back to embedded SAMPLE data. Call /api/poll-disclosures with the header 'Authorization: Bearer <CRON_SECRET>' (needs FMP_API_KEY) to ingest real filings.");
+    if (realDisclosures && !realPrices) notes.push("No prices cached — returns show 'indicative' and charts read 'Pending' until /api/refresh-prices is called with the header 'Authorization: Bearer <CRON_SECRET>' (needs FMP_API_KEY).");
     if (realDisclosures && !config.screening) notes.push("SCREENING_API_KEY unset — verdicts use the MOCK screening adapter. Set the key (Zoya / Halal Terminal) for real AAOIFI ratios, then /api/rescreen.");
     out.summary = realDisclosures
       ? `Serving REAL data: ${disclosures} disclosures (${screened ?? "?"} screened), ${prices ?? 0} price series cached.`

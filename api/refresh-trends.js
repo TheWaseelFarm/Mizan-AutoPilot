@@ -1,4 +1,4 @@
-// GET /api/refresh-trends?secret=CRON_SECRET
+// GET /api/refresh-trends   with header  Authorization: Bearer <CRON_SECRET>
 // Rebuilds the smart_money_trends cache from disclosures (spec §A3) so the Stocks tab never
 // aggregates raw trades on every request. Idempotent: recomputes all (ticker,timeframe,side)
 // rows and upserts them. Returns a summary. Tolerates the table being absent.

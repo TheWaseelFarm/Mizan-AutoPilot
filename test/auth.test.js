@@ -115,15 +115,20 @@ await test("cron rejects unconfigured secrets", () => {
     assert.equal(res.code, 503);
   }
 });
-await test("cron header and query contracts", () => {
+await test("cron accepts header credentials only", () => {
   for (const req of [
-    { query: { secret } },
     { headers: { "x-cron-secret": secret } },
     { headers: { authorization: `Bearer ${secret}` } },
   ]) {
     const res = response();
     assert.equal(requireCron(req, res), true);
     assert.equal(res.code, undefined);
+  }
+  // The correct secret in the query string is rejected: URLs are logged, headers are not.
+  for (const req of [{ query: { secret } }, { headers: {}, query: { secret } }]) {
+    const res = response();
+    assert.equal(requireCron(req, res), false);
+    assert.equal(res.code, 401);
   }
   for (const req of [{}, { query: { secret: "wrong" } }, { query: { secret: "x".repeat(secret.length) } }, { query: { secret: [secret] } }, { headers: { "x-cron-secret": [secret] } }, { headers: { authorization: [secret] } }]) {
     const res = response();

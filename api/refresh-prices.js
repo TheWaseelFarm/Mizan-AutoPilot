@@ -1,4 +1,4 @@
-// GET /api/refresh-prices?secret=CRON_SECRET
+// GET /api/refresh-prices   with header  Authorization: Bearer <CRON_SECRET>
 // Refreshes cached quotes + daily history (via Twelve Data) for the distinct tickers in
 // `disclosures` that are DUE — never fetched, or last touched on an earlier UTC day (so at most
 // ONE provider call per ticker per day; no weekend refreshes; tickers that never succeeded retry
