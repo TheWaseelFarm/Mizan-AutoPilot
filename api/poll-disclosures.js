@@ -1,4 +1,4 @@
-// GET /api/poll-disclosures?secret=CRON_SECRET
+// GET /api/poll-disclosures   with header  Authorization: Bearer <CRON_SECRET>
 // Triggered by cron-job.org (e.g. every 5 min). Ingest -> screen -> classify -> store.
 // De-dupes on a unique key so re-runs are idempotent.
 import { requireCron } from "./_lib/cron.js";

@@ -75,9 +75,12 @@ legacy SHA-256 + global salt password hash to scrypt/PBKDF2 remain follow-up wor
 **5. Open your Vercel URL** (https://mizan-auto-pilot.vercel.app). The feed loads from
 Supabase (the seed). Done — it's live.
 
-**6. Cron** → on cron-job.org add a job hitting, every 5 minutes:
+**6. Cron** → schedule a call every 5 minutes (GitHub Actions: `.github/workflows/mizan-cron.yml`;
+on cron-job.org add the same request header under the job's *Headers*). The secret goes in a
+header, never in the URL — a `?secret=` query is rejected with 401, because URLs end up in
+access logs, browser history and Referer headers:
 ```
-https://<your-app>.vercel.app/api/poll-disclosures?secret=<CRON_SECRET>
+curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>.vercel.app/api/poll-disclosures
 ```
 On the mock source this is idempotent (first run inserts, later runs insert 0).
 
@@ -86,7 +89,7 @@ cron a few times a day hitting `refresh-prices`. It batches oldest-first and sel
 the FMP quota. Until it runs, the app shows clearly-labelled **sample** performance; once real
 closes are cached the "sample" tags clear themselves automatically — no code change.
 ```
-https://<your-app>.vercel.app/api/refresh-prices?secret=<CRON_SECRET>
+curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>.vercel.app/api/refresh-prices
 ```
 Note: `poll-disclosures` also uses the FMP key for real Senate/House filings — every 5 min is
 576 calls/day (over the free cap), so run it hourly or less once the key is live.
@@ -109,7 +112,7 @@ To go from sample → real: (1) set `SUPABASE_*` and apply `supabase/schema.sql`
 AAOIFI ratios (else the mock screener runs). The app **never fabricates** — until a table is
 populated it shows a clearly-labelled *Sample* / *Pending* state.
 
-| Cron (cron-job.org → `?secret=CRON_SECRET`) | Fills | Needs |
+| Cron (header `Authorization: Bearer <CRON_SECRET>`) | Fills | Needs |
 | --- | --- | --- |
 | `/api/poll-disclosures` | `disclosures` (+ screening cache) | `FMP_API_KEY` |
 | `/api/refresh-prices`   | `prices` (charts + returns)      | `FMP_API_KEY` |
